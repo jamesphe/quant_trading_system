@@ -1,0 +1,10 @@
+/__pycache__
+/backtrader.log
+/backtrader_optimizer.log
+/buy_signals_latest_day.xlsx
+/current_trade_suggestions.csv
+/macd_strategy_optimized.log
+/optimization_results.csv
+/requirements.txt
+/test_best_parameters.log
+/trade_signals.log
