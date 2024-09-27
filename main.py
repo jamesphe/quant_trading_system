@@ -78,10 +78,10 @@ if __name__ == '__main__':
         cerebro.addstrategy(
             strat,
             atr_period=14,
-            atr_multiplier=1.0,
-            use_close=False,
+            atr_multiplier=2.0,
+            use_close=True,
             printlog=True,
-            investment_fraction=0.5,  # 每次交易使用可用资金的比例
+            investment_fraction=0.8,  # 每次交易使用可用资金的比例
             max_pyramiding=2                # 允许最多加仓2次
         )
 
@@ -155,9 +155,18 @@ if __name__ == '__main__':
 
         # 获取策略实例的 closed_trades
         print("\n交易记录:")
-        if hasattr(strat_result, 'closed_trades') and strat_result.closed_trades:
-            for idx, trade_pnl in enumerate(strat_result.closed_trades, 1):
-                print(f"交易 {idx}: 盈亏: {trade_pnl:.2f}")
+        closed_trades = strat_result.trades
+        if closed_trades:
+            for idx, trade in enumerate(closed_trades, 1):
+                print(f"交易 {idx}:")
+                print(f"  开仓时间: {bt.num2date(trade.dtopen)}")
+                print(f"  收仓时间: {bt.num2date(trade.dtclose)}")
+                print(f"  开仓价格: {trade.price:.2f}")
+                print(f"  交易数量: {trade.size}")
+                print(f"  交易方向: {'多头' if trade.size > 0 else '空头'}")
+                print(f"  交易成本: {trade.commission:.2f}")
+                print(f"  交易盈亏: {trade.pnlcomm:.2f}")
+                print("-" * 30)
         else:
             print("无交易记录。")
         print("-" * 40)
@@ -227,7 +236,7 @@ if __name__ == '__main__':
         fig.canvas.mpl_connect('button_press_event', on_right_click)
         
         # 显示图表
-        plt.show()
+        #plt.show()
 
     # 打印所有策略的结果
     print("\n策略回测结果总览：")

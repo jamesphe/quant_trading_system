@@ -1,8 +1,5 @@
-# strategies/chandelier_exit_strategy.py
-
 import backtrader as bt
-import backtrader.indicators as btind
-
+import datetime
 
 class ChandelierExitStrategy(bt.Strategy):
     params = (
@@ -15,128 +12,123 @@ class ChandelierExitStrategy(bt.Strategy):
     )
 
     def __init__(self):
-        # 初始化价格数据
-        self.dataclose = self.datas[0].close
-        self.datahigh = self.datas[0].high
+        # 计算 ATR
+        self.atr = bt.indicators.AverageTrueRange(period=self.params.atr_period)
+        self.atr_value = self.params.atr_multiplier * self.atr
 
-        # ATR 指标
-        self.atr = btind.ATR(self.datas[0], period=self.params.atr_period)
-
-        # 多头停止点
+        # 计算最高高点或最高收盘价
         if self.params.use_close:
-            self.highest = btind.Highest(self.datas[-1].close, period=self.params.atr_period)
+            self.highest = bt.indicators.Highest(self.data.close, period=self.params.atr_period)
+            self.lowest = bt.indicators.Lowest(self.data.close, period=self.params.atr_period)
         else:
-            self.highest = btind.Highest(self.datas[-1].high, period=self.params.atr_period)
-        self.long_stop = self.highest - self.params.atr_multiplier * self.atr
-        
-        # 前一个周期的多头停止点
-        self.long_stop_prev = self.long_stop(-1)
-        
-        # 更新多头停止点
-        self.long_stop = bt.If(
-            self.data.close(-1) > self.long_stop_prev,
-            bt.Max(self.long_stop, self.long_stop_prev),
-            self.long_stop
-        )
+            self.highest = bt.indicators.Highest(self.data.high, period=self.params.atr_period)
+            self.lowest = bt.indicators.Lowest(self.data.low, period=self.params.atr_period)
 
-        # 记录止损价
-        self.stop_price = None
+        # 初始化长短止损
+        self.long_stop = self.highest - self.atr_value
+        self.short_stop = self.lowest + self.atr_value
 
-        # 记录订单状态
-        self.order = None
+        # 方向: 1 = 多头, -1 = 空头
+        self.direction = 1  # 初始方向为多头
 
-        # 初始化已关闭交易列表
-        self.closed_trades = []
+        # 设置允许的最大加仓次数
+        self.max_pyramiding = self.params.max_pyramiding
+        self.current_pyramiding = 0  # 当前加仓次数
 
-        # 初始化买入信号列表
-        self.buy_signals = []
-
-        # 方向变量
-        self.direction = -1  # -1 表示空头方向，1 表示多头方向
+        self.trades = []  # 用于存储交易记录
 
     def log(self, txt, dt=None):
-        ''' 日志函数，用于调试 '''
+        ''' 日志记录功能 '''
         if self.params.printlog:
             dt = dt or self.datas[0].datetime.date(0)
             print(f'{dt.isoformat()} {txt}')
 
+    def next(self):
+        # 获取当前价格和前一个价格
+        current_close = self.data.close[0]
+        prev_close = self.data.close[-1]
+
+        # 获取前一个周期的止损值
+        prev_long_stop = self.long_stop[-1]
+        prev_short_stop = self.short_stop[-1]
+
+        # 更新长止损
+        if prev_close > prev_long_stop:
+            self.long_stop[0] = max(self.long_stop[0], prev_long_stop)
+        else:
+            self.long_stop[0] = self.long_stop[0]
+
+        # 更新短止损
+        if prev_close < prev_short_stop:
+            self.short_stop[0] = min(self.short_stop[0], prev_short_stop)
+        else:
+            self.short_stop[0] = self.short_stop[0]
+
+        # 确定当前方向
+        if current_close > prev_short_stop:
+            new_direction = 1  # 多头
+        elif current_close < prev_long_stop:
+            new_direction = -1  # 空头
+        else:
+            new_direction = self.direction  # 保持原方向
+
+        # 检查方向变化
+        direction_changed = new_direction != self.direction
+        self.direction = new_direction
+
+        # 获取当前持仓数量
+        current_positions = self.position.size
+
+        # 计算每次交易的资金量
+        available_cash = self.broker.getcash() * self.params.investment_fraction
+        stake = int((available_cash * self.params.investment_fraction) / current_close)
+
+        # 处理多头方向
+        if self.direction == 1:
+            # 检查是否可以买入或加仓
+            if not self.position:  # 如果当前未持仓
+                self.buy(size=stake)
+                self.current_pyramiding = 1
+                self.log(f'买入信号 - 价格: {current_close:.2f}, 首次建仓')
+            elif self.current_pyramiding < self.max_pyramiding and current_close > self.position.price * 1.02:
+                # 如果当前收盘价高于持仓价的2%，且未达到最大加仓次数，则加仓
+                self.buy(size=stake)
+                self.current_pyramiding += 1
+                self.log(f'加仓信号 - 价格: {current_close:.2f}, 加仓次数: {self.current_pyramiding}')
+        
+        # 处理空头方向
+        elif self.direction == -1:
+            if direction_changed:
+                # 如果方向变化为空头，清空多头仓位
+                if self.position.size > 0:
+                    self.close()  # 平多头仓位
+                    self.log(f'平多头仓位, 价格: {current_close:.2f}')
+                    self.current_pyramiding = 0  # 重置加仓次数
+
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
-            # 订单已提交/接受，不做任何处理
-            self.log(f'订单状态更新: {order.getstatusname(order.status)}')
+            # 订单已提交/接受，但尚未执行
             return
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log(f'买入执行: 价格: {order.executed.price:.2f}, 数量: {order.executed.size}')
-                # 记录买入信号
-                self.buy_signals.append({
-                    'Date': self.datas[0].datetime.date(0),
-                    'Buy Price': order.executed.price
-                })
-                # 方向从非多头（-1）转为多头（1）
-                if self.direction != 1:
-                    self.direction = 1
-                    self.log('方向改变为多头')
+                self.log(f'买入执行, 价格: {order.executed.price:.2f}')
             elif order.issell():
-                self.log(f'卖出执行: 价格: {order.executed.price:.2f}, 数量: {order.executed.size}')
-                # 方向从多头（1）转为空头（-1）
-                if self.direction != -1:
-                    self.direction = -1
-                    self.log('方向改变为空头')
-            self.order = None  # 重置订单状态
+                self.log(f'卖出执行, 价格: {order.executed.price:.2f}')
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log(f'订单取消/保证金不足/拒绝: {order.getstatusname(order.status)}')
-            self.order = None  # 重置订单状态
-        else:
-            self.log(f'未知订单状态: {order.getstatusname(order.status)}')
+            self.log('订单取消/保证金不足/拒单')
 
     def notify_trade(self, trade):
         if trade.isclosed:
-            self.log(f'交易关闭: 盈亏={trade.pnl:.2f}, 手续费={trade.pnlcomm:.2f}')
-            self.closed_trades.append(trade.pnl)
-
-    def next(self):
-        """策略的核心逻辑"""
-        # 更新止损价
-        #self.long_stop = self.highest[0] - self.params.atr_multiplier * self.atr[0]
-
-        # 检查是否已经有订单待处理
-        if self.order:
-            return
-
-        # 买入信号
-        if self.dataclose[0] > self.long_stop[0]:
-            if self.direction != 1:
-                # 方向从空头转为多头，开始建仓
-                self.log(f'检测到方向从空头转为多头，准备建仓。当前收盘价: {self.dataclose[0]:.2f}, 当前止损线: {self.long_stop[0]:.2f}')
-                # 计算可用资金
-                available_cash = self.broker.getcash()
-                # 可用资金的比例用于购买
-                investment = available_cash * self.params.investment_fraction
-                # 计算可购买的最大股数
-                size = int(investment / self.dataclose[0])
-
-                # 检查是否允许加仓
-                if self.params.max_pyramiding > 0 and self.position.size > 0:
-                    max_allowed = self.params.max_pyramiding - self.position.size
-                    if max_allowed > 0:
-                        size = min(size, max_allowed)
-
-                # 如果可购买股数大于0，创建买入订单
-                if size > 0:
-                    self.log(f'创建买入订单: 价格: {self.dataclose[0]:.2f}, 数量: {size}')
-                    self.order = self.buy(size=size)
-                else:
-                    self.log('可用资金不足或达到加仓限制，无法买入')
-
-        # 持仓时的止损逻辑
-        if self.position:
-            if self.dataclose[0] < self.long_stop:
-                self.log(f'触发止损卖出订单: 价格: {self.dataclose[0]:.2f}, 数量: {self.position.size}')
-                self.order = self.sell(size=self.position.size)
+            self.trades.append(trade)
+        super().notify_trade(trade)
 
     def stop(self):
-        if self.params.printlog:
-            self.log(f'策略结束时资金: {self.broker.getvalue():.2f}')
-            self.log(f'已关闭交易的盈亏列表: {self.closed_trades}')
+        print('交易记录:')
+        for trade in self.trades:
+            print(f'开仓时间: {bt.num2date(trade.dtopen)}, '
+                  f'收仓时间: {bt.num2date(trade.dtclose)}, '
+                  f'开仓价格: {trade.price:.2f}, '
+                  f'数量: {trade.size}, '
+                  f'佣金: {trade.commission:.2f}, '
+                  f'净盈亏: {trade.pnlcomm:.2f}')
