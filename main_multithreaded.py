@@ -9,7 +9,7 @@ import os
 import concurrent.futures
 
 # 导入策略
-from strategies.chandelier_exit_strategy import ChandelierExitStrategy
+from strategies.chandelier_zlsma_strategy import ChandelierZlSmaStrategy
 
 class AccountValue(bt.Observer):
     lines = ('value',)
@@ -52,13 +52,14 @@ def process_stock(stock_code, start_date, end_date, printlog):
 
     # 添加策略，并传递相关参数
     cerebro.addstrategy(
-        ChandelierExitStrategy,
-        atr_period=22,
-        atr_multiplier=3.0,
+        ChandelierZlSmaStrategy,
+        length=14,
+        mult=2,
         use_close=True,
+        zlsma_length=14,
         printlog=printlog,
-        investment_fraction=0.5,  # 每次交易使用可用资金的比例
-        max_pyramiding=2           # 允许最多加仓2次
+        investment_fraction=0.8,  # 每次交易使用可用资金的比例
+        max_pyramiding=2          # 允许最多加仓2次
     )
 
     # 设置初始资金
@@ -163,7 +164,7 @@ def main_multithreaded(start_date, end_date, printlog=False):
 
 if __name__ == '__main__':
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description='A股 Chandelier Exit 策略最新交易日买入信号筛选程序（多线程版）')
+    parser = argparse.ArgumentParser(description='A股 Chandelier ZLSMA 策略最新交易日买入信号筛选程序（多线程版）')
     parser.add_argument('--months', type=int, default=48, help='分析时长（月数）')
     parser.add_argument('--printlog', action='store_true', help='是否打印策略日志')
     args = parser.parse_args()

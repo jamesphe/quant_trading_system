@@ -7,7 +7,7 @@ import argparse
 from datetime import datetime, timedelta
 
 # 仅导入需要使用的策略
-from strategies import ChandelierExitStrategy
+from strategies import ChandelierZlSmaStrategy
 
 # 设置日志配置
 logging.basicConfig(
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     print(f"{'='*50}\n")
     
     # 定义策略列表
-    strategies = [ChandelierExitStrategy]
+    strategies = [ChandelierZlSmaStrategy]
 
     # 记录策略结果
     strategy_results = []
@@ -59,13 +59,11 @@ if __name__ == '__main__':
         # 定义数据源类
         class AkShareData(bt.feeds.PandasData):
             params = (
-                ('datetime', None),
-                ('open', 'Open'),
-                ('high', 'High'),
-                ('low', 'Low'),
-                ('close', 'Close'),
-                ('volume', 'Volume'),
-                ('openinterest', -1),
+                ('length', 14),         # ATR 和 Chandelier Exit 的周期
+                ('mult', 2),            # ATR 的倍数
+                ('use_close', True),    # 是否使用收盘价计算最高/最低
+                ('zlsma_length', 20),   # ZLSMA 的周期
+                ('printlog', False),    # 是否打印日志
             )
 
         # 为每个策略创建独立的数据源实例
@@ -77,12 +75,11 @@ if __name__ == '__main__':
         # 添加策略，传递相关参数
         cerebro.addstrategy(
             strat,
-            atr_period=14,
-            atr_multiplier=2.0,
+            length=14,
+            mult=2.0,
             use_close=True,
             printlog=True,
-            investment_fraction=0.8,  # 每次交易使用可用资金的比例
-            max_pyramiding=2                # 允许最多加仓2次
+            zlsma_length=20,
         )
 
         # 设置初始资金
@@ -153,23 +150,12 @@ if __name__ == '__main__':
         print(f"累计收益率: {cumulative_return:.2f}%")
         print("----------------------------------------")
 
-        # 获取策略实例的 closed_trades
-        print("\n交易记录:")
-        closed_trades = strat_result.trades
-        if closed_trades:
-            for idx, trade in enumerate(closed_trades, 1):
-                print(f"交易 {idx}:")
-                print(f"  开仓时间: {bt.num2date(trade.dtopen)}")
-                print(f"  收仓时间: {bt.num2date(trade.dtclose)}")
-                print(f"  开仓价格: {trade.price:.2f}")
-                print(f"  交易数量: {trade.size}")
-                print(f"  交易方向: {'多头' if trade.size > 0 else '空头'}")
-                print(f"  交易成本: {trade.commission:.2f}")
-                print(f"  交易盈亏: {trade.pnlcomm:.2f}")
-                print("-" * 30)
-        else:
-            print("无交易记录。")
-        print("-" * 40)
+        # 使用这个替代方法
+        closed_trades = trades_analyzer.total.closed
+
+        # 然后遍历并打印交易记录
+        for trade in closed_trades:
+            print(f"开仓时间: {trade.dtopen}, 平仓时间: {trade.dtclose}, 收益: {trade.pnl}")
 
         # 记录结果
         strategy_results.append({
