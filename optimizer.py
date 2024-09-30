@@ -5,13 +5,22 @@ import optuna
 import logging
 import pandas as pd
 import os
+import argparse
+from datetime import datetime
+import random  # 添加这一行
+import numpy as np  # 添加这一行
 
 from data_fetch import get_stock_data
-from strategies import SwingStrategy, BreakoutStrategy, MeanReversionStrategy, MACDStrategy
+from strategies import SwingStrategy, BreakoutStrategy, MeanReversionStrategy, MACDStrategy, ChandelierZlSmaStrategy
 
 # 设置日志配置
 logging.basicConfig(filename='backtrader_optimizer.log', level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
+
+# 设置固定的随机种子
+RANDOM_SEED = 42
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
 
 def run_backtest(strategy, params, data_feed):
     cerebro = bt.Cerebro()
@@ -69,12 +78,26 @@ def objective(trial, strategy, data_feed):
             'period': period
         }
     elif strategy == MeanReversionStrategy:
-        # 定义 MeanReversionStrategy 的参数空间
+        # 定 MeanReversionStrategy 的参数空间
         period = trial.suggest_int('period', 10, 30)
         devfactor = trial.suggest_float('devfactor', 1.5, 3.0)
         params = {
             'period': period,
             'devfactor': devfactor
+        }
+    elif strategy == ChandelierZlSmaStrategy:
+        length = trial.suggest_int('length', 10, 30)
+        mult = trial.suggest_float('mult', 1.5, 3.5)
+        zlsma_length = trial.suggest_int('zlsma_length', 10, 30)
+        investment_fraction = trial.suggest_float('investment_fraction', 0.5, 1.0)
+        max_pyramiding = trial.suggest_int('max_pyramiding', 0, 3)
+        params = {
+            'length': length,
+            'mult': mult,
+            'zlsma_length': zlsma_length,
+            'investment_fraction': investment_fraction,
+            'max_pyramiding': max_pyramiding,
+            'printlog': False
         }
     else:
         params = {}
@@ -88,16 +111,23 @@ def optimize_strategy(strategy, data_feed, n_trials=50, n_jobs=1):
     def objective_wrapper(trial):
         return objective(trial, strategy, data_feed)
     
-    study = optuna.create_study(direction='minimize')
+    sampler = optuna.samplers.TPESampler(seed=RANDOM_SEED)
+    study = optuna.create_study(direction='minimize', sampler=sampler)
     study.optimize(objective_wrapper, n_trials=n_trials, n_jobs=n_jobs)
     
     return study
 
 def main():
     # 设置股票代码和日期范围
-    symbol = '300687'  # 贵州茅台
-    start_date = '2023-01-01'
-    end_date = '2024-09-20'
+    parser = argparse.ArgumentParser(description='股票回测优化程序')
+    parser.add_argument('symbol', type=str, help='股票代码')
+    parser.add_argument('--start_date', type=str, default='2024-01-01', help='回测开始日期 (YYYY-MM-DD)')
+    parser.add_argument('--end_date', type=str, help='回测结束日期 (YYYY-MM-DD)')
+    args = parser.parse_args()
+
+    symbol = args.symbol
+    start_date = args.start_date
+    end_date = args.end_date if args.end_date else datetime.now().strftime('%Y-%m-%d')
 
     # 获取数据
     stock_data = get_stock_data(symbol, start_date, end_date)
@@ -123,7 +153,7 @@ def main():
     data_feed = AkShareData(dataname=stock_data)
 
     # 定义策略列表
-    strategies = [MACDStrategy]  # 您可以添加其他策略
+    strategies = [ChandelierZlSmaStrategy]  # 您可以添加其他策略
 
     # 记录优化结果
     optimization_results = []
@@ -131,44 +161,29 @@ def main():
     for strat in strategies:
         strategy_name = strat.__name__
         print(f'优化策略：{strategy_name}')
-        study = optimize_strategy(strat, data_feed, n_trials=50, n_jobs=1)  # 可以根据需要调整 n_trials 和 n_jobs
+        study = optimize_strategy(strat, data_feed, n_trials=100, n_jobs=1)  # 可以根据需要调整 n_trials 和 n_jobs
 
         best_trial = study.best_trial
 
         # 根据策略类型提取最佳参数
-        if strat == SwingStrategy:
+        if strat == ChandelierZlSmaStrategy:
             best_params = {
-                'ma_short': best_trial.params['ma_short'],
-                'ma_long': best_trial.params['ma_long'],
-                'rsi_low': best_trial.params['rsi_low'],
-                'rsi_high': best_trial.params['rsi_high'],
+                'length': int(best_trial.params['length']),
+                'mult': round(best_trial.params['mult'], 2),
+                'zlsma_length': int(best_trial.params['zlsma_length']),
+                'investment_fraction': round(best_trial.params['investment_fraction'], 2),
+                'max_pyramiding': int(best_trial.params['max_pyramiding']),
                 'printlog': False
-            }
-        elif strat == MACDStrategy:
-            best_params = {
-                'macd1': best_trial.params['macd1'],
-                'macd2': best_trial.params['macd2'],
-                'signal': best_trial.params['signal'],
-                'stake': 1,
-                'printlog': False
-            }
-        elif strat == BreakoutStrategy:
-            best_params = {
-                'period': best_trial.params['period']
-            }
-        elif strat == MeanReversionStrategy:
-            best_params = {
-                'period': best_trial.params['period'],
-                'devfactor': best_trial.params['devfactor']
             }
         else:
             best_params = {}
 
-        # 记录结果
+        # 记录结果，包括股票代码
         optimization_results.append({
+            'symbol': symbol,
             'strategy': strategy_name,
             **best_params,
-            'sharpe_ratio': best_trial.value * -1,  # 恢复正值
+            'sharpe_ratio': round(best_trial.value * -1, 2),
             'max_drawdown': 0  # 可以扩展以记录实际的回撤
         })
 
@@ -177,11 +192,16 @@ def main():
 
     # 转换为 DataFrame 便于分析
     results_df = pd.DataFrame(optimization_results)
+    
+    # 对浮点数列进行四舍五入
+    float_columns = results_df.select_dtypes(include=['float64']).columns
+    results_df[float_columns] = results_df[float_columns].round(2)
+
     print("优化结果汇总：")
     print(results_df)
 
     # 导出优化结果到 CSV
-    results_df.to_csv('optimization_results.csv', index=False)
+    results_df.to_csv(f'{symbol}_optimization_results.csv', index=False)
 
 if __name__ == '__main__':
     main()

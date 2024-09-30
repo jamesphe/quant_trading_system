@@ -77,6 +77,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 计算 ATR 指标
         self.atr = bt.ind.ATR(self.datas[0], period=self.p.length)
 
+
         # 根据 use_close 参数决定使用收盘价还是高低价计算最高/最低
         if self.p.use_close:
             self.highest = bt.ind.Highest(self.datas[0].close, period=self.p.length)
@@ -87,7 +88,24 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
         # 计算 Long_Stop 和 Short_Stop
         self.long_stop = self.highest - (self.p.mult * self.atr)
+        self.long_stop_prev = self.long_stop(-1)
+        self.long_stop = bt.If(
+            self.data.close(-1) > self.long_stop_prev,
+            bt.Max(self.long_stop, self.long_stop_prev),
+            self.long_stop
+        )
+        
+        self.chandelier_exit_long = self.long_stop
+
         self.short_stop = self.lowest + (self.p.mult * self.atr)
+        self.short_stop_prev = self.short_stop(-1)
+        self.short_stop = bt.If(
+            self.data.close(-1) < self.short_stop_prev,
+            bt.Min(self.short_stop, self.short_stop_prev),
+            self.short_stop
+        )
+        
+        self.chandelier_exit_short = self.short_stop
 
         # 初始化方向变量
         self.direction = 0  # 1 表示多头，-1 表示空头，0 表示中立
@@ -137,10 +155,16 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 计算当前方向
         if current_close > prev_short_stop:
             current_direction = 1  # 转为多头
+            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 多头, 原因: 收盘价 {current_close:.2f} 高于 Short_Stop {prev_short_stop:.2f}')
         elif current_close < prev_long_stop:
             current_direction = -1  # 转为空头
+            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 空头, 原因: 收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
         else:
             current_direction = self.direction  # 维持原有方向
+            direction_name = '多头' if self.direction == 1 else '空头' if self.direction == -1 else '中立'
+            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, '
+                     f'原因: 维持原有方向 (收盘价 {current_close:.2f} 介于 '
+                     f'Long_Stop {prev_long_stop:.2f} 和 Short_Stop {prev_short_stop:.2f} 之间)')
 
         # 检查方向是否发生变化
         # 打印方向和价格信息
@@ -227,7 +251,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
         self.trades.append(trade)  # Record closed trades
 
-def run_backtest(symbol, start_date, end_date, printlog=False):
+def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
     """
     运行回测
 
@@ -236,6 +260,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False):
     - start_date: 回测开始日期，格式 'YYYY-MM-DD'
     - end_date: 回测结束日期，格式 'YYYY-MM-DD'
     - printlog: 是否打印日志
+    - **strategy_params: 策略参数，用于初始化策略
     """
     # 获取股票数据
     data_df = get_stock_data(symbol, start_date, end_date)
@@ -247,8 +272,8 @@ def run_backtest(symbol, start_date, end_date, printlog=False):
     # 初始化 Cerebro 引擎
     cerebro = bt.Cerebro()
 
-    # 添加策略
-    cerebro.addstrategy(ChandelierZlSmaStrategy, printlog=printlog)
+    # 添加策略，并传入策略参数
+    cerebro.addstrategy(ChandelierZlSmaStrategy, printlog=printlog, **strategy_params)
 
     # 将 Pandas DataFrame 转换为 Backtrader 数据格式
     data_bt = bt.feeds.PandasData(
@@ -268,7 +293,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False):
 
     # 添加分析器
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe',
-                       timeframe=bt.TimeFrame.Days, compression=1)
+                        timeframe=bt.TimeFrame.Days, compression=1)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
 
     # 打印初始资金
@@ -282,7 +307,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False):
 
     # 打印最终资金
     final_cash = cerebro.broker.getvalue()
-    total_profit = final_cash - initial_cash
+    total_profit = sum(trade.pnlcomm for trade in strat.trades if trade.isclosed)
     roi = (total_profit / initial_cash) * 100
 
     print(f'最终资金: {final_cash:.2f}')
@@ -313,7 +338,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False):
         print(f"  开仓价格: {trade.price:.2f}")
         print(f"  开仓数量: {trade.size}")
         print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
-        #print(f"  平仓价格: {trade.barclose:.2f}")
+        # print(f"  平仓价格: {trade.barclose:.2f}")
         print(f"  交易盈亏: {trade.pnl:.2f}")
         print(f"  交易佣金: {trade.commission:.2f}")
         print(f"  净盈亏: {trade.pnlcomm:.2f}")
@@ -329,11 +354,22 @@ if __name__ == '__main__':
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='股票回测程序')
     parser.add_argument('symbol', type=str, help='股票代码')
-    parser.add_argument('--start_date', type=str, default='2024-06-01', help='回测开始日期 (YYYY-MM-DD)')
+    parser.add_argument('--start_date', type=str, default='2024-05-01', help='回测开始日期 (YYYY-MM-DD)')
     parser.add_argument('--end_date', type=str, default='2024-09-28', help='回测结束日期 (YYYY-MM-DD)')
     args = parser.parse_args()
 
     print(f"开始回测股票: {args.symbol}")
+    
 
     # 运行回测
-    run_backtest(args.symbol, args.start_date, args.end_date, printlog=True)
+    run_backtest(
+        symbol=args.symbol,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        length=10,
+        mult=1.5,
+        zlsma_length=10,
+        investment_fraction=0.55,
+        max_pyramiding=1,
+        printlog=False
+    )
