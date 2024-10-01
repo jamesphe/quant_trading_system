@@ -1,67 +1,97 @@
-# 蜡烛图与ZLSMA策略交易系统
+# 股票投资组合分析和交易建议系统
 
-## 项目概述
+这个项目是一个股票投资组合分析和交易建议系统,使用 Chandelier Exit 和 ZLSMA 策略进行回测和优化。
 
-这个项目是一个基于蜡烛图(Chandelier)和零滞后简单移动平均线(ZLSMA)的交易策略系统。它包括策略实现、数据获取、回测、优化功能以及投资组合分析。
+## 主要功能
 
-## 文件结构
+1. 对指定的股票组合进行参数优化
+2. 使用优化后的参数进行回测
+3. 生成每只股票的交易建议
+4. 将交易建议汇总发送到微信
 
-- `strategies/chandelier_zlsma_strategy.py`: 蜡烛图与ZLSMA策略的核心实现
-- `test_chandelier_zlsma_strategy.py`: 策略的单元测试
-- `data_fetch.py`: 用于获取交易数据的模块
-- `chandelier_zlsma_test.py`: 策略的回测脚本
-- `optimizer.py`: 策略参数优化脚本
-- `portfolio_analysis.py`: 投资组合分析脚本
-- `[股票代码]_optimization_results.csv`: 特定股票代码的优化结果
+## 文件说明
 
-## 功能特点
+- `portfolio_analysis.py`: 主程序,用于分析投资组合并生成交易建议
+- `data_fetch.py`: 用于获取股票数据
+- `chandelier_zlsma_test.py`: 使用 Chandelier Exit 和 ZLSMA 策略进行回测
+- `strategies/chandelier_zlsma_strategy.py`: 定义了 Chandelier Exit 和 ZLSMA 策略
+- `main_multithreaded.py`: 多线程优化程序
+- `optimize_us.py`: 美股交易优化程序
+- `*_optimization_results.csv`: 各股票的优化结果文件
+- `run_analysis.sh`: 用于在 conda 环境中运行分析的 shell 脚本
 
-1. 实现了基于蜡烛图和ZLSMA的交易策略
-2. 提供数据获取功能，支持实时和历史数据
-3. 包含策略回测功能，可评估策略性能
-4. 支持参数优化，以找到最佳策略配置
-5. 提供投资组合分析功能，可批量处理多只股票
+## 使用方法
 
-## 使用说明
-
-1. 安装依赖:
+1. 确保已安装所有必要的依赖:
    ```
-   pip install -r requirements.txt
+   pip install pandas numpy backtrader requests
    ```
 
-2. 运行单只股票的回测:
-   ```
-   python chandelier_zlsma_test.py [股票代码]
-   ```
-
-3. 运行单只股票的参数优化:
-   ```
-   python optimizer.py [股票代码]
+2. 在 `portfolio_analysis.py` 文件中设置您的股票组合:
+   ```python
+   portfolio = ['300077', '300383', '300687', '603206']  # 根据实际情况修改
    ```
 
-4. 运行投资组合分析:
+3. 在 `portfolio_analysis.py` 文件中设置您的 Server 酱 SCKEY:
+   ```python
+   sckey = "YOUR_SCKEY_HERE"  # 替换为您的实际 SCKEY
    ```
-   python portfolio_analysis.py
+   注意: 请确保您使用的是最新的Server酱API。当前使用的API域名为 `sctapi.ftqq.com`。
+
+4. 设置 conda 环境:
+   ```
+   conda create -n stock_analysis python=3.9
+   conda activate stock_analysis
+   pip install pandas numpy backtrader requests
    ```
 
-5. 执行单元测试:
+5. 修改 `run_analysis.sh` 文件中的路径:
+   ```bash
+   #!/bin/bash
+   source ~/anaconda3/etc/profile.d/conda.sh
+   conda activate stock_analysis
+   python /path/to/your/portfolio_analysis.py >> /path/to/logfile.log 2>&1
    ```
-   python -m unittest test_chandelier_zlsma_strategy.py
+   请确保将路径替换为您系统上的实际路径。
+
+6. 给 `run_analysis.sh` 添加执行权限:
+   ```
+   chmod +x /path/to/your/run_analysis.sh
    ```
 
-6. 查看优化结果:
-   打开`[股票代码]_optimization_results.csv`文件查看特定股票的优化参数。
+7. 设置定时运行:
+   - 对于 Linux 或 macOS:
+     使用 cron 任务。编辑 crontab (`crontab -e`),添加如下行:
+     ```
+     0 9 * * * /bin/bash /path/to/your/run_analysis.sh
+     ```
+     这将使程序每天早上 9 点运行。
+
+   - 对于 Windows:
+     创建一个批处理文件 `run_analysis.bat`:
+     ```batch
+     @echo off
+     call C:\Users\YourUsername\Anaconda3\Scripts\activate.bat
+     call conda activate stock_analysis
+     python C:\path\to\your\portfolio_analysis.py >> C:\path\to\logfile.log 2>&1
+     ```
+     然后使用任务计划程序创建一个每天运行这个批处理文件的任务。
 
 ## 注意事项
 
-- 请确保在使用前正确配置数据源和API密钥（如果需要）。
-- 交易策略仅供研究和学习使用，实际交易时请谨慎评估风险。
-- 在运行投资组合分析之前，请在`portfolio_analysis.py`文件中更新您的持仓股票列表。
+- 请确保您有足够的计算资源,因为优化过程可能比较耗时。
+- 交易建议仅供参考,请结合实际情况和专业意见进行投资决策。
+- 定期检查和更新您的 Server 酱 SCKEY,以确保消息能正常发送到微信。
+- 请确保您使用的是最新版本的Server酱API。如果API有更新,请相应地更新代码中的域名。
+- 如果您设置了定时任务,请确保运行环境中有所有必要的依赖,并且路径设置正确。
+- 定时任务可能需要管理员权限才能正确执行,特别是在 Windows 系统上。
+- 定期检查日志文件以确保脚本正常运行。
+- 如果您的系统进行了重启或更新,请确保 conda 环境和定时任务仍然正确设置。
 
 ## 贡献
 
-欢迎提交问题和拉取请求来改进这个项目。
+欢迎提出问题、建议或直接贡献代码。请通过 GitHub Issues 或 Pull Requests 与我们互动。
 
-## 许可证
+## 许可
 
-[在此处添加您的许可证信息]
+本项目采用 MIT 许可证。详情请参阅 [LICENSE](LICENSE) 文件。

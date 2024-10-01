@@ -109,12 +109,12 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
 
     # 获取策略中的指标值
     if hasattr(strat, 'chandelier_exit_long') and len(strat.chandelier_exit_long) > 0:
-        latest_chandelier_exit_long = strat.chandelier_exit_long[-1]
+        latest_chandelier_exit_long = strat.chandelier_exit_long[0]
     else:
         latest_chandelier_exit_long = None
 
     if hasattr(strat, 'chandelier_exit_short') and len(strat.chandelier_exit_short) > 0:
-        latest_chandelier_exit_short = strat.chandelier_exit_short[-1]
+        latest_chandelier_exit_short = strat.chandelier_exit_short[0]
     else:
         latest_chandelier_exit_short = None
 
@@ -144,13 +144,27 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
 
     if latest_chandelier_exit_long is not None and latest_zlsma is not None:
         if latest_close > latest_chandelier_exit_long and latest_close > latest_zlsma:
-            print("建议: 买入或持有")
+            advice = "买入或持有"
         elif latest_close < latest_chandelier_exit_short and latest_close < latest_zlsma:
-            print("建议: 卖出或观望")
+            advice = "卖出或观望"
         else:
-            print("建议: 观望")
+            advice = "观望"
     else:
-        print("无法给出建议：缺少必要的指标数据")
+        advice = "无法给出建议：缺少必要的指标数据"
+    
+    if len(strat.signal) > 0:
+        last_signal = strat.signal[0]
+        if last_signal == 1:
+            signal_type = "买入"
+        elif last_signal == -1:
+            signal_type = "卖出"
+        else:
+            signal_type = "观望"
+    else:
+        signal_type = "无交易信号"
+    
+    print(f"建议: {advice}")
+    print(f"信号类型: {signal_type}")
 
     # 可选：绘制结果
     # cerebro.plot(style='candlestick', volume=False, barup='green', bardown='red')[0][0]
@@ -158,12 +172,13 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
 if __name__ == '__main__':
     import argparse
     import sys
-    
+    import datetime
+
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='股票回测程序')
     parser.add_argument('symbol', type=str, help='股票代码')
     parser.add_argument('-s', '--start', type=str, default='2024-01-01', help='开始日期')
-    parser.add_argument('-e', '--end', type=str, default='2024-09-28', help='结束日期')
+    parser.add_argument('-e', '--end', type=str, default=datetime.date.today().strftime('%Y-%m-%d'), help='结束日期')
     parser.add_argument('-l', '--len', type=int, default=14, help='ATR和CE周期')
     parser.add_argument('-m', '--mult', type=float, default=2, help='ATR倍数')
     parser.add_argument('-z', '--zlsma', type=int, default=14, help='ZLSMA周期')

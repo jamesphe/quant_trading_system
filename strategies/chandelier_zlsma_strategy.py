@@ -57,6 +57,8 @@ class ChandelierZlSmaStrategy(bt.Strategy):
     """
     基于 Chandelier Exit 和 ZLSMA 的交易策略。
     """
+    lines = ('signal',)  # 添加这行
+
     params = (
         ('length', 14),         # ATR 和 Chandelier Exit 的周期
         ('mult', 2),            # ATR 的倍数
@@ -122,6 +124,8 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
         self.trades = []  # Initialize the trades list
 
+        self.signal = self.lines.signal  # 如果需要，可以添加这行
+
     def next(self):
         """
         每个时间步执行的逻辑。
@@ -176,19 +180,23 @@ class ChandelierZlSmaStrategy(bt.Strategy):
             # 方向从空头转为多头，进一步检查收盘价是否高于 ZLSMA
             if current_close > self.zlsma[0]:
                 self.buy_signal = True
+                self.signal[0] = 1
                 direction_change = True
                 self.log(f'买入信号产生: 方向从空头转为多头，且收盘价 {current_close:.2f} 高于 ZLSMA {self.zlsma[0]:.2f}')
         elif (self.direction == 1 and current_direction == -1):
             # 方向从多头转为空头，可以设置卖出信号
             self.buy_signal = False
+            self.signal[0] = -1
             direction_change = True
             self.log(f'卖出信号产生: 方向从多头转为空头。当前收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
         elif (self.direction == 1 and current_direction == 1):
             if self.zlsma[-1] < self.zlsma[0]:
                 self.buy_signal = True
+                self.signal[0] = 1
                 self.log(f'买入信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
         else:
             self.buy_signal = False
+            self.signal[0] = 0
             self.log('无交易信号')
 
         # 打印当前信息

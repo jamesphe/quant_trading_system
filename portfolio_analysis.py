@@ -1,9 +1,16 @@
 import subprocess
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import requests  # 新增导入
 
 # 定义持仓股票清单
-portfolio = ['300077', '300383', '300687', '603206']  # 可以根据实际情况修改
+portfolio = {
+    '300077': '聚光科技',
+    '300383': '光环新网',
+    '300687': '赛意信息',
+    '603206': '嘉环科技',
+    '600141': '兴发集团'
+}  # 可以根据实际情况修改
 
 def optimize_and_backtest(symbol):
     # 运行优化器
@@ -45,6 +52,20 @@ def optimize_and_backtest(symbol):
     
     return symbol, '\n'.join(trading_advice)
 
+def send_to_wechat(content):
+    # 替换为您的Server酱 SCKEY
+    sckey = "SCT257266Tdc4MxFyOWnZ9PINv52Rh2zOh"
+    url = f"https://sctapi.ftqq.com/{sckey}.send"  # 更新为新的API域名
+    payload = {
+        "title": "交易建议汇总",
+        "desp": content
+    }
+    response = requests.post(url, data=payload)
+    if response.status_code == 200:
+        print("成功发送到微信")
+    else:
+        print("发送失败")
+
 def main():
     results = []
     
@@ -57,13 +78,18 @@ def main():
                 result = future.result()
                 results.append(result)
             except Exception as exc:
-                print(f'{symbol} 生成了一个异常: {exc}')
+                print(f'{portfolio[symbol]}（{symbol}）生成了一个异常: {exc}')
 
-    # 打印结果
+    # 打印结果并准备发送内容
     print("\n=== 交易建议汇总 ===")
+    wechat_content = "# 交易建议汇总\n\n"
     for symbol, advice in results:
-        print(f"\n股票代码: {symbol}")
+        print(f"\n{portfolio[symbol]}（{symbol}）")
         print(advice)
+        wechat_content += f"## {portfolio[symbol]}（{symbol}）\n{advice}\n\n"
+    
+    # 发送到微信
+    send_to_wechat(wechat_content)
 
 if __name__ == "__main__":
     main()
