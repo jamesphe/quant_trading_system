@@ -1,7 +1,7 @@
 from strategies.chandelier_zlsma_strategy import ChandelierZlSmaStrategy
 import backtrader as bt
 import pandas as pd
-from data_fetch import get_stock_data
+from data_fetch import get_stock_data , get_etf_data , get_us_stock_data
 import os
 
 def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
@@ -16,7 +16,12 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     - **strategy_params: 策略参数，用于初始化策略
     """
     # 获取股票数据
-    data_df = get_stock_data(symbol, start_date, end_date)
+    if symbol.startswith(('510', '159')):  # ETF
+        data_df = get_etf_data(symbol, start_date, end_date)
+    elif symbol.isdigit():  # A股
+        data_df = get_stock_data(symbol, start_date, end_date)
+    else:  # 美股
+        data_df = get_us_stock_data(symbol, start_date, end_date)
 
     if data_df.empty:
         print(f"股票 {symbol} 没有可用的数据进行回测。")
@@ -103,7 +108,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
         print(f"  净盈亏: {trade.pnlcomm:.2f}")
         print()
 
-    # 输出最新交易日的交易建议
+    # 输出最新交易日的��易建议
     latest_date = data_df.index[-1]
     latest_close = data_df['Close'].iloc[-1]
 
@@ -119,7 +124,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
         latest_chandelier_exit_short = None
 
     if hasattr(strat, 'zlsma') and len(strat.zlsma) > 0:
-        latest_zlsma = strat.zlsma[-1]
+        latest_zlsma = strat.zlsma[0]
     else:
         latest_zlsma = None
 
@@ -144,22 +149,22 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
 
     if latest_chandelier_exit_long is not None and latest_zlsma is not None:
         if latest_close > latest_chandelier_exit_long and latest_close > latest_zlsma:
-            advice = "买入或持有"
+            advice = "买入或持有，因为当前收盘价高于多头止损线和ZLSMA线，表明市场趋势向上。"
         elif latest_close < latest_chandelier_exit_short and latest_close < latest_zlsma:
-            advice = "卖出或观望"
+            advice = "卖出或观望，因为当前收盘价低于空头止损线和ZLSMA线，表明市场趋势向下。"
         else:
-            advice = "观望"
+            advice = "观望，因为当前收盘价介于多头止损线和空头止损线之间，且与ZLSMA线接近，市场趋势不明确。"
     else:
         advice = "无法给出建议：缺少必要的指标数据"
     
     if len(strat.signal) > 0:
         last_signal = strat.signal[0]
         if last_signal == 1:
-            signal_type = "买入"
+            signal_type = "买入信号，可能是以下两种情况之一：1) 方向从空头转为多头，且收盘价高于ZLSMA线；2) 多头趋势中，ZLSMA上升。"
         elif last_signal == -1:
-            signal_type = "卖出"
+            signal_type = "卖出信号，因为方向从多头转为空头。"
         else:
-            signal_type = "观望"
+            signal_type = "无交易信号，当前市场趋势不明确。"
     else:
         signal_type = "无交易信号"
     
@@ -177,7 +182,7 @@ if __name__ == '__main__':
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='股票回测程序')
     parser.add_argument('symbol', type=str, help='股票代码')
-    parser.add_argument('-s', '--start', type=str, default='2024-01-01', help='开始日期')
+    parser.add_argument('-s', '--start', type=str, default='2023-9-30', help='开始日期')
     parser.add_argument('-e', '--end', type=str, default=datetime.date.today().strftime('%Y-%m-%d'), help='结束日期')
     parser.add_argument('-l', '--len', type=int, default=14, help='ATR和CE周期')
     parser.add_argument('-m', '--mult', type=float, default=2, help='ATR倍数')
@@ -190,7 +195,7 @@ if __name__ == '__main__':
     print(f"开始回测股票: {args.symbol}")
 
     # 检查是否存在优化结果文件
-    optimization_file = f"{args.symbol}_optimization_results.csv"
+    optimization_file = f"results/{args.symbol}_optimization_results.csv"
     if os.path.exists(optimization_file) and len(sys.argv) == 2:
         print(f"发现优化结果文件：{optimization_file}，正在加载参数...")
         opt_results = pd.read_csv(optimization_file)

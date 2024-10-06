@@ -69,15 +69,15 @@ def main():
 
     # 转换为 DataFrame 并导出到 CSV
     results_df = pd.DataFrame([optimization_result])
-    results_df.to_csv(f'{symbol}_ChandelierZlSmaStrategy_optimization_result.csv', index=False)
+    results_df.to_csv(f'results/{symbol}_ChandelierZlSmaStrategy_optimization_result.csv', index=False)
 
     print("优化结果已保存到 CSV 文件。")
 
     # 使用最佳参数进行回测
     cerebro = bt.Cerebro()
     cerebro.adddata(data_feed)
-    cerebro.addstrategy(ChandelierZlSmaStrategy, **best_params)
-    cerebro.broker.setcash(10000)
+    cerebro.addstrategy(ChandelierZlSmaStrategy, min_trade_unit=1, **best_params)
+    cerebro.broker.setcash(2000)
     cerebro.broker.setcommission(commission=0.001)
     cerebro.addsizer(bt.sizers.PercentSizer, percents=best_params['investment_fraction'] * 100)
 
@@ -91,6 +91,18 @@ def main():
     print(f'最终资金: {cerebro.broker.getvalue():.2f}')
     print(f'总回报率: {(cerebro.broker.getvalue() / 2000 - 1) * 100:.2f}%')
 
+    # 打印所有交易记录
+    print("\n交易记录:")
+    for i, trade in enumerate(strategy.trades):
+        print(f"交易 {i+1}:")
+        print(f"  开仓日期: {bt.num2date(trade.dtopen)}")
+        print(f"  开仓价格: {trade.price:.2f}")
+        print(f"  开仓数量: {trade.size}")
+        print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
+        print(f"  交易盈亏: {trade.pnl:.2f}")
+        print(f"  交易佣金: {trade.commission:.2f}")
+        print(f"  净盈亏: {trade.pnlcomm:.2f}")
+        print()
     # 获取最后一个交易日的止损价
     last_long_stop = strategy.long_stop[0]
     last_short_stop = strategy.short_stop[0]

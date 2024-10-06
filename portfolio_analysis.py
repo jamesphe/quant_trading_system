@@ -5,11 +5,13 @@ import requests  # 新增导入
 
 # 定义持仓股票清单
 portfolio = {
-    '300077': '聚光科技',
+    '300077': '国民技术',
     '300383': '光环新网',
     '300687': '赛意信息',
     '603206': '嘉环科技',
-    '600141': '兴发集团'
+    '600141': '兴发集团',
+    'ZTO': '中通快递',
+    'VGT': '信息科技'
 }  # 可以根据实际情况修改
 
 def optimize_and_backtest(symbol):
@@ -18,7 +20,7 @@ def optimize_and_backtest(symbol):
     subprocess.run(optimize_cmd, shell=True, check=True)
 
     # 读取优化结果
-    opt_results = pd.read_csv(f"{symbol}_optimization_results.csv")
+    opt_results = pd.read_csv(f"results/{symbol}_optimization_results.csv")
     if opt_results.empty:
         print(f"股票 {symbol} 的优化结果为空")
         return symbol, "无法获取优化结果"
@@ -56,9 +58,13 @@ def send_to_wechat(content):
     # 替换为您的Server酱 SCKEY
     sckey = "SCT257266Tdc4MxFyOWnZ9PINv52Rh2zOh"
     url = f"https://sctapi.ftqq.com/{sckey}.send"  # 更新为新的API域名
+    
+    # 修改content，在每行后添加两个换行符
+    formatted_content = content.replace('\n', '\n\n')
+    
     payload = {
         "title": "交易建议汇总",
-        "desp": content
+        "desp": formatted_content
     }
     response = requests.post(url, data=payload)
     if response.status_code == 200:
@@ -86,7 +92,7 @@ def main():
     for symbol, advice in results:
         print(f"\n{portfolio[symbol]}（{symbol}）")
         print(advice)
-        wechat_content += f"## {portfolio[symbol]}（{symbol}）\n{advice}\n\n"
+        wechat_content += f"## {portfolio[symbol]}（{symbol}）\n\n{advice}\n\n"
     
     # 发送到微信
     send_to_wechat(wechat_content)

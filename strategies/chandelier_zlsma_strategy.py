@@ -67,6 +67,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         ('printlog', False),    # 是否打印日志
         ('investment_fraction', 0.8), # 每次交易使用可用资金的比例
         ('max_pyramiding', 0),        # 允许的最大加仓次数
+        ('min_trade_unit', 100),  # 添加新参数,设置最小交易单位
     )
 
     def log(self, txt, dt=None):
@@ -146,13 +147,22 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 当前持仓数量
         current_positions = self.position.size
 
-        # 计算每次交易的资金量，考虑加仓次数
+        # 计算每次交易的资金量,考虑加仓次数
         remaining_pyramiding = self.params.max_pyramiding - self.current_pyramiding
         available_cash = self.broker.getcash() * self.params.investment_fraction
         available_cash_per_trade = available_cash / max(1, remaining_pyramiding)
         stake = int(available_cash_per_trade / current_close)
-        # 确保交易数量是100的倍数
-        stake = (stake // 100) * 100
+        # 确保交易数量是最小交易单位的倍数
+        stake = (stake // self.params.min_trade_unit) * self.params.min_trade_unit
+        
+        # 添加调试代码
+        self.log(f'调试信息:')
+        self.log(f'  剩余加仓次数: {remaining_pyramiding}')
+        self.log(f'  可用资金: {available_cash:.2f}')
+        self.log(f'  每次交易可用资金: {available_cash_per_trade:.2f}')
+        self.log(f'  计算得到的交易数量: {stake}')
+        self.log(f'  当前收盘价: {current_close:.2f}')
+        self.log(f'  最小交易单位: {self.params.min_trade_unit}')
 
         # 计算当前方向
         
@@ -208,9 +218,9 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 执行买入信号
         if not self.position:
             if self.buy_signal:
-                self.log(f'买入信号 - 价格: {current_close:.2f}, 首次建仓')
+                self.log(f'买入信号 - 价格: {current_close:.2f}, 首次建仓, 买入数量: {stake}')
                 self.buy(size=stake)
-                self.current_pyramiding = 1
+                self.current_pyramiding = 0
         else:
             # 根据策略逻辑决定何时卖出
             if self.direction == 1:
@@ -238,16 +248,27 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         """
         if order.status in [order.Submitted, order.Accepted]:
             # 订单已提交/被接受，尚未执行
+            self.log(f'订单状态: {"已提交" if order.status == order.Submitted else "已接受"}')
             return
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log(f'买单执行，价格: {order.executed.price}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'当前持仓: {self.position.size}')
             elif order.issell():
-                self.log(f'卖单执行，价格: {order.executed.price}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'当前持仓: {self.position.size}')
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log('订单取消/保证金不足/被拒绝')
+            self.log(f'订单状态: {"已取消" if order.status == order.Canceled else "保证金不足" if order.status == order.Margin else "被拒绝"}')
+            self.log(f'订单详情: {order}')
+
+        # 添加调试信息
+        self.log(f'当前账户价值: {self.broker.getvalue():.2f}')
+        self.log(f'当前现金: {self.broker.getcash():.2f}')
+        self.log(f'当前ZLSMA值: {self.zlsma[0]:.2f}')
+        self.log(f'当前Chandelier Exit Long: {self.chandelier_exit_long[0]:.2f}')
+        self.log(f'当前Chandelier Exit Short: {self.chandelier_exit_short[0]:.2f}')
 
     def notify_trade(self, trade):
         """
@@ -379,5 +400,6 @@ if __name__ == '__main__':
         zlsma_length=10,
         investment_fraction=0.55,
         max_pyramiding=1,
+        min_trade_unit=100,  # 添加新参数
         printlog=False
     )

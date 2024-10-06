@@ -10,7 +10,7 @@ from datetime import datetime
 import random  # 添加这一行
 import numpy as np  # 添加这一行
 
-from data_fetch import get_stock_data
+from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
 from strategies import SwingStrategy, BreakoutStrategy, MeanReversionStrategy, MACDStrategy, ChandelierZlSmaStrategy
 
 # 设置日志配置
@@ -31,6 +31,7 @@ def run_backtest(strategy, params, data_feed):
     cerebro.broker.setcommission(commission=0.001)
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe', timeframe=bt.TimeFrame.Days, compression=1)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')  # 添加这行
 
     try:
         results = cerebro.run()
@@ -38,13 +39,21 @@ def run_backtest(strategy, params, data_feed):
 
         sharpe = strat.analyzers.sharpe.get_analysis().get('sharperatio', 0)
         drawdown = strat.analyzers.drawdown.get_analysis().get('max', {}).get('drawdown', 0)
+        
+        # 计算总收益率
+        total_return = strat.analyzers.returns.get_analysis()['rtot']
+        
+        # 添加胜率计算
+        total_trades = len(strat.trades)
+        winning_trades = sum(1 for trade in strat.trades if trade.pnlcomm > 0)
+        win_rate = winning_trades / total_trades if total_trades > 0 else 0
 
-        logging.info(f"Strategy: {strategy.__name__}, Params: {params}, Sharpe Ratio: {sharpe}, Max Drawdown: {drawdown}")
+        logging.info(f"策略: {strategy.__name__}, 参数: {params}, 夏普比率: {sharpe}, 最大回撤: {drawdown}, 胜率: {win_rate}, 总收益率: {total_return}")
 
-        return sharpe, drawdown
+        return sharpe, drawdown, win_rate, total_return
     except Exception as e:
-        logging.error(f"Backtest failed for strategy: {strategy.__name__}, Params: {params}, Error: {e}")
-        return 0.0, 0.0
+        logging.error(f"回测失败，策略: {strategy.__name__}, 参数: {params}, 错误: {e}")
+        return 0.0, 0.0, 0.0, 0.0
 
 def objective(trial, strategy, data_feed):
     # 根据策略类型定义参数空间
@@ -102,7 +111,12 @@ def objective(trial, strategy, data_feed):
     else:
         params = {}
 
-    sharpe, drawdown = run_backtest(strategy, params, data_feed)
+    sharpe, drawdown, win_rate, total_return = run_backtest(strategy, params, data_feed)
+
+    # 将胜率和总收益率作为额外信息存储在 trial 中
+    trial.set_user_attr('win_rate', win_rate)
+    trial.set_user_attr('max_drawdown', drawdown)
+    trial.set_user_attr('total_return', total_return)
 
     # Optuna 试图最小化目标函数，因此返回负的夏普比率
     return -sharpe if sharpe else 0.0
@@ -128,9 +142,18 @@ def main():
     symbol = args.symbol
     start_date = args.start_date
     end_date = args.end_date if args.end_date else datetime.now().strftime('%Y-%m-%d')
+    
+        # 获取股票数据
+    if symbol.startswith(('510', '159')):  # ETF
+        stock_data = get_etf_data(symbol, start_date, end_date)
+    elif symbol.isdigit():  # A股
+        stock_data = get_stock_data(symbol, start_date, end_date)
+    else:  # 美股
+        stock_data = get_us_stock_data(symbol, start_date, end_date)
 
-    # 获取数据
-    stock_data = get_stock_data(symbol, start_date, end_date)
+    if stock_data.empty:
+        print(f"股票 {symbol} 没有可用的数据进行回测。")
+        return
 
     # 打印数据范围和样本
     print(f"数据范围: {stock_data.index.min()} 至 {stock_data.index.max()}")
@@ -178,17 +201,22 @@ def main():
         else:
             best_params = {}
 
-        # 记录结果，包括股票代码
+        # 记录结果，包括股票代码和总收益率
         optimization_results.append({
             'symbol': symbol,
             'strategy': strategy_name,
             **best_params,
             'sharpe_ratio': round(best_trial.value * -1, 2),
-            'max_drawdown': 0  # 可以扩展以记录实际的回撤
+            'max_drawdown': round(best_trial.user_attrs['max_drawdown'], 2),
+            'win_rate': round(best_trial.user_attrs['win_rate'], 2),
+            'total_return': round(best_trial.user_attrs['total_return'], 4)  # 添加总收益率
         })
 
         print(f'最佳参数组合：{best_params}')
-        print(f'最佳夏普比率：{best_trial.value * -1:.2f}\n')
+        print(f'最佳夏普比率：{best_trial.value * -1:.2f}')
+        print(f'最大回撤：{best_trial.user_attrs["max_drawdown"]:.2f}')
+        print(f'胜率：{best_trial.user_attrs["win_rate"]:.2f}')
+        print(f'总收益率：{best_trial.user_attrs["total_return"]:.4f}\n')
 
     # 转换为 DataFrame 便于分析
     results_df = pd.DataFrame(optimization_results)
@@ -201,7 +229,7 @@ def main():
     print(results_df)
 
     # 导出优化结果到 CSV
-    results_df.to_csv(f'{symbol}_optimization_results.csv', index=False)
+    results_df.to_csv(f'results/{symbol}_optimization_results.csv', index=False)
 
 if __name__ == '__main__':
     main()

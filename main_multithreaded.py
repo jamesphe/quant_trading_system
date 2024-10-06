@@ -99,11 +99,15 @@ def process_stock(stock_code, start_date, end_date, printlog):
     buy_signals = getattr(strat_result, 'buy_signals', [])
 
     if buy_signals:
+        print(f"股票 {stock_code} 有买入信号")  # 调试信息
+        print(f"买入信号列表: {buy_signals}")  # 调试信息
         # 检查是否有买入信号在最新交易日
         latest_date = stock_data.index[-1].date()
+        print(f"最新交易日: {latest_date}")  # 调试信息
         latest_buy_signals = [
             signal for signal in buy_signals if signal['Date'] == latest_date
         ]
+        print(f"最新交易日的买入信号: {latest_buy_signals}")  # 调试信息
         if latest_buy_signals:
             # 假设每只股票在同一日期只有一个买入信号
             buy_signals_dict = {
@@ -112,6 +116,8 @@ def process_stock(stock_code, start_date, end_date, printlog):
             }
             print(f"股票 {stock_code} 产生买入信号: {buy_signals_dict}")  # 调试信息
             return stock_code, buy_signals_dict
+    else:
+        print(f"股票 {stock_code} 没有买入信号")  # 调试信息
 
     return stock_code, None
 
