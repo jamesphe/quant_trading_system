@@ -8,9 +8,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from data_fetch import get_us_stock_data
-from data_fetch import get_etf_list
-from data_fetch import get_etf_data
+from data_fetch import get_us_stock_data, get_etf_list, get_etf_data, get_stock_data_hourly
 
 def test_get_vgt_data():
     """
@@ -124,9 +122,58 @@ def test_get_etf_data():
     
     print("测试完成。")
 
+def test_get_stock_data_hourly():
+    """
+    测试获取股票或ETF的小时级别历史行情数据
+    """
+    print("\n开始测试获取小时级别历史行情数据...")
+    
+    # 测试A股
+    symbol_cn = "600519"  # 贵州茅台
+    # 测试ETF
+    symbol_etf = "159919"  # 沪深300ETF
+    # 测试美股
+    symbol_us = "AAPL"  # 苹果公司
+    
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+    
+    for symbol, market in [(symbol_cn, 'CN'), (symbol_etf, 'CN'), (symbol_us, 'US')]:
+        print(f"\n测试 {market} 市场的 {symbol}")
+        print(f"开始日期: {start_date}")
+        print(f"结束日期: {end_date}")
+        
+        hourly_data = get_stock_data_hourly(symbol, start_date, end_date, market)
+        
+        if not hourly_data.empty:
+            print(f"成功获取 {symbol} 从 {start_date} 到 {end_date} 的数据。")
+            print("数据前5行：")
+            print(hourly_data.head())
+            print(f"数据行数: {len(hourly_data)}")
+            
+            # 检查数据列
+            expected_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Pct_change']
+            assert all(col in hourly_data.columns for col in expected_columns), f"{symbol} 数据列不完整"
+            
+            # 检查数据类型
+            assert hourly_data.index.dtype == 'datetime64[ns]', f"{symbol} 索引不是日期时间类型"
+            assert hourly_data['Close'].dtype == 'float64', f"{symbol} Close列不是浮点数类型"
+            
+            # 检查数据范围
+            assert hourly_data.index.min().strftime('%Y-%m-%d') >= start_date, f"{symbol} 数据开始日期早于请求的开始日期"
+            assert hourly_data.index.max().strftime('%Y-%m-%d') <= end_date, f"{symbol} 数据结束日期晚于请求的结束日期"
+            
+            print(f"{symbol} 数据验证通过！")
+        else:
+            print(f"未能获取 {symbol} 的数据。")
+    
+    print("数据测试完成。")
+
 if __name__ == "__main__":
     #test_get_vgt_data()
-    print("\n" + "="*50 + "\n")
+    #print("\n" + "="*50 + "\n")
     #test_get_etf_list()
     #print("\n" + "="*50 + "\n")
-    test_get_etf_data()
+    #test_get_etf_data()
+    #print("\n" + "="*50 + "\n")
+    test_get_stock_data_hourly()
