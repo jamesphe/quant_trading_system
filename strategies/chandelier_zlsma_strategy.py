@@ -6,6 +6,7 @@ import backtrader as bt
 import numpy as np
 import pandas as pd
 from data_fetch import get_a_share_list, get_stock_data
+import math
 
 class LinearRegression(bt.Indicator):
     """
@@ -119,13 +120,15 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 初始化买入信号变量
         self.buy_signal = False
         
-        # 设置允许的最大加仓次数
+        # 设置允��的最大加仓次数
         self.max_pyramiding = self.params.max_pyramiding
         self.current_pyramiding = 0  # 当前加仓次数
 
         self.trades = []  # Initialize the trades list
 
         self.signal = self.lines.signal  # 如果需要，可以添加这行
+        
+        self.min_trade_unit = self.params.min_trade_unit    # 最小交易单位
 
     def next(self):
         """
@@ -229,8 +232,9 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                     self.sell(size=current_positions)
                     self.current_pyramiding = 0
                 elif self.zlsma[-1] > self.zlsma[0] and current_close < self.zlsma[0] and self.zlsma[-2] > self.zlsma[-1]:
-                    self.log('卖出信号触发：ZLSMA下降且当前价格低于ZLSMA（ZLSMA前值: {:.2f}, 当前值: {:.2f}，当前价格: {:.2f}），执行卖出操作'.format(self.zlsma[-1], self.zlsma[0], current_close))
-                    self.sell(size=current_positions)
+                    sell_size = math.ceil(current_positions / 2 / self.min_trade_unit) * self.min_trade_unit
+                    self.log(f'卖出信号触发：ZLSMA下降且当前价格低于ZLSMA（ZLSMA前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}，当前价格: {current_close:.2f}），执行卖出操作，卖出数量: {sell_size}')
+                    self.sell(size=sell_size)
                     self.current_pyramiding = 0
                 elif current_close > self.position.price * 1.03:
                     if self.current_pyramiding < self.max_pyramiding:
@@ -253,10 +257,10 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}, 买入数量: {order.executed.size}')
                 self.log(f'当前持仓: {self.position.size}')
             elif order.issell():
-                self.log(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}, 卖出数量: {order.executed.size}')
                 self.log(f'当前持仓: {self.position.size}')
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
