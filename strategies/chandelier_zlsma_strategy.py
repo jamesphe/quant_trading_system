@@ -156,23 +156,23 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         stake = (stake // self.params.min_trade_unit) * self.params.min_trade_unit
         
         # 添加调试代码
-        self.log(f'调试信息:')
-        self.log(f'  剩余加仓次数: {remaining_pyramiding}')
-        self.log(f'  可用资金: {available_cash:.2f}')
-        self.log(f'  每次交易可用资金: {available_cash_per_trade:.2f}')
-        self.log(f'  计算得到的交易数量: {stake}')
-        self.log(f'  当前收盘价: {current_close:.2f}')
-        self.log(f'  最小交易单位: {self.params.min_trade_unit}')
+        # self.log(f'调试信息:')
+        # self.log(f'  剩余加仓次数: {remaining_pyramiding}')
+        # self.log(f'  可用资金: {available_cash:.2f}')
+        # self.log(f'  每次交易可用资金: {available_cash_per_trade:.2f}')
+        # self.log(f'  计算得到的交易数量: {stake}')
+        # self.log(f'  当前收盘价: {current_close:.2f}')
+        # self.log(f'  最小交易单位: {self.params.min_trade_unit}')
 
         # 计算当前方向
         
         # 计算当前方向
-        if current_close > prev_short_stop:
-            current_direction = 1  # 转为多头
-            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 多头, 原因: 收盘价 {current_close:.2f} 高于 Short_Stop {prev_short_stop:.2f}')
-        elif current_close < prev_long_stop:
+        if current_close < prev_long_stop:
             current_direction = -1  # 转为空头
             self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 空头, 原因: 收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
+        elif current_close > prev_short_stop and current_close > prev_long_stop:
+            current_direction = 1  # 转为多头
+            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 多头, 原因: 收盘价 {current_close:.2f} 高于 Short_Stop {prev_short_stop:.2f} 和 Long_Stop {prev_long_stop:.2f}')
         else:
             current_direction = self.direction  # 维持原有方向
             direction_name = '多头' if self.direction == 1 else '空头' if self.direction == -1 else '中立'
@@ -186,33 +186,42 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         #         f'当前收盘价: {current_close:.2f}, ZLSMA当前值: {self.zlsma[0]:.2f}')
         direction_change = False
         self.buy_signal = False
-        if (self.direction == -1 and current_direction == 1):
-            # 方向从空头转为多头，进一步检查收盘价是否高于 ZLSMA
-            if current_close > self.zlsma[0]:
-                self.buy_signal = True
-                self.signal[0] = 1
-                direction_change = True
-                self.log(f'买入信号产生: 方向从空头转为多头，且收盘价 {current_close:.2f} 高于 ZLSMA {self.zlsma[0]:.2f}')
-        elif (self.direction == 1 and current_direction == -1):
-            # 方向从多头转为空头，可以设置卖出信号
-            self.buy_signal = False
-            self.signal[0] = -1
+        if self.direction != current_direction:
             direction_change = True
-            self.log(f'卖出信号产生: 方向从多头转为空头。当前收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
-        elif (self.direction == 1 and current_direction == 1):
+            if current_direction == 1:
+                if current_close > self.zlsma[0]:
+                    self.buy_signal = True
+                    self.signal[0] = 1
+                    self.log(f'建仓信号产生: 方向从空头转为多头，且收盘价 {current_close:.2f} 高于 ZLSMA {self.zlsma[0]:.2f}')
+                else:
+                    self.signal[0] = 0
+                    self.log('建仓信号产生: 方向从空头转为多头，但收盘价未高于 ZLSMA，无交易信号')
+            elif current_direction == -1:
+                self.buy_signal = False
+                self.signal[0] = -1
+                self.log(f'清仓信号产生: 方向从多头转为空头。当前收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
+        elif self.direction == 1 and current_direction == 1:
             if self.zlsma[-1] < self.zlsma[0]:
                 self.buy_signal = True
-                self.signal[0] = 1
-                self.log(f'买入信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
+                self.signal[0] = 2
+                self.log(f'加仓信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
+            else:
+                self.signal[0] = -2
+                self.log('减仓预警信号产生: 多头趋势中，但ZLSMA未上升，无交易信号')
+        elif self.direction == -1 and current_direction == -1:
+            self.signal[0] = -1
+            self.log(f'清仓信号产生: 方向持续空头')
+            if self.position:
+                self.buy_signal = False
+                self.log(f'清仓信号产生:方向持续空头')
         else:
-            self.buy_signal = False
             self.signal[0] = 0
             self.log('无交易信号')
 
         # 打印当前信息
         #current_date = self.datas[0].datetime.date(0)
         #self.log(f'当前日期: {current_date}, 持仓: {current_positions}, 方向: {self.direction}, '
-        #         f'方向变化: {"是" if direction_change else "否"}, '
+        #         f'���向变化: {"是" if direction_change else "否"}, '
         #         f'买入信息: {"是" if self.buy_signal else "否"}, '
         #         f'当前收盘价: {current_close:.2f}, ZLSMA当前值: {self.zlsma[0]:.2f}')
         # 执行买入信号

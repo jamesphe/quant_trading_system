@@ -11,7 +11,7 @@ def get_a_share_list():
     try:
         stock_info = ak.stock_info_a_code_name()
         # 排除8开头的股票和ST股票
-        stock_info = stock_info[(~stock_info['code'].str.startswith('8')) & (~stock_info['name'].str.contains('ST'))]
+        stock_info = stock_info[(~stock_info['code'].str.startswith('8')) & (~stock_info['name'].str.contains('ST')) & (~stock_info['code'].str.startswith('688'))]
         #stock_info = stock_info[stock_info['code'].str.startswith('3')]
         return stock_info
     except Exception as e:
@@ -123,30 +123,27 @@ def get_stock_name(symbol):
     根据股票代码获取股票名称
 
     参数：
-    - symbol: 股票代码，例如 '300077'
+    - symbol: 股票代码，例如 '300077' 或 'AAPL'
 
     返回：
     - 股票名称，如果未找到则返回原始代码
     """
     try:
-        # 使用 akshare 获取 A 股股票列表
+        # 尝试获取A股股票名称
         stock_list = ak.stock_info_a_code_name()
-        
-        # 查找匹配的股票
-        stock = stock_list[stock_list['代码'] == symbol]
+        print(stock_list)
+        print(symbol)
+        stock = stock_list[stock_list['code'] == symbol]
+        print(stock)
         
         if not stock.empty:
-            return stock['名称'].values[0]
-        else:
-            # 如果在 A 股列表中未找到，尝试获取美股名称
-            us_stock_info = ak.stock_us_fundamental(symbol=symbol)
-            if not us_stock_info.empty and 'name' in us_stock_info.columns:
-                return us_stock_info['name'].values[0]
-            else:
-                return symbol  # 如果未找到，返回原始代码
+            return stock['name'].values[0]
+               
+        # 如果都未找到，返回原始代码
+        return symbol
     except Exception as e:
         print(f"获取股票 {symbol} 名称时发生错误: {e}")
-        return symbol  # 发生错误时返回原始代码
+        return symbol
 
 def get_etf_data(symbol, start_date, end_date):
     """

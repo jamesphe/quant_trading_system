@@ -122,13 +122,13 @@ def process_stock(stock_code, start_date, end_date, printlog):
     return stock_code, None
 
 def main_multithreaded(start_date, end_date, printlog=False):
-    # 获取A股股票列表
-    stock_info = get_a_share_list()
+    # 从当前目录下的all_strategy_results.csv文件中获取股票清单
+    stock_info = pd.read_csv('all_strategy_results.csv')
     if stock_info.empty:
-        print("未能获取A股股票列表。")
+        print("未能获取股票清单。")
         return
 
-    symbols = stock_info['code'].tolist()
+    symbols = stock_info['股票代码'].tolist()
 
     buy_signals_dict = {}
 

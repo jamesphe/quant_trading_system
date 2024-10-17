@@ -11,6 +11,7 @@ sys.path.append(parent_dir)
 from data_fetch import get_us_stock_data
 from data_fetch import get_etf_list
 from data_fetch import get_etf_data
+from data_fetch import get_stock_name
 
 def test_get_vgt_data():
     """
@@ -124,9 +125,32 @@ def test_get_etf_data():
     
     print("测试完成。")
 
+def test_get_stock_name():
+    """
+    测试获取股票名称功能
+    """
+    print("\n开始测试获取股票名称...")
+    
+    # 测试A股股票
+    a_share_symbol = "301183"  # 贵州茅台
+    a_share_name = get_stock_name(a_share_symbol)
+    print(f"A股股票 {a_share_symbol} 的名称: {a_share_name}")
+    assert a_share_name == "贵州茅台", f"预期名称为'贵州茅台'，实际获得'{a_share_name}'"
+    
+    
+    # 测试不存在的股票代码
+    invalid_symbol = "000000"
+    invalid_name = get_stock_name(invalid_symbol)
+    print(f"无效股票代码 {invalid_symbol} 的返回结果: {invalid_name}")
+    assert invalid_name == invalid_symbol, f"对于无效代码，预期返回原始代码，实际返回'{invalid_name}'"
+    
+    print("获取股票名称测试完成。")
+
 if __name__ == "__main__":
     #test_get_vgt_data()
-    print("\n" + "="*50 + "\n")
+    #print("\n" + "="*50 + "\n")
     #test_get_etf_list()
     #print("\n" + "="*50 + "\n")
-    test_get_etf_data()
+    #test_get_etf_data()
+    #print("\n" + "="*50 + "\n")
+    test_get_stock_name()

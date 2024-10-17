@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime
 import random  # 添加这一行
 import numpy as np  # 添加这一行
+import optuna.logging
 
 from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
 from strategies import SwingStrategy, BreakoutStrategy, MeanReversionStrategy, MACDStrategy, ChandelierZlSmaStrategy
@@ -23,7 +24,7 @@ random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 
 def run_backtest(strategy, params, data_feed):
-    cerebro = bt.Cerebro()
+    cerebro = bt.Cerebro(stdstats=False)
     cerebro.adddata(data_feed)
     cerebro.addstrategy(strategy, **params)
     cerebro.broker.setcash(100000.0)
@@ -31,7 +32,7 @@ def run_backtest(strategy, params, data_feed):
     cerebro.broker.setcommission(commission=0.001)
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe', timeframe=bt.TimeFrame.Days, compression=1)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
-    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')  # 添加这行
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
 
     try:
         results = cerebro.run()
@@ -42,18 +43,21 @@ def run_backtest(strategy, params, data_feed):
         
         # 计算总收益率
         total_return = strat.analyzers.returns.get_analysis()['rtot']
-        
-        # 添加胜率计算
+
+        # 获取策略中的 signal 属性
+        signals = strat.signal.array  # 获取整个 signal 数组
+        last_signal = signals[-1] if len(signals) > 0 else 0  # 获取最后一个 signal 值
+
         total_trades = len(strat.trades)
         winning_trades = sum(1 for trade in strat.trades if trade.pnlcomm > 0)
         win_rate = winning_trades / total_trades if total_trades > 0 else 0
 
-        logging.info(f"策略: {strategy.__name__}, 参数: {params}, 夏普比率: {sharpe}, 最大回撤: {drawdown}, 胜率: {win_rate}, 总收益率: {total_return}")
+        logging.info(f"策略: {strategy.__name__}, 参数: {params}, 夏普比率: {sharpe}, 最大回撤: {drawdown}, 胜率: {win_rate}, 总收益率: {total_return}, 最后信号: {last_signal}")
 
-        return sharpe, drawdown, win_rate, total_return
+        return sharpe, drawdown, win_rate, total_return, last_signal
     except Exception as e:
         logging.error(f"回测失败，策略: {strategy.__name__}, 参数: {params}, 错误: {e}")
-        return 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0
 
 def objective(trial, strategy, data_feed):
     # 根据策略类型定义参数空间
@@ -111,20 +115,21 @@ def objective(trial, strategy, data_feed):
     else:
         params = {}
 
-    sharpe, drawdown, win_rate, total_return = run_backtest(strategy, params, data_feed)
+    sharpe, drawdown, win_rate, total_return, last_signal = run_backtest(strategy, params, data_feed)
 
-    # 将胜率和总收益率作为额外信息存储在 trial 中
+    # 将胜率、总收益率和最后信号作为额外信息存储在 trial 中
     trial.set_user_attr('win_rate', win_rate)
     trial.set_user_attr('max_drawdown', drawdown)
     trial.set_user_attr('total_return', total_return)
+    trial.set_user_attr('last_signal', last_signal)
 
-    # Optuna 试图最小化目标函数，因此返回负的夏普比率
     return -sharpe if sharpe else 0.0
 
 def optimize_strategy(strategy, data_feed, n_trials=50, n_jobs=1):
     def objective_wrapper(trial):
         return objective(trial, strategy, data_feed)
     
+    optuna.logging.set_verbosity(optuna.logging.ERROR)
     sampler = optuna.samplers.TPESampler(seed=RANDOM_SEED)
     study = optuna.create_study(direction='minimize', sampler=sampler)
     study.optimize(objective_wrapper, n_trials=n_trials, n_jobs=n_jobs)
@@ -132,10 +137,11 @@ def optimize_strategy(strategy, data_feed, n_trials=50, n_jobs=1):
     return study
 
 def main():
+
     # 设置股票代码和日期范围
     parser = argparse.ArgumentParser(description='股票回测优化程序')
     parser.add_argument('symbol', type=str, help='股票代码')
-    parser.add_argument('--start_date', type=str, default='2024-01-01', help='回测开始日期 (YYYY-MM-DD)')
+    parser.add_argument('--start_date', type=str, default='2023-10-09', help='回测开始日期 (YYYY-MM-DD)')
     parser.add_argument('--end_date', type=str, help='回测结束日期 (YYYY-MM-DD)')
     args = parser.parse_args()
 
@@ -144,7 +150,7 @@ def main():
     end_date = args.end_date if args.end_date else datetime.now().strftime('%Y-%m-%d')
     
         # 获取股票数据
-    if symbol.startswith(('510', '159')):  # ETF
+    if symbol.startswith(('51', '159')):  # ETF
         stock_data = get_etf_data(symbol, start_date, end_date)
     elif symbol.isdigit():  # A股
         stock_data = get_stock_data(symbol, start_date, end_date)
@@ -156,9 +162,9 @@ def main():
         return
 
     # 打印数据范围和样本
-    print(f"数据范围: {stock_data.index.min()} 至 {stock_data.index.max()}")
-    print(stock_data.head())
-    print(stock_data.tail())
+    # print(f"数据范围: {stock_data.index.min()} 至 {stock_data.index.max()}")
+    # print(stock_data.head())
+    # print(stock_data.tail())
 
     # 定义数据源类
     class AkShareData(bt.feeds.PandasData):
@@ -184,7 +190,7 @@ def main():
     for strat in strategies:
         strategy_name = strat.__name__
         print(f'优化策略：{strategy_name}')
-        study = optimize_strategy(strat, data_feed, n_trials=100, n_jobs=1)  # 可以根据需要调整 n_trials 和 n_jobs
+        study = optimize_strategy(strat, data_feed, n_trials=50, n_jobs=1)  # 可以根据需要调整 n_trials 和 n_jobs
 
         best_trial = study.best_trial
 
@@ -209,14 +215,16 @@ def main():
             'sharpe_ratio': round(best_trial.value * -1, 2),
             'max_drawdown': round(best_trial.user_attrs['max_drawdown'], 2),
             'win_rate': round(best_trial.user_attrs['win_rate'], 2),
-            'total_return': round(best_trial.user_attrs['total_return'], 4)  # 添加总收益率
+            'total_return': round(best_trial.user_attrs['total_return'], 4),  # 添加总收益率
+            'last_signal': best_trial.user_attrs['last_signal']  # 添加最后信号
         })
 
         print(f'最佳参数组合：{best_params}')
         print(f'最佳夏普比率：{best_trial.value * -1:.2f}')
         print(f'最大回撤：{best_trial.user_attrs["max_drawdown"]:.2f}')
         print(f'胜率：{best_trial.user_attrs["win_rate"]:.2f}')
-        print(f'总收益率：{best_trial.user_attrs["total_return"]:.4f}\n')
+        print(f'总收益率：{best_trial.user_attrs["total_return"]:.4f}')
+        print(f'最后信号：{best_trial.user_attrs["last_signal"]}')  # 打印最后信号
 
     # 转换为 DataFrame 便于分析
     results_df = pd.DataFrame(optimization_results)

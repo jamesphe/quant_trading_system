@@ -10,8 +10,8 @@ def get_a_share_list():
     try:
         stock_info = ak.stock_info_a_code_name()
         # 排除8开头的股票和ST股票
-        stock_info = stock_info[(~stock_info['code'].str.startswith('8')) & (~stock_info['name'].str.contains('ST'))]
-        return stock_info
+        stock_info = stock_info[(~stock_info['code'].str.startswith('8')) & (~stock_info['code'].str.startswith('688')) & (~stock_info['name'].str.contains('ST'))]
+        return stock_info.head(3)
     except Exception as e:
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()

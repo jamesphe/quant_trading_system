@@ -2,22 +2,32 @@ import subprocess
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests  # 新增导入
-
+from datetime import datetime, timedelta
 # 定义持仓股票清单
 portfolio = {
     '300077': '国民技术',
-    '300383': '光环新网',
+    '301178': '天亿马',
     '300687': '赛意信息',
     '603206': '嘉环科技',
     '600141': '兴发集团',
     'ZTO': '中通快递',
-    'VGT': '信息科技'
+    'VGT': '信息科技',
+    '300967': '晓鸣股份',
+    '300857': '协创数据',
+    '159949': '创业板50ETF',
+    '515010': '券商ETF基金',
+    '301012': '扬电科技',
+    '601398': '工商银行',
+    '301183': '东田微',
+    '300210': '森远股份',
+    '300753': '爱朋医疗'
+
 }  # 可以根据实际情况修改
 
 def optimize_and_backtest(symbol):
     # 运行优化器
-    optimize_cmd = f"python optimizer.py {symbol}"
-    subprocess.run(optimize_cmd, shell=True, check=True)
+    #optimize_cmd = f"python optimizer.py {symbol}"
+    #subprocess.run(optimize_cmd, shell=True, check=True)
 
     # 读取优化结果
     opt_results = pd.read_csv(f"results/{symbol}_optimization_results.csv")
@@ -26,6 +36,15 @@ def optimize_and_backtest(symbol):
         return symbol, "无法获取优化结果"
 
     best_params = opt_results.iloc[0]
+
+    # 格式化最佳参数
+    formatted_best_params = (
+        f"length: {int(best_params['length'])}, "
+        f"mult: {best_params['mult']:.2f}, "
+        f"zlsma_length: {int(best_params['zlsma_length'])}, "
+        f"investment_fraction: {best_params['investment_fraction']:.2f}, "
+        f"max_pyramiding: {int(best_params['max_pyramiding'])}"
+    )
 
     # 构建回测命令
     backtest_cmd = (
@@ -45,14 +64,16 @@ def optimize_and_backtest(symbol):
     trading_advice = []
     capture_advice = False
     for line in output_lines:
-        if "最新交易日交易建议:" in line:
+        if line.startswith((datetime.now() - timedelta(days=0)).strftime('%Y-%m-%d')):
+            trading_advice.append(line.strip())
+        elif "最新交易日交易建议:" in line:
             capture_advice = True
         elif capture_advice and line.strip() == "":
             break
         elif capture_advice:
-            trading_advice.append(line.strip())
-    
-    return symbol, '\n'.join(trading_advice)
+            trading_advice.append(line.strip())        
+
+    return symbol, '\n'.join(trading_advice) + '\n' + formatted_best_params
 
 def send_to_wechat(content):
     # 替换为您的Server酱 SCKEY
