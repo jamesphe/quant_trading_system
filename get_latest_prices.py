@@ -3,18 +3,27 @@ import akshare as ak
 import sys
 from datetime import datetime
 
-def get_all_stock_data():
+def get_stock_data(symbol):
     try:
-        # 获取A股实时行情
-        stock_df = ak.stock_zh_a_spot_em()
-        print(stock_df)
+        # 获取个股资金流向数据
+        market = "sh" if symbol.startswith("6") else "sz"
+        stock_df = ak.stock_individual_fund_flow(stock=symbol, market=market)
+        # 获取最新的一行数据
+        latest_data = stock_df.iloc[-1]
+        # 计算最近3日和最近5日的累计主力净流入-净额
+        last_3_days_net_inflow = stock_df['主力净流入-净额'].iloc[-3:].sum()
+        last_5_days_net_inflow = stock_df['主力净流入-净额'].iloc[-5:].sum()
         
-        # 将代码列设置为索引，以便后续快速查找
-        stock_df.set_index('代码', inplace=True)
-        
-        return stock_df
+        return {
+            'latest_price': latest_data['收盘价'],
+            'latest_change': latest_data['涨跌幅'],
+            'main_net_inflow': latest_data['主力净流入-净额'],
+            'main_net_inflow_rate': latest_data['主力净流入-净占比'],
+            'last_3_days_net_inflow': last_3_days_net_inflow,
+            'last_5_days_net_inflow': last_5_days_net_inflow
+        }
     except Exception as e:
-        print(f"获取股票数据时发生错误: {e}")
+        print(f"获取股票 {symbol} 数据时发生错误: {e}")
         return None
 
 def update_target_stocks():
@@ -27,31 +36,33 @@ def update_target_stocks():
 
     df = pd.read_csv(f'target_stocks_{date_suffix}.csv', dtype={'symbol': str})
     
-    # 获取所有股票数据
-    stock_df = get_all_stock_data()
-    
-    if stock_df is None:
-        print("无法获取股票数据，程序退出。")
-        return
-    
     # 添加新列
     df['latest_price'] = None
     df['latest_change'] = None
+    df['main_net_inflow'] = None
+    df['main_net_inflow_rate'] = None
     
     # 更新目标股票的数据
     for index, row in df.iterrows():
         symbol = row['symbol'].zfill(6)
         print(f"正在处理股票 {symbol}...")
         
-        if symbol in stock_df.index:
-            df.at[index, 'latest_price'] = stock_df.loc[symbol, '最新价']
-            df.at[index, 'latest_change'] = stock_df.loc[symbol, '涨跌幅']
-            df.at[index, '换手率'] = stock_df.loc[symbol, '换手率']
+        stock_data = get_stock_data(symbol)
+        if stock_data:
+            df.at[index, 'latest_price'] = stock_data['latest_price']
+            df.at[index, 'latest_change'] = stock_data['latest_change']
+            df.at[index, 'main_net_inflow'] = stock_data['main_net_inflow']
+            df.at[index, 'main_net_inflow_rate'] = stock_data['main_net_inflow_rate']
+            df.at[index, 'last_3_days_net_inflow'] = stock_data['last_3_days_net_inflow']
+            df.at[index, 'last_5_days_net_inflow'] = stock_data['last_5_days_net_inflow']
         else:
-            print(f"未找到股票 {symbol} 的价格信息")
+            print(f"未找到股票 {symbol} 的数据")
+            
+    # 把df中的字段名称转换为中文
+    df = df.rename(columns={'symbol': '股票代码', 'stock_name': '股票名称', 'latest_trading_amount': '最新交易量', 'sharpe_ratio': '夏普比率', 'best_win_rate': '最佳胜率', 'best_max_drawdown': '最佳最大回撤', 'best_return': '最佳回报', 'last_signal': '最新信号', 'length': '长度', 'mult': '倍数', 'zlsma_length': 'ZLSMA长度', 'investment_fraction': '投资比例', 'max_pyramiding': '最大加仓', 'latest_price': '最新价格', 'latest_change': '最新涨跌幅', 'main_net_inflow': '主力净流入', 'main_net_inflow_rate': '主力净流入率', 'last_3_days_net_inflow': '最近3日净流入', 'last_5_days_net_inflow': '最近5日净流入'})
     
     # 按涨跌幅降序排序
-    df = df.sort_values(by='latest_change', ascending=False)
+    df = df.sort_values(by='最新涨跌幅', ascending=False)
     
     # 保存更新后的数据
     df.to_csv(f'updated_target_stocks_{date_suffix}.csv', index=False)

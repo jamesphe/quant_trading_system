@@ -45,9 +45,8 @@ def optimize_single_stock(symbol):
 
         best_trial = study.best_trial
         best_params = {
-            'length': int(best_trial.params['length']),
+            'period': int(best_trial.params['period']),
             'mult': round(best_trial.params['mult'], 2),
-            'zlsma_length': int(best_trial.params['zlsma_length']),
             'investment_fraction': round(best_trial.params['investment_fraction'], 2),
             'max_pyramiding': int(best_trial.params['max_pyramiding'])
         }

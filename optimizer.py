@@ -99,15 +99,13 @@ def objective(trial, strategy, data_feed):
             'devfactor': devfactor
         }
     elif strategy == ChandelierZlSmaStrategy:
-        length = trial.suggest_int('length', 10, 30)
+        period = trial.suggest_int('period', 10, 30)
         mult = trial.suggest_float('mult', 1.5, 3.5)
-        zlsma_length = trial.suggest_int('zlsma_length', 10, 30)
         investment_fraction = trial.suggest_float('investment_fraction', 0.5, 1.0)
         max_pyramiding = trial.suggest_int('max_pyramiding', 0, 3)
         params = {
-            'length': length,
+            'period': period,
             'mult': mult,
-            'zlsma_length': zlsma_length,
             'investment_fraction': investment_fraction,
             'max_pyramiding': max_pyramiding,
             'printlog': False
@@ -197,9 +195,8 @@ def main():
         # 根据策略类型提取最佳参数
         if strat == ChandelierZlSmaStrategy:
             best_params = {
-                'length': int(best_trial.params['length']),
+                'period': int(best_trial.params['period']),
                 'mult': round(best_trial.params['mult'], 2),
-                'zlsma_length': int(best_trial.params['zlsma_length']),
                 'investment_fraction': round(best_trial.params['investment_fraction'], 2),
                 'max_pyramiding': int(best_trial.params['max_pyramiding']),
                 'printlog': False

@@ -9,7 +9,6 @@ portfolio = {
     '301178': '天亿马',
     '300687': '赛意信息',
     '603206': '嘉环科技',
-    '600141': '兴发集团',
     'ZTO': '中通快递',
     'VGT': '信息科技',
     '300967': '晓鸣股份',
@@ -21,7 +20,6 @@ portfolio = {
     '301183': '东田微',
     '300210': '森远股份',
     '300753': '爱朋医疗'
-
 }  # 可以根据实际情况修改
 
 def optimize_and_backtest(symbol):
@@ -39,9 +37,8 @@ def optimize_and_backtest(symbol):
 
     # 格式化最佳参数
     formatted_best_params = (
-        f"length: {int(best_params['length'])}, "
+        f"period: {int(best_params['period'])}, "
         f"mult: {best_params['mult']:.2f}, "
-        f"zlsma_length: {int(best_params['zlsma_length'])}, "
         f"investment_fraction: {best_params['investment_fraction']:.2f}, "
         f"max_pyramiding: {int(best_params['max_pyramiding'])}"
     )
@@ -49,11 +46,10 @@ def optimize_and_backtest(symbol):
     # 构建回测命令
     backtest_cmd = (
         f"python chandelier_zlsma_test.py {symbol} "
-        f"-l {int(best_params['length'])} "
+        f"-p {int(best_params['period'])} "
         f"-m {best_params['mult']:.2f} "
-        f"-z {int(best_params['zlsma_length'])} "
         f"-i {best_params['investment_fraction']:.2f} "
-        f"-p {int(best_params['max_pyramiding'])}"
+        f"-y {int(best_params['max_pyramiding'])}"
     )
 
     # 运行回测

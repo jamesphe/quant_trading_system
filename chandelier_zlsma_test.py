@@ -1,10 +1,10 @@
 from strategies.chandelier_zlsma_strategy import ChandelierZlSmaStrategy
 import backtrader as bt
 import pandas as pd
-from data_fetch import get_stock_data , get_etf_data , get_us_stock_data
+from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
 import os
 
-def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
+def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params):
     """
     运行回测
 
@@ -102,13 +102,12 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
         print(f"  开仓价格: {trade.price:.2f}")
         print(f"  开仓数量: {trade.size}")
         print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
-        # print(f"  平仓价格: {trade.barclose:.2f}")
         print(f"  交易盈亏: {trade.pnl:.2f}")
         print(f"  交易佣金: {trade.commission:.2f}")
         print(f"  净盈亏: {trade.pnlcomm:.2f}")
         print()
 
-    # 输出最新交易日的��易建议
+    # 输出最新交易日的交易建议
     latest_date = data_df.index[-1]
     latest_close = data_df['Close'].iloc[-1]
 
@@ -168,9 +167,6 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     
     print(f"交易建议: {signal_type}")
 
-    # 可选：绘制结果
-    # cerebro.plot(style='candlestick', volume=False, barup='green', bardown='red')[0][0]
-
 if __name__ == '__main__':
     import argparse
     import sys
@@ -181,11 +177,10 @@ if __name__ == '__main__':
     parser.add_argument('symbol', type=str, help='股票代码')
     parser.add_argument('-s', '--start', type=str, default='2023-9-30', help='开始日期')
     parser.add_argument('-e', '--end', type=str, default=datetime.date.today().strftime('%Y-%m-%d'), help='结束日期')
-    parser.add_argument('-l', '--len', type=int, default=14, help='ATR和CE周期')
+    parser.add_argument('-p', '--period', type=int, default=14, help='ATR、CE和ZLSMA周期')
     parser.add_argument('-m', '--mult', type=float, default=2, help='ATR倍数')
-    parser.add_argument('-z', '--zlsma', type=int, default=14, help='ZLSMA周期')
-    parser.add_argument('-i', '--inv', type=float, default=0.8, help='资比例')
-    parser.add_argument('-p', '--pyr', type=int, default=0, help='最大加仓次数')
+    parser.add_argument('-i', '--inv', type=float, default=0.8, help='资金比例')
+    parser.add_argument('-y', '--pyr', type=int, default=0, help='最大加仓次数')
     parser.add_argument('--log', action='store_true', help='打印日志')
     args = parser.parse_args()
 
@@ -200,12 +195,11 @@ if __name__ == '__main__':
             best_params = opt_results.iloc[0]
             args.start = args.start  # 保持默认值
             args.end = args.end  # 保持默认值
-            args.len = int(best_params['length'])
+            args.period = int(best_params['period'])
             args.mult = float(best_params['mult'])
-            args.zlsma = int(best_params['zlsma_length'])
             args.inv = float(best_params['investment_fraction'])
             args.pyr = int(best_params['max_pyramiding'])
-            args.log = bool(best_params['printlog'])
+            args.log = True
             print("已加载优化参数。")
         else:
             print("优化结果文件为空，使用默认参数。")
@@ -217,9 +211,8 @@ if __name__ == '__main__':
         symbol=args.symbol,
         start_date=args.start,
         end_date=args.end,
-        length=args.len,
+        period=args.period,
         mult=args.mult,
-        zlsma_length=args.zlsma,
         investment_fraction=args.inv,
         max_pyramiding=args.pyr,
         printlog=True

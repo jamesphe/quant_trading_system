@@ -11,7 +11,7 @@ def get_a_share_list():
     try:
         stock_info = ak.stock_info_a_code_name()
         # 排除8开头的股票和ST股票
-        stock_info = stock_info[(~stock_info['code'].str.startswith('8')) & (~stock_info['name'].str.contains('ST')) & (~stock_info['code'].str.startswith('688'))]
+        stock_info = stock_info[(~stock_info['code'].str.startswith('8')) & (~stock_info['name'].str.contains('ST')) & (~stock_info['code'].str.startswith('688')) & (~stock_info['code'].str.startswith('4'))]
         #stock_info = stock_info[stock_info['code'].str.startswith('3')]
         return stock_info
     except Exception as e:

@@ -57,17 +57,16 @@ class ChandelierZlSmaStrategy(bt.Strategy):
     """
     基于 Chandelier Exit 和 ZLSMA 的交易策略。
     """
-    lines = ('signal',)  # 添加这行
+    lines = ('signal',)
 
     params = (
-        ('length', 14),         # ATR 和 Chandelier Exit 的周期
+        ('period', 14),         # Chandelier Exit 和 ZLSMA 的统一周期
         ('mult', 2),            # ATR 的倍数
         ('use_close', True),    # 是否使用收盘价计算最高/最低
-        ('zlsma_length', 14),   # ZLSMA 的周期
-        ('printlog', False),    # 是否打印日志
+        ('printlog', True),    # 是否打印日志
         ('investment_fraction', 0.8), # 每次交易使用可用资金的比例
         ('max_pyramiding', 0),        # 允许的最大加仓次数
-        ('min_trade_unit', 100),  # 添加新参数,设置最小交易单位
+        ('min_trade_unit', 100),  # 最小交易单位
     )
 
     def log(self, txt, dt=None):
@@ -78,16 +77,15 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
     def __init__(self):
         # 计算 ATR 指标
-        self.atr = bt.ind.ATR(self.datas[0], period=self.p.length)
-
+        self.atr = bt.ind.ATR(self.datas[0], period=self.p.period)
 
         # 根据 use_close 参数决定使用收盘价还是高低价计算最高/最低
         if self.p.use_close:
-            self.highest = bt.ind.Highest(self.datas[0].close, period=self.p.length)
-            self.lowest = bt.ind.Lowest(self.datas[0].close, period=self.p.length)
+            self.highest = bt.ind.Highest(self.datas[0].close, period=self.p.period)
+            self.lowest = bt.ind.Lowest(self.datas[0].close, period=self.p.period)
         else:
-            self.highest = bt.ind.Highest(self.datas[0].high, period=self.p.length)
-            self.lowest = bt.ind.Lowest(self.datas[0].low, period=self.p.length)
+            self.highest = bt.ind.Highest(self.datas[0].high, period=self.p.period)
+            self.lowest = bt.ind.Lowest(self.datas[0].low, period=self.p.period)
 
         # 计算 Long_Stop 和 Short_Stop
         self.long_stop = self.highest - (self.p.mult * self.atr)
@@ -113,8 +111,8 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 初始化方向变量
         self.direction = 0  # 1 表示多头，-1 表示空头，0 表示中立
 
-        # 计算 ZLSMA 指标
-        self.zlsma = ZLSMA(self.datas[0].close, period=self.p.zlsma_length)
+        # 计算 ZLSMA 指标，使用相同的周期
+        self.zlsma = ZLSMA(self.datas[0].close, period=self.p.period)
 
         # 初始化买入信号变量
         self.buy_signal = False
@@ -221,7 +219,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 打印当前信息
         #current_date = self.datas[0].datetime.date(0)
         #self.log(f'当前日期: {current_date}, 持仓: {current_positions}, 方向: {self.direction}, '
-        #         f'���向变化: {"是" if direction_change else "否"}, '
+        #         f'向变化: {"是" if direction_change else "否"}, '
         #         f'买入信息: {"是" if self.buy_signal else "否"}, '
         #         f'当前收盘价: {current_close:.2f}, ZLSMA当前值: {self.zlsma[0]:.2f}')
         # 执行买入信号
@@ -404,11 +402,10 @@ if __name__ == '__main__':
         symbol=args.symbol,
         start_date=args.start_date,
         end_date=args.end_date,
-        length=10,
+        period=14,  # 使用统一的周期参数
         mult=1.5,
-        zlsma_length=10,
         investment_fraction=0.55,
         max_pyramiding=1,
-        min_trade_unit=100,  # 添加新参数
+        min_trade_unit=100,
         printlog=False
     )
