@@ -3,6 +3,9 @@ import backtrader as bt
 import pandas as pd
 from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
 import os
+from datetime import datetime, timedelta
+import argparse
+import sys
 
 def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params):
     """
@@ -26,12 +29,6 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     if data_df.empty:
         print(f"股票 {symbol} 没有可用的数据进行回测。")
         return
-
-    # 添加调试信息
-    print("数据框的列名:")
-    print(data_df.columns)
-    print("\n数据框的前几行:")
-    print(data_df.head())
 
     # 初始化 Cerebro 引擎
     cerebro = bt.Cerebro()
@@ -78,6 +75,9 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     print(f'总收益: {total_profit:.2f}')
     print(f'收益率: {roi:.2f}%')
 
+    # 计算胜率
+    win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100
+    print(f'胜率: {win_rate:.2f}%')
     # 计算夏普比率
     sharpe_analysis = strat.analyzers.sharpe.get_analysis()
     sharpe_ratio = sharpe_analysis.get('sharperatio', None)
@@ -130,6 +130,10 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     print("\n最新交易日交易建议:")
     print(f"日期: {latest_date.strftime('%Y-%m-%d')}")
     print(f"收盘价: {latest_close:.2f}")
+    print(f"开盘价: {data_df['Open'].iloc[-1]:.2f}")
+    print(f"最高价: {data_df['High'].iloc[-1]:.2f}")
+    print(f"最低价: {data_df['Low'].iloc[-1]:.2f}")
+    print(f"涨跌幅: {(latest_close - data_df['Close'].iloc[-2]) / data_df['Close'].iloc[-2] * 100:.2f}%")
     
     if hasattr(strat, 'chandelier_exit_long') and len(strat.chandelier_exit_long) > 0:
         latest_chandelier_exit_long = strat.chandelier_exit_long[0]
@@ -156,10 +160,14 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
             signal_type = "买入，方向从空头转为多头，且收盘价高于ZLSMA线。"
         elif last_signal == 2:
             signal_type = "买入，多头趋势中，ZLSMA上升。"
+        elif last_signal == 3:
+            signal_type = "建仓预警，收盘价高于空头止损价，但没有高于多头止损价。"
         elif last_signal == -1:
-            signal_type = "卖出，因为方向从多头转为空头。"
+            signal_type = "清仓，因为方向从多头转为空头。"
         elif last_signal == -2:
-            signal_type = "减仓，多头趋势中，但ZLSMA未上升。"
+            signal_type = "减仓预警，多头趋势中，但ZLSMA未上升。"
+        elif last_signal == -3:
+            signal_type = "减仓或清仓，收盘价低于多头止损价，但没有低于空头止损价。"
         else:
             signal_type = "无交易信号，当前市场趋势不明确。"
     else:
@@ -168,15 +176,12 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     print(f"交易建议: {signal_type}")
 
 if __name__ == '__main__':
-    import argparse
-    import sys
-    import datetime
 
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='股票回测程序')
     parser.add_argument('symbol', type=str, help='股票代码')
-    parser.add_argument('-s', '--start', type=str, default='2023-9-30', help='开始日期')
-    parser.add_argument('-e', '--end', type=str, default=datetime.date.today().strftime('%Y-%m-%d'), help='结束日期')
+    parser.add_argument('-s', '--start', type=str, default=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'), help='开始日期')
+    parser.add_argument('-e', '--end', type=str, default=datetime.now().strftime('%Y-%m-%d'), help='结束日期')
     parser.add_argument('-p', '--period', type=int, default=14, help='ATR、CE和ZLSMA周期')
     parser.add_argument('-m', '--mult', type=float, default=2, help='ATR倍数')
     parser.add_argument('-i', '--inv', type=float, default=0.8, help='资金比例')

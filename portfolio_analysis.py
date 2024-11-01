@@ -1,31 +1,50 @@
 import subprocess
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests  # 新增导入
+import requests
 from datetime import datetime, timedelta
+import argparse
+
 # 定义持仓股票清单
 portfolio = {
     '300077': '国民技术',
-    '301178': '天亿马',
-    '300687': '赛意信息',
-    '603206': '嘉环科技',
-    'ZTO': '中通快递',
+    '600580': '卧龙电驱',
+    'ARKK': 'ARK创新',
     'VGT': '信息科技',
+    'TSLA': '特斯拉',
     '300967': '晓鸣股份',
     '300857': '协创数据',
-    '159949': '创业板50ETF',
-    '515010': '券商ETF基金',
-    '301012': '扬电科技',
     '601398': '工商银行',
-    '301183': '东田微',
-    '300210': '森远股份',
-    '300753': '爱朋医疗'
+    '600678': '四川金顶',
+    '301366': '一搏科技',
+    '000595': '宝塔实业',
+    '002786': '银宝山新',
+    '300363': '博腾股份',
+    '300075': '数字政通',
+    '002053': '云南能投',
+    '300315': '掌趣科技'
 }  # 可以根据实际情况修改
+
+# 新增目标股票清单
+target_stocks = {
+    '603628': '清源股份',
+    '601519': '大智慧',
+    '300524': '新晨科技',
+    '300459': '汤姆猫',
+    '300398': '飞凯材料'
+}
+
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='股票分析工具')
+    parser.add_argument('--mode', type=str, choices=['portfolio', 'target'],
+                      default='portfolio', help='分析模式：portfolio(持仓分析)或target(目标股分析)')
+    return parser.parse_args()
 
 def optimize_and_backtest(symbol):
     # 运行优化器
-    #optimize_cmd = f"python optimizer.py {symbol}"
-    #subprocess.run(optimize_cmd, shell=True, check=True)
+    optimize_cmd = f"python optimizer.py {symbol}"
+    subprocess.run(optimize_cmd, shell=True, check=True)
 
     # 读取优化结果
     opt_results = pd.read_csv(f"results/{symbol}_optimization_results.csv")
@@ -90,26 +109,32 @@ def send_to_wechat(content):
         print("发送失败")
 
 def main():
+    args = parse_args()
     results = []
     
+    # 根据模式选择股票清单
+    stocks_to_analyze = portfolio if args.mode == 'portfolio' else target_stocks
+    mode_name = "持仓" if args.mode == 'portfolio' else "目标股票"
+    
     # 使用线程池并行处理
-    with ThreadPoolExecutor(max_workers=len(portfolio)) as executor:
-        future_to_symbol = {executor.submit(optimize_and_backtest, symbol): symbol for symbol in portfolio}
+    with ThreadPoolExecutor(max_workers=len(stocks_to_analyze)) as executor:
+        future_to_symbol = {executor.submit(optimize_and_backtest, symbol): symbol 
+                          for symbol in stocks_to_analyze}
         for future in as_completed(future_to_symbol):
             symbol = future_to_symbol[future]
             try:
                 result = future.result()
                 results.append(result)
             except Exception as exc:
-                print(f'{portfolio[symbol]}（{symbol}）生成了一个异常: {exc}')
+                print(f'{stocks_to_analyze[symbol]}（{symbol}）生成了一个异常: {exc}')
 
     # 打印结果并准备发送内容
-    print("\n=== 交易建议汇总 ===")
-    wechat_content = "# 交易建议汇总\n\n"
+    print(f"\n=== {mode_name}分析汇总 ===")
+    wechat_content = f"# {mode_name}分析汇总\n\n"
     for symbol, advice in results:
-        print(f"\n{portfolio[symbol]}（{symbol}）")
+        print(f"\n{stocks_to_analyze[symbol]}（{symbol}）")
         print(advice)
-        wechat_content += f"## {portfolio[symbol]}（{symbol}）\n\n{advice}\n\n"
+        wechat_content += f"## {stocks_to_analyze[symbol]}（{symbol}）\n\n{advice}\n\n"
     
     # 发送到微信
     send_to_wechat(wechat_content)

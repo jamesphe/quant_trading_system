@@ -90,8 +90,9 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 计算 Long_Stop 和 Short_Stop
         self.long_stop = self.highest - (self.p.mult * self.atr)
         self.long_stop_prev = self.long_stop(-1)
+        
         self.long_stop = bt.If(
-            self.data.close(-1) > self.long_stop_prev,
+            self.data.close(0) > self.long_stop_prev,
             bt.Max(self.long_stop, self.long_stop_prev),
             self.long_stop
         )
@@ -166,17 +167,24 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         
         # 计算当前方向
         if current_close < prev_long_stop:
-            current_direction = -1  # 转为空头
-            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 空头, 原因: 收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
-        elif current_close > prev_short_stop and current_close > prev_long_stop:
-            current_direction = 1  # 转为多头
-            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 多头, 原因: 收盘价 {current_close:.2f} 高于 Short_Stop {prev_short_stop:.2f} 和 Long_Stop {prev_long_stop:.2f}')
+            if current_close < prev_short_stop:
+                current_direction = -1  # 转为空头
+                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 空头, 原因: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f} 和 空头止损价 {prev_short_stop:.2f}')
+            else:
+                current_direction = -2    # 清仓预警
+                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 清仓预警, 原因: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}')
+        elif current_close > prev_short_stop:
+            if current_close > prev_long_stop:
+                current_direction = 1  # 转为多头
+                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 多头, 原因: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f} 和 多头止损价 {prev_long_stop:.2f}')
+            else:
+                current_direction = 2    # 建仓预警
+                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 建仓预警, 原因: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}')
         else:
             current_direction = self.direction  # 维持原有方向
-            direction_name = '多头' if self.direction == 1 else '空头' if self.direction == -1 else '中立'
+            direction_name = '多头' if self.direction == 1 else '空头' if self.direction == -1 else '建仓预警' if self.direction == 2 else '清仓预警' if self.direction == -2 else '中立'
             self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, '
-                     f'原因: 维持原有方向 (收盘价 {current_close:.2f} 介于 '
-                     f'Long_Stop {prev_long_stop:.2f} 和 Short_Stop {prev_short_stop:.2f} 之间)')
+                     f'原因: 收盘价 {current_close:.2f} 介于 多头止损价 {prev_long_stop:.2f} 和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
 
         # 检查方向是否发生变化
         # 打印方向和价格信息
@@ -197,12 +205,24 @@ class ChandelierZlSmaStrategy(bt.Strategy):
             elif current_direction == -1:
                 self.buy_signal = False
                 self.signal[0] = -1
-                self.log(f'清仓信号产生: 方向从多头转为空头。当前收盘价 {current_close:.2f} 低于 Long_Stop {prev_long_stop:.2f}')
+                self.log(f'清仓信号产生: 方向从多头转为空头。当前收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}')
+            elif current_direction == 2:
+                self.buy_signal = False
+                self.signal[0] = 3
+                self.log(f'建仓预警信号产生: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}')
+            elif current_direction == -2:
+                self.buy_signal = False
+                self.signal[0] = -3
+                self.log(f'减仓预警信号产生: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}')
         elif self.direction == 1 and current_direction == 1:
             if self.zlsma[-1] < self.zlsma[0]:
                 self.buy_signal = True
-                self.signal[0] = 2
-                self.log(f'加仓信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
+                if not self.position:
+                    self.signal[0] = 1
+                    self.log(f'建仓信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
+                else:
+                    self.signal[0] = 2
+                    self.log(f'加仓信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
             else:
                 self.signal[0] = -2
                 self.log('减仓预警信号产生: 多头趋势中，但ZLSMA未上升，无交易信号')
@@ -212,6 +232,12 @@ class ChandelierZlSmaStrategy(bt.Strategy):
             if self.position:
                 self.buy_signal = False
                 self.log(f'清仓信号产生:方向持续空头')
+        elif self.direction == 2 and current_direction == 2:
+            self.signal[0] = 2
+            self.log(f'建仓预警信号产生: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}')
+        elif self.direction == -2 and current_direction == -2:
+            self.signal[0] = -3
+            self.log(f'减仓预警信号产生: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}') 
         else:
             self.signal[0] = 0
             self.log('无交易信号')
@@ -232,11 +258,11 @@ class ChandelierZlSmaStrategy(bt.Strategy):
             # 根据策略逻辑决定何时卖出
             if self.direction == 1:
                 if direction_change:
-                    self.log('卖出信号触发：方向变化，执行卖出操作')
+                    self.log('**卖出信号触发**：方向变化，执行卖出操作')
                     self.sell(size=current_positions)
                     self.current_pyramiding = 0
                 elif self.zlsma[-1] > self.zlsma[0] and current_close < self.zlsma[0] and self.zlsma[-2] > self.zlsma[-1]:
-                    self.log('卖出信号触发：ZLSMA下降且当前价格低于ZLSMA（ZLSMA前值: {:.2f}, 当前值: {:.2f}，当前价格: {:.2f}），执行卖出操作'.format(self.zlsma[-1], self.zlsma[0], current_close))
+                    self.log('**卖出信号触发**：ZLSMA下降且当前价格低于ZLSMA（ZLSMA前值: {:.2f}, 当前值: {:.2f}，当前价格: {:.2f}），执行卖出操作'.format(self.zlsma[-1], self.zlsma[0], current_close))
                     self.sell(size=current_positions)
                     self.current_pyramiding = 0
                 elif current_close > self.position.price * 1.03:
@@ -349,6 +375,12 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     print(f'最终资金: {final_cash:.2f}')
     print(f'总收益: {total_profit:.2f}')
     print(f'收益率: {roi:.2f}%')
+    
+    print(f"交易总数: {len(strat.trades)}")
+    print(f"盈利交易数: {len([trade for trade in strat.trades if trade.pnl > 0])}")
+    # 计算胜率
+    win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100
+    print(f'胜率: {win_rate:.2f}%')
 
     # 计算夏普比率
     sharpe_analysis = strat.analyzers.sharpe.get_analysis()
