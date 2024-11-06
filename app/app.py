@@ -1,7 +1,12 @@
 from flask import Flask, render_template, request, jsonify
 import backtrader as bt
 from optimizer import optimize_strategy
-from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
+from data_fetch import (
+    get_stock_data, 
+    get_etf_data, 
+    get_us_stock_data, 
+    get_stock_name
+)
 from strategies import ChandelierZlSmaStrategy
 import logging  # 添加日志模块
 import pandas as pd
@@ -32,10 +37,9 @@ def optimize():
         start_date = data.get('startDate')
         end_date = data.get('endDate')
 
-        logger.debug(
-            f"收到优化请求: symbol={symbol}, start_date={start_date}, "
-            f"end_date={end_date}"
-        )
+        # 获取股票名称
+        stock_name = get_stock_name(symbol)
+        logger.info(f'股票名称: {stock_name}')
 
         # 根据股票类型获取数据
         if symbol.startswith(('51', '159')):
@@ -67,7 +71,7 @@ def optimize():
         study = optimize_strategy(
             ChandelierZlSmaStrategy, 
             data_feed, 
-            n_trials=50, 
+            n_trials=100, 
             n_jobs=1
         )
         best_trial = study.best_trial
@@ -92,6 +96,7 @@ def optimize():
 
         # 构建返回结果
         result = {
+            'stockName': stock_name,
             'bestParams': best_params,
             'metrics': {
                 'sharpeRatio': round(best_trial.value * -1, 2),
@@ -124,16 +129,13 @@ def optimize():
         results_dir = 'results'
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
+        # 保存优化结果到CSV文件
         df.to_csv(
             f'{results_dir}/{symbol}_optimization_results.csv',
-            mode='a',
-            header=not os.path.exists(
-                f'{results_dir}/{symbol}_optimization_results.csv'
-            ),
             index=False
         )
 
-        logger.debug(f"返回��果: {result}")
+        logger.debug(f"返回果: {result}")
         return jsonify(result)
 
     except Exception as e:
@@ -146,56 +148,80 @@ def backtest():
     try:
         logger.info('收到 /backtest 请求')
         data = request.get_json()
-        symbol = data.get('symbol')
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
         
-        # 获取股票数据并添加错误处理
-        stock_data = get_stock_data(symbol, start_date, end_date)
-        if stock_data is None or stock_data.empty:
-            logger.error(f'无法获取股票 {symbol} 的数据')
+        # 验证输入参数
+        if not data:
             return jsonify({
                 'success': False,
-                'error': f'无法获取股票 {symbol} 的数据，请检查股票代码是否正确或稍后重试'
+                'error': '未收到有效的请求数据'
+            })
+            
+        symbol = data.get('symbol')
+        start_date = data.get('startDate')
+        end_date = data.get('endDate')
+        # 验证必需的参数
+        if not all([symbol, start_date, end_date]):
+            return jsonify({
+                'success': False,
+                'error': '缺少必需的参数：symbol、startDate 或 endDate'
             })
         
-        # 创建数据源
-        data_feed = bt.feeds.PandasData(
-            dataname=stock_data,
-            fromdate=pd.to_datetime(start_date),
-            todate=pd.to_datetime(end_date)
-        )
+        # 获取股票名称
+        stock_name = get_stock_name(symbol)
         
-        # 创建 cerebro 实例
-        cerebro = bt.Cerebro()
-        
-        # 添加数据
-        cerebro.adddata(data_feed)
-        
-        # 设置初始资金
-        cerebro.broker.setcash(100000.0)
-        
-        # 运行回测
-        results = cerebro.run()
-        
-        # 获取回测结果
-        strategy = results[0]
-        
-        # 构建返回结果
-        result = {
-            'finalValue': cerebro.broker.getvalue(),
-            'returns': cerebro.broker.getvalue() / 100000.0 - 1,
-            # 添加其他需要的回测指标
-        }
-
+        # 导入并执行回测脚本
+        import chandelier_zlsma_test
+        # 检查是否存在优化参数文件
+        optimization_file = f'results/{symbol}_optimization_results.csv'
+        if os.path.exists(optimization_file):
+            # 读取优化参数
+            opt_params = pd.read_csv(optimization_file).iloc[-1]
+            result = chandelier_zlsma_test.run_backtest(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                printlog=True,
+                period=int(opt_params['period']),
+                mult=float(opt_params['mult']),
+                investment_fraction=float(opt_params['investment_fraction']),
+                max_pyramiding=int(opt_params['max_pyramiding'])
+            )
+        else:
+            # 使用默认参数
+            result = chandelier_zlsma_test.run_backtest(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                printlog=True,
+                period=14,
+                mult=2.0,
+                investment_fraction=0.8,
+                max_pyramiding=0
+            )
+               
+        # 确保返回结果包含必要的字段
+        if not result:
+            return jsonify({
+                'success': False,
+                'error': '回测执行完成但未返回结果'
+            })
+            
+        # 添加成功标志
+        result['success'] = True
+        result['stockName'] = stock_name
         return jsonify(result)
 
     except Exception as e:
-        app.logger.error(f'回测过程发生错误: {str(e)}', exc_info=True)
+        logger.error(f'回测过程发生错误: {str(e)}', exc_info=True)
+        error_message = f'回测失败: {str(e)}'
         return jsonify({
             'success': False,
-            'error': f'回测失败: {str(e)}'
-        })
+            'error': error_message,
+            'details': {
+                'exception_type': type(e).__name__,
+                'exception_message': str(e)
+            }
+        }), 500
 
 
 def _convert_signal_to_text(signal):
@@ -214,7 +240,7 @@ def _convert_signal_to_text(signal):
         },
         2: {
             'text': "加仓信号",
-            'color': 'green'   # 加仓信号使用绿色
+            'color': 'green'   # 加仓信号用绿色
         },
         -2: {
             'text': "减仓预警",

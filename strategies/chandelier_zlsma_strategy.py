@@ -30,27 +30,26 @@ class LinearRegression(bt.Indicator):
         # 预测当前周期的y值（x = 0）
         linreg_value = intercept
         self.lines.linreg[0] = linreg_value
-        
+
 class ZLSMA(bt.Indicator):
     """
     Zero Lag Smoothed Moving Average (ZLSMA) 指标实现。
-    计算方法基于两次指数移动平均（EMA）的差值。
+    计算方法基于两次线性回归的差值，消除滞后。
     """
     lines = ('zlsma',)
     params = (
         ('period', 20),  # 计算周期
-        ('lag', 0),      # 延迟期数
     )
 
     def __init__(self):
-        # 使用内置的 linreg_indicator 或自定义线性回归
+        # 计算两次线性回归指标
         self.lsma = LinearRegression(self.data, period=self.p.period)
         self.lsma2 = LinearRegression(self.lsma, period=self.p.period)
+        
+        # 计算 ZLSMA 值
         self.zlsma = self.lsma + (self.lsma - self.lsma2)
         
-        if self.p.lag > 0:
-            self.zlsma = self.zlsma(-self.p.lag)
-        
+        # 将计算结果赋值给指标线
         self.lines.zlsma = self.zlsma
 
 class ChandelierZlSmaStrategy(bt.Strategy):
@@ -63,10 +62,10 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         ('period', 14),         # Chandelier Exit 和 ZLSMA 的统一周期
         ('mult', 2),            # ATR 的倍数
         ('use_close', True),    # 是否使用收盘价计算最高/最低
-        ('printlog', True),    # 是否打印日志
+        ('printlog', True),     # 是否打印日志
         ('investment_fraction', 0.8), # 每次交易使用可用资金的比例
         ('max_pyramiding', 0),        # 允许的最大加仓次数
-        ('min_trade_unit', 100),  # 最小交易单位
+        ('min_trade_unit', 100),      # 最小交易单位
     )
 
     def log(self, txt, dt=None):
@@ -112,7 +111,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 初始化方向变量
         self.direction = 0  # 1 表示多头，-1 表示空头，0 表示中立
 
-        # 计算 ZLSMA 指标，使用相同的周期
+        # 计算 ZLSMA 指标，移除了 lag 参数
         self.zlsma = ZLSMA(self.datas[0].close, period=self.p.period)
 
         # 初始化买入信号变量
@@ -122,7 +121,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         self.max_pyramiding = self.params.max_pyramiding
         self.current_pyramiding = 0  # 当前加仓次数
 
-        self.trades = []  # Initialize the trades list
+        self.trades = []  # 初始化交易记录列表
 
         self.signal = self.lines.signal  # 如果需要，可以添加这行
 
@@ -130,9 +129,6 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         """
         每个时间步执行的逻辑。
         """
-        # 打印当前的日期、收盘价和ZLSMA价格
-        #current_date = self.datas[0].datetime.date(0)
-        #self.log(f'当前日期: {current_date}, 收盘价: {self.datas[0].close[0]:.2f}, ZLSMA价格: {self.zlsma[0]:.2f}')
         # 当前收盘价
         current_close = self.datas[0].close[0]
 
@@ -153,116 +149,122 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         stake = int(available_cash_per_trade / current_close)
         # 确保交易数量是最小交易单位的倍数
         stake = (stake // self.params.min_trade_unit) * self.params.min_trade_unit
-        
-        # 添加调试代码
-        # self.log(f'调试信息:')
-        # self.log(f'  剩余加仓次数: {remaining_pyramiding}')
-        # self.log(f'  可用资金: {available_cash:.2f}')
-        # self.log(f'  每次交易可用资金: {available_cash_per_trade:.2f}')
-        # self.log(f'  计算得到的交易数量: {stake}')
-        # self.log(f'  当前收盘价: {current_close:.2f}')
-        # self.log(f'  最小交易单位: {self.params.min_trade_unit}')
 
-        # 计算当前方向
-        
-        # 计算当前方向
-        if current_close < prev_long_stop:
+        # 方向判断
+        if current_close < prev_long_stop or current_close < prev_short_stop:
+            current_direction = -1
+            direction_name = '空头'
+            reason = f'收盘价 {current_close:.2f} 低于 '
+            if current_close < prev_long_stop:
+                reason += f'多头止损价 {prev_long_stop:.2f} '
             if current_close < prev_short_stop:
-                current_direction = -1  # 转为空头
-                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 空头, 原因: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f} 和 空头止损价 {prev_short_stop:.2f}')
-            else:
-                current_direction = -2    # 清仓预警
-                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 清仓预警, 原因: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}')
+                reason += f'空头止损价 {prev_short_stop:.2f}'
         elif current_close > prev_short_stop:
-            if current_close > prev_long_stop:
-                current_direction = 1  # 转为多头
-                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 多头, 原因: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f} 和 多头止损价 {prev_long_stop:.2f}')
-            else:
-                current_direction = 2    # 建仓预警
-                self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: 建仓预警, 原因: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}')
+            current_direction = 1 if current_close > prev_long_stop else 2
+            direction_name = '多头' if current_direction == 1 else '建仓预警'
+            reason = f'收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}'
+            if current_direction == 1:
+                reason += f' 和 多头止损价 {prev_long_stop:.2f}'
         else:
-            current_direction = self.direction  # 维持原有方向
-            direction_name = '多头' if self.direction == 1 else '空头' if self.direction == -1 else '建仓预警' if self.direction == 2 else '清仓预警' if self.direction == -2 else '中立'
-            self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, '
-                     f'原因: 收盘价 {current_close:.2f} 介于 多头止损价 {prev_long_stop:.2f} 和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
+            current_direction = self.direction
+            direction_map = {1: '多头', -1: '空头', 2: '建仓预警', -2: '清仓预警', 0: '中立'}
+            direction_name = direction_map.get(self.direction, '中立')
+            reason = (f'收盘价 {current_close:.2f} 介于 多头止损价 {prev_long_stop:.2f} '
+                     f'和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
+
+        # 记录日志
+        self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {reason}')
 
         # 检查方向是否发生变化
-        # 打印方向和价格信息
-        #self.log(f'当前方向: {self.direction}, 新方向: {current_direction}, '
-        #         f'当前收盘价: {current_close:.2f}, ZLSMA当前值: {self.zlsma[0]:.2f}')
         direction_change = False
         self.buy_signal = False
+
         if self.direction != current_direction:
             direction_change = True
-            if current_direction == 1:
+            if current_direction == 1:  # 转为多头
                 if current_close > self.zlsma[0]:
                     self.buy_signal = True
                     self.signal[0] = 1
-                    self.log(f'建仓信号产生: 方向从空头转为多头，且收盘价 {current_close:.2f} 高于 ZLSMA {self.zlsma[0]:.2f}')
+                    self.log(
+                        f'建仓信号: 方向转多头，收盘价{current_close:.2f} > '
+                        f'ZLSMA {self.zlsma[0]:.2f}'
+                    )
                 else:
                     self.signal[0] = 0
-                    self.log('建仓信号产生: 方向从空头转为多头，但收盘价未高于 ZLSMA，无交易信号')
-            elif current_direction == -1:
+                    self.log('建仓信号: 方向转多头，但价格未高于ZLSMA，无交易')
+            elif current_direction == -1:  # 转为空头
                 self.buy_signal = False
                 self.signal[0] = -1
-                self.log(f'清仓信号产生: 方向从多头转为空头。当前收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}')
-            elif current_direction == 2:
+                self.log(
+                    f'清仓信号: 转空头，价格{current_close:.2f} < '
+                    f'止损价{prev_long_stop:.2f}'
+                )
+            elif current_direction == 2:  # 建仓预警
                 self.buy_signal = False
                 self.signal[0] = 3
-                self.log(f'建仓预警信号产生: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}')
-            elif current_direction == -2:
+                self.log(
+                    f'建仓预警: 价格{current_close:.2f} > 空头止损价 {prev_short_stop:.2f}'
+                )
+            elif current_direction == -2:  # 减仓预警
                 self.buy_signal = False
                 self.signal[0] = -3
-                self.log(f'减仓预警信号产生: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}')
-        elif self.direction == 1 and current_direction == 1:
-            if self.zlsma[-1] < self.zlsma[0]:
+                self.log(
+                    f'减仓预警: 价格{current_close:.2f} < 多头止损价 {prev_long_stop:.2f}'
+                )
+        elif self.direction == 1 and current_direction == 1:  # 保持多头
+            if self.zlsma[-1] < self.zlsma[0]:  # ZLSMA上升
                 self.buy_signal = True
                 if not self.position:
                     self.signal[0] = 1
-                    self.log(f'建仓信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
+                    self.log(
+                        f'建仓信号: 多头趋势，ZLSMA上升 '
+                        f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
+                    )
                 else:
                     self.signal[0] = 2
-                    self.log(f'加仓信号产生: 多头趋势中，ZLSMA上升（前值: {self.zlsma[-1]:.2f}, 当前值: {self.zlsma[0]:.2f}）')
+                    self.log(
+                        f'加仓信号: 多头趋势，ZLSMA上升 '
+                        f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
+                    )
             else:
                 self.signal[0] = -2
-                self.log('减仓预警信号产生: 多头趋势中，但ZLSMA未上升，无交易信号')
-        elif self.direction == -1 and current_direction == -1:
+                self.log('减仓预警: 多头趋势，但ZLSMA未上升')
+        elif self.direction == -1 and current_direction == -1:  # 保持空头
             self.signal[0] = -1
-            self.log(f'清仓信号产生: 方向持续空头')
+            self.log('清仓信号: 持续空头')
             if self.position:
                 self.buy_signal = False
-                self.log(f'清仓信号产生:方向持续空头')
-        elif self.direction == 2 and current_direction == 2:
+                self.log('清仓信号: 持续空头状态')
+        elif self.direction == 2 and current_direction == 2:  # 保持建仓预警
             self.signal[0] = 2
-            self.log(f'建仓预警信号产生: 收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}')
-        elif self.direction == -2 and current_direction == -2:
+            self.log(
+                f'建仓预警: 价格{current_close:.2f} > '
+                f'空头止损价{prev_short_stop:.2f}'
+            )
+        elif self.direction == -2 and current_direction == -2:  # 保持减仓预警
             self.signal[0] = -3
-            self.log(f'减仓预警信号产生: 收盘价 {current_close:.2f} 低于 多头止损价 {prev_long_stop:.2f}') 
+            self.log(
+                f'减仓预警: 价格{current_close:.2f} < '
+                f'多头止损价{prev_long_stop:.2f}'
+            )
         else:
             self.signal[0] = 0
             self.log('无交易信号')
 
-        # 打印当前信息
-        #current_date = self.datas[0].datetime.date(0)
-        #self.log(f'当前日期: {current_date}, 持仓: {current_positions}, 方向: {self.direction}, '
-        #         f'向变化: {"是" if direction_change else "否"}, '
-        #         f'买入信息: {"是" if self.buy_signal else "否"}, '
-        #         f'当前收盘价: {current_close:.2f}, ZLSMA当前值: {self.zlsma[0]:.2f}')
-        # 执行买入信号
+        # 执行交易
         if not self.position:
             if self.buy_signal:
                 self.log(f'买入信号 - 价格: {current_close:.2f}, 首次建仓, 买入数量: {stake}')
                 self.buy(size=stake)
                 self.current_pyramiding = 0
         else:
-            # 根据策略逻辑决定何时卖出
             if self.direction == 1:
                 if direction_change:
                     self.log('**卖出信号触发**：方向变化，执行卖出操作')
                     self.sell(size=current_positions)
                     self.current_pyramiding = 0
                 elif self.zlsma[-1] > self.zlsma[0] and current_close < self.zlsma[0] and self.zlsma[-2] > self.zlsma[-1]:
-                    self.log('**卖出信号触发**：ZLSMA下降且当前价格低于ZLSMA（ZLSMA前值: {:.2f}, 当前值: {:.2f}，当前价格: {:.2f}），执行卖出操作'.format(self.zlsma[-1], self.zlsma[0], current_close))
+                    self.log('**卖出信号触发**：ZLSMA下降且当前价格低于ZLSMA，执行卖出操作')
                     self.sell(size=current_positions)
                     self.current_pyramiding = 0
                 elif current_close > self.position.price * 1.03:
@@ -270,8 +272,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                         self.buy(size=stake)
                         self.current_pyramiding += 1
                         self.log(f'加仓信号 - 价格: {current_close:.2f}, 加仓次数: {self.current_pyramiding}')
-     
-
+         
         # 更新方向
         self.direction = current_direction
 
@@ -311,7 +312,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
             return
 
         self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
-        self.trades.append(trade)  # Record closed trades
+        self.trades.append(trade)  # 记录已完成的交易
 
 def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
     """
@@ -427,7 +428,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print(f"开始回测股票: {args.symbol}")
-    
 
     # 运行回测
     run_backtest(

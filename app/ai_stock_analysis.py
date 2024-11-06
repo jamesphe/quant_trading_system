@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import sys
 import argparse
 import os
+import zhipuai
+from zhipuai import ZhipuAI
 
 
 def get_kimi_analysis(stock_data):
@@ -22,23 +24,7 @@ def get_kimi_analysis(stock_data):
         base_url="https://api.moonshot.cn/v1",
     )
     
-    # 准备发送给Kimi的提示词
-    prompt = f"""
-    请分析以下股票数据，并根据分析结果给出交易建议：
-
-    {stock_data if isinstance(stock_data, str) else stock_data.to_string()}
-
-    请考虑以下方面进行分析：
-    1. 股票价格趋势
-    2. 成交量变化
-    3. 主要的技术指标（如移动平均线、RSI等）
-    4. 可能的支撑位和阻力位
-    5. 基于历史数据的短期和中期预测
-    6. 任何值得注意的异常模式或事件
-    7. 从网上获取的这支股票的最新消息
-
-    根据析结果请给出明确的交易建议，包括是否应该买入或卖出股票，以及建议的交易价格。
-    """
+    prompt = get_stock_analysis_prompt(stock_data)
     
     completion = client.chat.completions.create(
         model="moonshot-v1-8k",
@@ -54,7 +40,7 @@ def get_kimi_analysis(stock_data):
 
 def get_stock_web_analysis(symbol):
     """
-    使用Kimi的网络搜索功能获取股票的最新市场分析
+    使��Kimi的网络搜索功能获取股票的最新市场分析
     
     参数：
     - symbol: str，股票代码（例如：'600519'）
@@ -73,7 +59,7 @@ def get_stock_web_analysis(symbol):
     
     user_prompt = f"""@web 
     请搜索股票代码 {symbol} 的以下信息：
-    1. 最新的公司公告和新闻（最近7天内）
+    1. 最新的公司公告新闻（最近7天内）
     2. 当前的主要财务指标
     3. 最新的分析师评级和目标价
     4. 所属行业的最新动态
@@ -201,80 +187,216 @@ def stream_kimi_analysis(prompt):
     return full_response
 
 
-def analyze_csv_stocks(csv_file, date):
+def get_stock_analysis_prompt(stock_data):
     """
-    分析CSV文件中的股票数据,找出最适合买入的股票
+    生成单只股票分析的prompt
+    
+    参数：
+    - stock_data: DataFrame，包含股票历史数据
+    
+    返回：
+    - str，分析提示词
+    """
+    return f"""
+    请分析以下股票数据，并根据分析结果给出交易建议：
+
+    {stock_data if isinstance(stock_data, str) else stock_data.to_string()}
+
+    请考虑以下方面进行分析：
+    1. 股票价格趋势
+    2. 成交量变化
+    3. 主要的技术指标（如移动平均线、RSI等）
+    4. 可能的支撑位和阻力位
+    5. 基于历史数据的短期和中期预测
+    6. 任何值得注意的异常模式或事件
+    7. 从网上获取的这支股票的最新消息
+
+    根据分析结果请给出明确的交易建议，包括是否应该买入或卖出股票，以及建议的交易价格。
+    """
+
+
+def get_csv_analysis_prompt(df, industry_fund_flow):
+    """
+    生成CSV文件分析的prompt
+    
+    参数：
+    - df: DataFrame，股票列表数据
+    - industry_fund_flow: DataFrame，行业资金流数据
+    
+    返回：
+    - str，分析提示词
+    """
+    return f"""
+    请分析行业资金流数据和个股数据，以个股投资潜力为主要考虑因素，同时参考行业资金流向，
+    筛选出最具投资价值的5只股票。
+
+    行业资金流数据:
+    {industry_fund_flow.to_string() if industry_fund_flow is not None 
+      else "无可用的行业资金流数据"}
+
+    股票数据:
+    {df.to_string()}
+
+    分析步骤:
+    1. 个股筛选标准(主要考虑因素)
+    - 主力资金流向分析
+      * 主力净流入金额及占比
+      * 近3日和5日资金净流入趋势
+      * 主力资金持续性评估
+    - 技术指标表现
+      * 夏普比率(优选>0.15)
+      * 历史胜率(>60%)
+      * 最大回撤(<15%)
+      * 历史最佳回报率
+    - 交易活跃度
+      * 最新交易量
+      * 换手率变化
+      * 最新涨跌幅(优先选择涨幅在5%以内的股票,避免涨停和涨幅过大的股票)
+
+    2. 行业资金流分析(辅助参考)
+    - 所属行业资金流入规模
+    - 行业资金流入持续性
+    - 行业基本面和发展前景
+    
+    3. 风险控制指标
+    - 涨跌幅风险评估
+    - 流动性风险评估
+    - 行业系统性风险评估
+    
+    4. 综合评估
+    - 个股投资价值评分
+    - 行业景气度加分
+    - 风险因素扣分
+
+    对每只推荐股票请提供:
+    1. 核心推荐理由(重点说明个股自身优势)
+    2. 关键指标数据:
+       - 主力资金净流入情况
+       - 近期资金流向趋势
+       - 夏普比率
+       - 历史胜率
+       - 最大回撤
+       - 最新价格
+       - 最新涨跌幅（百分比）
+    3. 所属行业资金流情况及影响
+    4. 风险提示
+    5. 建议买入价位区间
+
+    最后请给出:
+    1. 投资组合配置建议
+    2. 仓位控制策略
+    3. 风险控制要点
+    4. 止盈止损建议
+    """
+
+
+def analyze_csv_stocks(csv_file, date, ai_provider="kimi"):
+    """
+    分析CSV文件中的股票数据
     
     参数:
     - csv_file: str, CSV文件的路径
     - date: datetime对象,表示分析的日期
+    - ai_provider: str, 使用的AI提供商 ("kimi" 或 "zhipu")
     
     返回:
     - str, 分析结果
     """
     # 读取CSV文件
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(csv_file, dtype={'股票代码': str})
     
     # 读取行业资金流数据
     industry_fund_flow = read_industry_fund_flow(date)
     
-    # 准备发送给Kimi的提示词
-    prompt = f"""
-    请对以下股票数据进行全面分析,筛选出最适合买入的5只股票。
-
-    股票数据:
-    {df.to_string()}
-
-    行业资金流数据:
-    {industry_fund_flow.to_string() if industry_fund_flow is not None else "无可用的行业资金流数据"}
-
-    筛选标准:
-    1. 资金面分析
-    - 主力资金净流入情况
-    - 近3日和5日资金净流入趋势
-    - 行业资金流向稳定性
+    # 获取分析提示词
+    prompt = get_csv_analysis_prompt(df, industry_fund_flow)
     
-    2. 市场表现
-    - 近期涨跌幅(优选涨幅温和的股票,规避当日涨幅过大的股票)
-    - 换手率和成交量变化
-    - 技术指标表现
-    - 涨停风险评估(需规避连续涨停、炒作题材等高风险股票)
-    
-    3. 风险控制指标
-    - 夏普比率(优选>1.5)
-    - 最大回撤(<20%)
-    - 历史胜率(>60%)
-    
-    4. 收益能力
-    - 历史总回报率
-    - 近期盈利表现
-    - 未来增长潜力
+    # 根据AI提供商选择不同的分析方法
+    if ai_provider == "kimi":
+        return stream_kimi_analysis(prompt)
+    else:
+        return stream_zhipu_analysis(prompt)
 
-    5. 行业资金流分析
-    - 根据行业资金流数据，重点关注资金净流入较大的行业
-    - 分析行业资金流入的持续性和稳定性
-    - 结合行业资金流向选择最具投资价值的个股
 
-    对每只推荐股票请提供:
-    1. 核心推荐理由
-    2. 关键指标数据支撑:
-       - 历史总回报率(百分比)
-       - 历史胜率(百分比)
-       - 最大回撤(百分比)
-    3. 所属行业资金流分析
-    4. 风险提示(特别关注涨停板风险)
-    5. 建议买入价位区间
-
-    最后请给出:
-    1. 整体投资策略建议
-    2. 仓位控制建议
-    3. 风险控制要点(包括涨停板风险防范措施)
-    4. 止盈止损参考位
+def get_zhipu_analysis(stock_data):
     """
+    使用智谱AI接口进行股票分析
     
-    print(prompt)
-    print("\nCSV文件中股票的分析结果:")
-    return stream_kimi_analysis(prompt)  # 返回分析结果
+    参数：
+    - stock_data: DataFrame，包含股票历史数据
+    
+    返回：
+    - str，智谱AI的分析结果
+    """
+    client = ZhipuAI(api_key="8d71dbdc04f0f2fb125badc9f6ab51be.vBBjM6pPSaoVIHoM")
+    
+    prompt = get_stock_analysis_prompt(stock_data)
+    
+    try:
+        response = client.chat.completions.create(
+            model="glm-4-plus",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一位专业的股票分析师，擅长分析股票数据并提供交易建议。"
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.7,
+            top_p=0.95,
+            max_tokens=4000,
+            tools=[{"type": "web_search"}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"智谱AI分析时发生错误: {str(e)}"
+
+
+def stream_zhipu_analysis(prompt):
+    """
+    使用智谱AI接口进行流式分析输出
+    
+    参数：
+    - prompt: str，发送给智谱AI的提示词
+    """
+    client = ZhipuAI(api_key="8d71dbdc04f0f2fb125badc9f6ab51be.vBBjM6pPSaoVIHoM")
+    
+    try:
+        response = client.chat.completions.create(
+            model="glm-4-plus",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一位专业的股票分析师，擅长分析大量股票数据并提供投资建议。"
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.7,
+            top_p=0.95,
+            max_tokens=4000,
+            stream=True
+        )
+        
+        full_response = ""
+        for chunk in response:
+            if hasattr(chunk.choices[0].delta, 'content'):
+                content = chunk.choices[0].delta.content
+                if content:
+                    full_response += content
+                    print(content, end='', flush=True)
+        print()
+        
+        return full_response
+    except Exception as e:
+        error_msg = f"智谱AI流式分析时发生错误: {str(e)}"
+        print(error_msg)
+        return error_msg
 
 
 if __name__ == "__main__":
@@ -290,6 +412,12 @@ if __name__ == "__main__":
         "-d", "--date", 
         default=datetime.now().strftime('%Y-%m-%d'), 
         help="分析日期，格式YYYY-MM-DD，默认为今天"
+    )
+    parser.add_argument(
+        "--ai", 
+        choices=["kimi", "zhipu"], 
+        default="kimi",
+        help="选择使用的AI接口: kimi 或 zhipu, 默认为kimi"
     )
     args = parser.parse_args()
 
@@ -315,32 +443,20 @@ if __name__ == "__main__":
                 print(f"无法获取股票 {args.symbol} 的数据")
                 sys.exit(1)
             
-            prompt = f"""
-            请分析以下股票数据，并根据分析结果给出交易建议：
-
-            {stock_data.to_string()}
-
-            请考虑以下方面进行分析：
-            1. 股票价格趋势
-            2. 成交量变化
-            3. 主要的技术指标（如移动平均线、RSI等）
-            4. 可能的支撑位和阻力位
-            5. 基于历史数据的短期和中期预测
-            6. 任何值得注意的异常模式或事件
-            7. 从网上获取的这支股票的最新消息
-
-            根据分析结果，请给出明确的交易建议，包括是否应该买入或卖出股票，以及建议的交易价格。
-            """
+            prompt = get_stock_analysis_prompt(stock_data)
             
             print(f"股票 {args.symbol} 的AI分析结果：")
-            analysis_result = stream_kimi_analysis(prompt)
+            if args.ai == "kimi":
+                analysis_result = stream_kimi_analysis(prompt)
+            else:
+                analysis_result = stream_zhipu_analysis(prompt)
             save_analysis_to_markdown(analysis_result, args.symbol, date)
     
     elif args.mode == "csv":
         csv_file = f"updated_target_stocks_{date.strftime('%Y-%m-%d')}.csv"
         try:
-            analysis_result = analyze_csv_stocks(csv_file, date)
-            if analysis_result:  # 确保有分析结果才保存
+            analysis_result = analyze_csv_stocks(csv_file, date, args.ai)
+            if analysis_result:
                 save_analysis_to_markdown(analysis_result, date=date)
             else:
                 print("错误: 未能获取分析结果")

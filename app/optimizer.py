@@ -9,6 +9,8 @@ import random
 import numpy as np
 import optuna.logging
 import argparse
+import importlib.util
+import os
 
 from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
 from strategies import MeanReversionStrategy, ChandelierZlSmaStrategy
@@ -105,7 +107,7 @@ def objective(trial, strategy, data_feed):
         }
     elif strategy == ChandelierZlSmaStrategy:
         period = trial.suggest_int('period', 10, 20)
-        mult = trial.suggest_float('mult', 1.5, 2.5)
+        mult = trial.suggest_float('mult', 1.5, 2.5, step=0.1)
         inv_fraction = trial.suggest_float('investment_fraction', 0.5, 1.0)
         max_pyramiding = trial.suggest_int('max_pyramiding', 0, 3)
         params = {
@@ -174,12 +176,75 @@ def main():
     if args.symbol:
         stocks_to_process = [{'code': args.symbol, 'name': '单只股票'}]
     else:
-        stocks_to_process = STOCK_LIST
-        print(f"将对 {len(STOCK_LIST)} 只股票进行批量优化...")
+        # 修改导入逻辑
+        stock_list_date = args.end_date.replace('-', '')
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            module_path = os.path.join(
+                current_dir,
+                f'../stock_pool/stock_list_{stock_list_date}.py'
+            )
+            
+            stocks_to_process = STOCK_LIST  # 设置默认值
+            
+            if os.path.exists(module_path):
+                try:
+                    spec = importlib.util.spec_from_file_location(
+                        "stock_list_module",
+                        module_path
+                    )
+                    stock_list_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(stock_list_module)
+                    
+                    if not hasattr(stock_list_module, 'STOCK_LIST'):
+                        print("导入的模块中没有找到 STOCK_LIST，使用默认列表")
+                    else:
+                        # 处理不同的数据格式
+                        imported_list = stock_list_module.STOCK_LIST
+                        if isinstance(imported_list, dict):
+                            # 如果是字典格式，转换为列表格式
+                            stocks_to_process = [
+                                {'code': code, 'name': name}
+                                for code, name in imported_list.items()
+                            ]
+                        elif isinstance(imported_list, list):
+                            if imported_list and isinstance(imported_list[0], str):
+                                # 如果是字符串列表
+                                stocks_to_process = [
+                                    {'code': code, 'name': code} 
+                                    for code in imported_list
+                                ]
+                            else:
+                                # 如果已经是字典列表格式
+                                stocks_to_process = imported_list
+                            print(f"成功处理列表格式的股票列表，包含 {len(stocks_to_process)} 只股票")
+                        else:
+                            print(f"未知的 STOCK_LIST 格式: {type(imported_list)}，使用默认列表")
+                            
+                except Exception as e:
+                    print(f"处理导入的股票列表时出错: {str(e)}")
+                    print(f"错误类型: {type(e)}")
+                    print("使用默认股票列表...")
+            else:
+                print(f"未找到股票列表文件: {module_path}，使用默认列表")
+                
+        except Exception as e:
+            print(f"导入股票列表时出错: {str(e)}")
+            print(f"错误类型: {type(e)}")
+            print("使用默认股票列表...")
+        
+        print(f"最终使用的股票列表: {stocks_to_process}")
+        print(f"将对 {len(stocks_to_process)} 只股票进行批量优化...")
 
     # 遍历处理每只股票
     for stock in stocks_to_process:
-        symbol = stock['code']
+        if isinstance(stock, str):
+            # 如果是字符串，转换为字典格式
+            symbol = stock
+            stock = {'code': symbol, 'name': symbol}
+        else:
+            symbol = stock['code']
+            
         print(f"\n{'='*60}")
         print(f"正在优化 {stock['name']}({symbol})")
         print(f"{'='*60}")
@@ -217,7 +282,7 @@ def main():
             print(f'\n策略: {strategy_name}')
             print('-'*50)
             
-            study = optimize_strategy(strat, data_feed, n_trials=50, n_jobs=1)
+            study = optimize_strategy(strat, data_feed, n_trials=100, n_jobs=1)
             best_trial = study.best_trial
 
             # 设置最优参数

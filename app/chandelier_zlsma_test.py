@@ -27,8 +27,7 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
         data_df = get_us_stock_data(symbol, start_date, end_date)
 
     if data_df.empty:
-        print(f"股票 {symbol} 没有可用的数据进行回测。")
-        return
+        return {'error': f"股票 {symbol} 没有可用的数据进行回测。"}
 
     # 初始化 Cerebro 引擎
     cerebro = bt.Cerebro()
@@ -57,75 +56,135 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
                         timeframe=bt.TimeFrame.Days, compression=1)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
 
-    # 打印初始资金
-    print(f'初始资金: {initial_cash:.2f}')
-
     # 运行策略，并获取策略实例列表
     results = cerebro.run()
 
     # 获取第一个策略实例
     strat = results[0]
 
-    # 打印最终资金
+    # 计算基本指标
     final_cash = cerebro.broker.getvalue()
     total_profit = sum(trade.pnlcomm for trade in strat.trades if trade.isclosed)
     roi = (total_profit / initial_cash) * 100
+    win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100 if strat.trades else 0
 
-    print(f'最终资金: {final_cash:.2f}')
-    print(f'总收益: {total_profit:.2f}')
-    print(f'收益率: {roi:.2f}%')
-
-    # 计算胜率
-    win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100
-    print(f'胜率: {win_rate:.2f}%')
     # 计算夏普比率
     sharpe_analysis = strat.analyzers.sharpe.get_analysis()
     sharpe_ratio = sharpe_analysis.get('sharperatio', None)
-    if sharpe_ratio is not None:
-        print(f'夏普比率: {sharpe_ratio:.2f}')
-    else:
-        print('夏普比率无法计算。')
 
     # 计算最大回撤
     drawdown_analysis = strat.analyzers.drawdown.get_analysis()
     max_drawdown = drawdown_analysis.get('max', {}).get('drawdown', None)
-    if max_drawdown is not None:
-        print(f'最大回撤: {max_drawdown:.2f}%')
-    else:
-        print('最大回撤无法计算。')
-        
-    # 打印交易记录
-    print("\n交易记录:")
-    for i, trade in enumerate(strat.trades):
-        print(f"交易 {i+1}:")
-        print(f"  开仓日期: {bt.num2date(trade.dtopen)}")
-        print(f"  开仓价格: {trade.price:.2f}")
-        print(f"  开仓数量: {trade.size}")
-        print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
-        print(f"  交易盈亏: {trade.pnl:.2f}")
-        print(f"  交易佣金: {trade.commission:.2f}")
-        print(f"  净盈亏: {trade.pnlcomm:.2f}")
-        print()
 
-    # 输出最新交易日的交易建议
+    # 获取交易记录
+    trades_list = []
+    # 记录已关闭的交易
+    for i, trade in enumerate(strat.trades):
+        try:
+            close_date = bt.num2date(trade.dtclose).strftime('%Y-%m-%d') if trade.dtclose > 0 else None
+            trades_list.append({
+                'trade_number': i + 1,
+                'status': 'closed' if close_date else 'open',
+                'open_date': bt.num2date(trade.dtopen).strftime('%Y-%m-%d'),
+                'open_price': float(trade.price),
+                'size': int(trade.size),
+                'close_date': close_date,
+                'pnl': float(trade.pnl) if close_date else 0.0,
+                'commission': float(trade.commission),
+                'net_pnl': float(trade.pnlcomm) if close_date else 0.0
+            })
+        except (ValueError, AttributeError) as e:
+            print(f"警告: 处理交易记录时出错: {e}")
+            print(f"交易详情: dtclose={trade.dtclose}, dtopen={trade.dtopen}")
+            continue
+
+    
+    # 记录未关闭的交易
+    open_trades = strat._trades  # 获取当前未关闭的交易
+    for i, trade in enumerate(open_trades, start=len(trades_list)+1):
+        if trade is not None and hasattr(trade, 'isclosed') and not trade.isclosed:
+            try:
+                trades_list.append({
+                    'trade_number': i,
+                    'status': 'open',
+                    'open_date': bt.num2date(trade.dtopen).strftime('%Y-%m-%d'),
+                    'open_price': float(trade.price),
+                    'size': int(trade.size),
+                    'close_date': None,
+                    'pnl': 0.0,
+                    'commission': float(trade.commission),
+                    'net_pnl': 0.0
+                })
+            except (ValueError, AttributeError) as e:
+                print(f"警告: 处理未完成交易记录时出错: {e}")
+                continue
+    
+
+    # 获取最新交易日数据
     latest_date = data_df.index[-1]
     latest_close = data_df['Close'].iloc[-1]
-
-    # 获取策略中的指标值
+    
+    # 获取最新指标值
+    latest_chandelier_exit_long = None
+    previous_chandelier_exit_long = None
     if hasattr(strat, 'chandelier_exit_long') and len(strat.chandelier_exit_long) > 0:
-        latest_chandelier_exit_long = strat.chandelier_exit_long[-1]
-    else:
-        latest_chandelier_exit_long = None
+        latest_chandelier_exit_long = strat.chandelier_exit_long[0]
+        previous_chandelier_exit_long = strat.chandelier_exit_long[-1] if len(strat.chandelier_exit_long) > 1 else None
 
+    latest_chandelier_exit_short = None
+    previous_chandelier_exit_short = None
     if hasattr(strat, 'chandelier_exit_short') and len(strat.chandelier_exit_short) > 0:
-        latest_chandelier_exit_short = strat.chandelier_exit_short[-1]
-    else:
-        latest_chandelier_exit_short = None
+        latest_chandelier_exit_short = strat.chandelier_exit_short[0]
+        previous_chandelier_exit_short = strat.chandelier_exit_short[-1] if len(strat.chandelier_exit_short) > 1 else None
 
+    latest_zlsma = None
+    previous_zlsma = None
     if hasattr(strat, 'zlsma') and len(strat.zlsma) > 0:
         latest_zlsma = strat.zlsma[0]
-    else:
-        latest_zlsma = None
+        previous_zlsma = strat.zlsma[-1] if len(strat.zlsma) > 1 else None
+
+    # 获取信号类型
+    signal_type = "无交易信号"
+    if len(strat.signal) > 0:
+        last_signal = strat.signal[0]
+        signal_map = {
+            1: "买入，方向从空头转为多头，且收盘价高于ZLSMA线。",
+            2: "买入，多头趋势中，ZLSMA上升。",
+            3: "建仓预警，收盘价高于空头止损价，但没有高于多头止损价。",
+            -1: "清仓，因为方向从多头转为空头。",
+            -2: "减仓预警，多头趋势中，但ZLSMA未上升。",
+            -3: "减仓或清仓，收盘价低于多头止损价，但没有低于空头止损价。"
+        }
+        signal_type = signal_map.get(last_signal, "无交易信号，当前市场趋势不明确。")
+
+    # 获取当前持仓信息和持仓订单列表
+    current_position = None
+    current_orders = []
+    
+    if strat.position.size != 0:
+        # 基本持仓信息
+        current_position = {
+            'size': strat.position.size,
+            'price': strat.position.price,
+            'value': strat.position.size * latest_close,
+            'unrealized_pnl': (latest_close - strat.position.price) * strat.position.size,
+            'unrealized_pnl_pct': ((latest_close - strat.position.price) / 
+                                 strat.position.price) * 100
+        }
+        
+        # 获取当前未完成的订单
+        for order in strat.broker.orders:
+            if order.status not in [order.Completed, order.Canceled, order.Expired]:
+                current_orders.append({
+                    'order_id': order.ref,
+                    'type': 'buy' if order.isbuy() else 'sell',
+                    'status': order.getstatusname(),
+                    'size': order.size,
+                    'price': order.price,
+                    'created_date': bt.num2date(order.created.dt).strftime('%Y-%m-%d'),
+                    'valid_until': (bt.num2date(order.valid.dt).strftime('%Y-%m-%d') 
+                                  if order.valid else None)
+                })
 
     print("\n最新交易日交易建议:")
     print(f"日期: {latest_date.strftime('%Y-%m-%d')}")
@@ -135,45 +194,44 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     print(f"最低价: {data_df['Low'].iloc[-1]:.2f}")
     print(f"涨跌幅: {(latest_close - data_df['Close'].iloc[-2]) / data_df['Close'].iloc[-2] * 100:.2f}%")
     
-    if hasattr(strat, 'chandelier_exit_long') and len(strat.chandelier_exit_long) > 0:
-        latest_chandelier_exit_long = strat.chandelier_exit_long[0]
-        previous_chandelier_exit_long = strat.chandelier_exit_long[-1] if len(strat.chandelier_exit_long) > 1 else None
-        print(f"多头止损: 前值: {previous_chandelier_exit_long:.2f}, 最新值: {latest_chandelier_exit_long:.2f}")
-    else:
-        print("多头止损: 无法获取")
-    
-    if hasattr(strat, 'chandelier_exit_short') and len(strat.chandelier_exit_short) > 0:
-        latest_chandelier_exit_short = strat.chandelier_exit_short[0]
-        previous_chandelier_exit_short = strat.chandelier_exit_short[-1] if len(strat.chandelier_exit_short) > 1 else None
-        print(f"空头止损: 前值: {previous_chandelier_exit_short:.2f}, 最新值: {latest_chandelier_exit_short:.2f}")
-    else:
-        print("空头止损: 无法获取")
-    
-    if latest_zlsma is not None:
-        print(f"ZLSMA: 前值: {strat.zlsma[-1]:.2f}, 最新值: {latest_zlsma:.2f}")
-    else:
-        print("ZLSMA: 无法获取")
-    
-    if len(strat.signal) > 0:
-        last_signal = strat.signal[0]
-        if last_signal == 1:
-            signal_type = "买入，方向从空头转为多头，且收盘价高于ZLSMA线。"
-        elif last_signal == 2:
-            signal_type = "买入，多头趋势中，ZLSMA上升。"
-        elif last_signal == 3:
-            signal_type = "建仓预警，收盘价高于空头止损价，但没有高于多头止损价。"
-        elif last_signal == -1:
-            signal_type = "清仓，因为方向从多头转为空头。"
-        elif last_signal == -2:
-            signal_type = "减仓预警，多头趋势中，但ZLSMA未上升。"
-        elif last_signal == -3:
-            signal_type = "减仓或清仓，收盘价低于多头止损价，但没有低于空头止损价。"
-        else:
-            signal_type = "无交易信号，当前市场趋势不明确。"
-    else:
-        signal_type = "无交易信号"
-    
-    print(f"交易建议: {signal_type}")
+    return {
+        'basic_info': {
+            'initial_cash': initial_cash,
+            'final_cash': final_cash,
+            'total_profit': total_profit,
+            'roi': roi,
+            'win_rate': win_rate,
+            'sharpe_ratio': sharpe_ratio,
+            'max_drawdown': max_drawdown
+        },
+        'trades': trades_list,
+        'latest_data': {
+            'date': latest_date.strftime('%Y-%m-%d'),
+            'close': latest_close,
+            'open': data_df['Open'].iloc[-1],
+            'high': data_df['High'].iloc[-1],
+            'low': data_df['Low'].iloc[-1],
+            'change_pct': ((latest_close - data_df['Close'].iloc[-2]) / 
+                         data_df['Close'].iloc[-2] * 100)
+        },
+        'indicators': {
+            'chandelier_exit_long': {
+                'current': latest_chandelier_exit_long,
+                'previous': previous_chandelier_exit_long
+            },
+            'chandelier_exit_short': {
+                'current': latest_chandelier_exit_short,
+                'previous': previous_chandelier_exit_short
+            },
+            'zlsma': {
+                'current': latest_zlsma,
+                'previous': previous_zlsma
+            }
+        },
+        'signal': signal_type,
+        'current_position': current_position,
+        'current_orders': current_orders
+    }
 
 if __name__ == '__main__':
 
@@ -212,7 +270,7 @@ if __name__ == '__main__':
         print("未找到优化结果文件或提供了其他参数，使用命令行参数。")
 
     # 运行回测
-    run_backtest(
+    results = run_backtest(
         symbol=args.symbol,
         start_date=args.start,
         end_date=args.end,
@@ -222,3 +280,47 @@ if __name__ == '__main__':
         max_pyramiding=args.pyr,
         printlog=True
     )
+    
+    if results:
+        print("\n回测结果:")
+        print(f"初始资金: {results['basic_info']['initial_cash']:.2f}")
+        print(f"最终资金: {results['basic_info']['final_cash']:.2f}")
+        print(f"总收益: {results['basic_info']['total_profit']:.2f}")
+        print(f"收益率: {results['basic_info']['roi']:.2f}%")
+        print(f"胜率: {results['basic_info']['win_rate']:.2f}%")
+        print(f"夏普比率: {results['basic_info']['sharpe_ratio']:.2f}")
+        print(f"最大回撤: {results['basic_info']['max_drawdown']:.2f}%")
+        
+        if results.get('current_position'):
+            print("\n当前持仓信息:")
+            print(f"  持仓数量: {results['current_position']['size']}")
+            print(f"  持仓成本: {results['current_position']['price']:.2f}")
+            
+        if results.get('current_orders'):
+            print("\n未完成订单:")
+            for order in results['current_orders']:
+                print(f"  订单类型: {'买入' if order['type'] == 'buy' else '卖出'}")
+                print(f"  订单数量: {order['size']}")
+                # 添加价格检查
+                if order['price'] is not None:
+                    print(f"  订单价格: {order['price']:.2f}")
+                else:
+                    print("  订单价格: 市价单")
+                print(f"  创建时间: {order['created_date']}")
+        print("\n交易记录:")
+        for trade in results['trades']:
+            print(f"\n交易 {trade['trade_number']}:")
+            print(f"  状态: {trade['status']}")
+            print(f"  开仓日期: {trade['open_date']}")
+            print(f"  开仓价格: {trade['open_price']:.2f}")
+            print(f"  开仓数量: {trade['size']}")
+            if trade['status'] == 'closed':
+                print(f"  平仓日期: {trade['close_date']}")
+                print(f"  交易盈亏: {trade['pnl']:.2f}")
+                print(f"  交易佣金: {trade['commission']:.2f}")
+                print(f"  净盈亏: {trade['net_pnl']:.2f}")
+                
+        print(f"\n交易建议: {results['signal']}")
+
+        
+        
