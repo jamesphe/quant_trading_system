@@ -6,14 +6,14 @@ from datetime import datetime
 def add_stock_names(input_file, output_file):
     # 读取指定日期后缀的CSV文件
     df = pd.read_csv(input_file, dtype={'symbol': str})
-    df = df[df['last_signal'].isin([1, 2])]
+    df = df[df['last_signal'] == 1]
     
-    # 过滤出最佳回报大于0.2的股票
-    df = df[df['best_return'] > 0.5]
+    # 过滤出最佳回报大于0.3的股票
+    df = df[df['best_return'] >= 0.3]
     
     df = df[df['best_max_drawdown'] < 20]
     
-    df = df[df['best_win_rate'] > 0.5]
+    df = df[df['best_win_rate'] > 0.4]
     # 将symbol列的值前缀补0符合A股编码规则
     df['symbol'] = df['symbol'].apply(lambda x: x.zfill(6))
 

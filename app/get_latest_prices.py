@@ -106,6 +106,9 @@ def update_target_stocks():
         'main_net_inflow': '主力净流入', 'main_net_inflow_rate': '主力净流入率',
         'last_3_days_net_inflow': '最近3日净流入', 'last_5_days_net_inflow': '最近5日净流入'
     })
+    
+    # 过滤出涨跌幅小于9的股票
+    #df = df[df['最新涨跌幅'] < 9]
 
     # 按涨跌幅降序排序
     df = df.sort_values(by='最新涨跌幅', ascending=False)
