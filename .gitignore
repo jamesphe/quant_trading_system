@@ -1,9 +1,9 @@
-/__pycache__
-/*.log
+**/__pycache__/
+*.log
 /buy_signals_latest_day.xlsx
 /requirements.txt
 /results
-/*.csv
-/*.pyc
-
+*.csv
+**/*.pyc
+/app/results
 
