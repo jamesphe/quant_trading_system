@@ -308,11 +308,19 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         """
         交易通知，用于跟踪交易结果。
         """
-        if not trade.isclosed:
-            return
-
-        self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
-        self.trades.append(trade)  # 记录已完成的交易
+        # 检查是否已存在相同的交易
+        for i, existing_trade in enumerate(self.trades):
+            if existing_trade.ref == trade.ref:
+                # 如果找到相同的交易引用,则更新它
+                self.trades[i] = trade
+                if trade.isclosed:
+                    self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
+                return
+                
+        # 如果是新交易则添加到列表
+        self.trades.append(trade)
+        if trade.isclosed:
+            self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
 
 def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
     """
