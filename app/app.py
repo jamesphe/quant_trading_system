@@ -12,6 +12,7 @@ import logging  # 添加日志模块
 import pandas as pd
 import os
 from datetime import datetime
+import subprocess
 
 
 # 配置日志
@@ -41,6 +42,37 @@ def optimize():
         stock_name = get_stock_name(symbol)
         logger.info(f'股票名称: {stock_name}')
 
+        # 检查是否存在优化参数文件且是当天15:00后生成的
+        optimization_file = f'results/{symbol}_optimization_results.csv'
+        current_time = datetime.now()
+        cutoff_time = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
+        
+        if os.path.exists(optimization_file):
+            file_mtime = datetime.fromtimestamp(os.path.getmtime(optimization_file))
+            if file_mtime > cutoff_time:
+                logger.info(f'使用已有的优化结果文件: {optimization_file}')
+                df = pd.read_csv(optimization_file)
+                if not df.empty:
+                    best_row = df.iloc[0]
+                    result = {
+                        'stockName': stock_name,
+                        'bestParams': {
+                            'period': int(best_row['period']),
+                            'mult': round(float(best_row['mult']), 2),
+                            'investment_fraction': round(float(best_row['investment_fraction']), 2),
+                            'max_pyramiding': int(best_row['max_pyramiding'])
+                        },
+                        'metrics': {
+                            'sharpeRatio': round(float(best_row['sharpe_ratio']), 2),
+                            'maxDrawdown': round(float(best_row['max_drawdown']), 2),
+                            'winRate': round(float(best_row['win_rate']) * 100, 2),
+                            'totalReturn': round(float(best_row['total_return']) * 100, 2),
+                            'lastSignal': _convert_signal_to_text(best_row['last_signal'])
+                        }
+                    }
+                    return jsonify(result)
+
+        # 如果没有最新的优化结果文件，执行优化流程
         # 根据股票类型获取数据
         if symbol.startswith(('51', '159')):
             stock_data = get_etf_data(symbol, start_date, end_date)
@@ -221,6 +253,68 @@ def backtest():
                 'exception_type': type(e).__name__,
                 'exception_message': str(e)
             }
+        }), 500
+
+
+@app.route('/portfolio_analysis', methods=['POST'])
+def portfolio_analysis():
+    try:
+        logger.info('开始执行持仓分析')
+        data = request.get_json()
+        
+        # 构建命令行参数
+        cmd = ['python', 'portfolio_analysis.py']
+        if data.get('mode'):
+            cmd.extend(['--mode', data['mode']])
+        if data.get('date'):
+            cmd.extend(['--date', data['date']])
+        if data.get('sendToWechat'):
+            cmd.append('--send-wechat')  # 添加发送到微信的参数
+            
+        # 运行portfolio_analysis.py
+        result = subprocess.run(
+            cmd,
+            capture_output=True, 
+            text=True
+        )
+        
+        # 解析输出内容
+        output_lines = result.stdout.split('\n')
+        analysis_results = []
+        current_stock = None
+        current_content = []
+        
+        for line in output_lines:
+            if line.startswith('==='):  # 跳过标题行
+                continue
+            if '（' in line and '）' in line:  # 新的股票开始
+                if current_stock:
+                    analysis_results.append({
+                        'stock': current_stock,
+                        'content': '\n'.join(current_content)
+                    })
+                current_stock = line.strip()
+                current_content = []
+            elif line.strip():
+                current_content.append(line.strip())
+                
+        if current_stock:  # 添加最后一个股票的数据
+            analysis_results.append({
+                'stock': current_stock,
+                'content': '\n'.join(current_content)
+            })
+            
+        return jsonify({
+            'success': True,
+            'results': analysis_results,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+        
+    except Exception as e:
+        logger.error(f'持仓分析过程发生错误: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'分析失败: {str(e)}'
         }), 500
 
 

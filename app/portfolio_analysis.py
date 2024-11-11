@@ -4,9 +4,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from datetime import datetime, timedelta
 import argparse
+import os
 
 # 定义持仓股票清单
 portfolio = {
+    '000921': '海信家电',
+    '002229': '鸿博股份',
+    '600667': '太极实业',
+    '001286': '陕西能源',
     '002779': '中坚科技',
     '300762': '上海瀚讯',
     '002747': '埃斯顿',
@@ -15,7 +20,6 @@ portfolio = {
     '601519': '大智慧',
     '300363': '博腾股份',
     '300077': '国民技术',
-    '000595': '宝塔实业',
     '002786': '银宝山新',
     '600580': '卧龙电驱',
     'ARKK': 'ARK创新',
@@ -43,15 +47,28 @@ def parse_args():
     parser.add_argument('--date', type=str, 
                       default=datetime.now().strftime('%Y%m%d'),
                       help='分析日期，格式为YYYYMMDD')
+    parser.add_argument('--send-wechat', action='store_true',
+                      help='是否发送结果到微信')
     return parser.parse_args()
 
 def optimize_and_backtest(symbol):
-    # 运行优化器
-    optimize_cmd = f"python optimizer.py --symbol {symbol}"
-    subprocess.run(optimize_cmd, shell=True, check=True)
-
     # 读取优化结果
-    opt_results = pd.read_csv(f"results/{symbol}_optimization_results.csv")
+    opt_file = f"results/{symbol}_optimization_results.csv"
+    if not os.path.exists(opt_file):
+        # 运行优化器
+        optimize_cmd = f"python optimizer.py --symbol {symbol}"
+        subprocess.run(optimize_cmd, shell=True, check=True)
+        
+    file_mtime = datetime.fromtimestamp(os.path.getmtime(opt_file))
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if file_mtime < today:
+        print(f"股票 {symbol} 的优化结果已过期,需要重新生成")
+        # 运行优化器
+        optimize_cmd = f"python optimizer.py --symbol {symbol}"
+        subprocess.run(optimize_cmd, shell=True, check=True)
+        
+    opt_results = pd.read_csv(opt_file)
     if opt_results.empty:
         print(f"股票 {symbol} 的优化结果为空")
         return symbol, "无法获取优化结果"
@@ -156,7 +173,7 @@ def main():
         wechat_content += f"## {stocks_to_analyze[symbol]}（{symbol}）\n\n{advice}\n\n"
     
     # 发送到微信
-    if args.mode == 'portfolio':
+    if args.mode == 'portfolio' and args.send_wechat:
         send_to_wechat(wechat_content)
 
 if __name__ == "__main__":

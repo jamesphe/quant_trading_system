@@ -193,6 +193,14 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     print(f"最高价: {data_df['High'].iloc[-1]:.2f}")
     print(f"最低价: {data_df['Low'].iloc[-1]:.2f}")
     print(f"涨跌幅: {(latest_close - data_df['Close'].iloc[-2]) / data_df['Close'].iloc[-2] * 100:.2f}%")
+    # 打印指标信息
+    if latest_chandelier_exit_long is not None:
+        print(f"多头止损: {latest_chandelier_exit_long:.2f}")
+    if latest_chandelier_exit_short is not None:
+        print(f"空头止损: {latest_chandelier_exit_short:.2f}")
+    if latest_zlsma is not None:
+        print(f"ZLSMA: {latest_zlsma:.2f}")
+    print(f"交易建议: {signal_type}")
     
     return {
         'basic_info': {
@@ -319,8 +327,6 @@ if __name__ == '__main__':
                 print(f"  交易盈亏: {trade['pnl']:.2f}")
                 print(f"  交易佣金: {trade['commission']:.2f}")
                 print(f"  净盈亏: {trade['net_pnl']:.2f}")
-                
-        print(f"\n交易建议: {results['signal']}")
 
         
         

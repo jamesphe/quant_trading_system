@@ -6,7 +6,7 @@ from datetime import datetime
 def add_stock_names(input_file, output_file):
     # 读取指定日期后缀的CSV文件
     df = pd.read_csv(input_file, dtype={'symbol': str})
-    df = df[df['last_signal'].isin([1, 2])]
+    df = df[df['last_signal'] == 1]
     
     # 过滤出最佳回报大于0.2的股票
     df = df[df['best_return'] > 0.5]
