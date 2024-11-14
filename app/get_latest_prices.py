@@ -108,12 +108,12 @@ def update_target_stocks():
     })
     
     # 根据股票代码和涨跌幅进行过滤
-    df = df[
-        # 以3开头的股票,涨跌幅在5%~12%之间
-        ((df['股票代码'].str.startswith('3')) & (df['最新涨跌幅'].between(5, 12))) |
-        # 其他股票,涨幅在3%~7%之间 
-        ((~df['股票代码'].str.startswith('3')) & (df['最新涨跌幅'].between(3, 7)))
-    ]
+    # df = df[
+    #     # 以3开头的股票,涨跌幅在5%~12%之间
+    #     ((df['股票代码'].str.startswith('3')) & (df['最新涨跌幅'].between(5, 12))) |
+    #     # 其他股票,涨幅在3%~7%之间 
+    #     ((~df['股票代码'].str.startswith('3')) & (df['最新涨跌幅'].between(3, 7)))
+    # ]
 
     # 按涨跌幅降序排序
     df = df.sort_values(by='最新涨跌幅', ascending=False)

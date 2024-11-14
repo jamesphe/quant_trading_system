@@ -287,23 +287,23 @@ async function handleBacktest() {
     }
 }
 
-// 个股分析处理函数
+// 修改个股分析处理函数
 async function handleAnalysis(event) {
     event.preventDefault();
-    console.log('Analysis form submitted');
     
     const symbol = document.getElementById('analysisSymbol').value;
+    const model = document.getElementById('modelSelect').value;
+    const resultsDiv = document.getElementById('analysisResults');
+    const contentDiv = document.getElementById('analysisContent');
     
     if (!symbol) {
         alert('请输入股票代码');
         return;
     }
     
-    console.log('Analyzing stock:', symbol);
-    
-    // 显示加载动画
-    document.getElementById('loading').classList.remove('hidden');
-    document.getElementById('analysisResults').classList.add('hidden');
+    // 显示结果区域和加载提示
+    resultsDiv.classList.remove('hidden');
+    contentDiv.innerHTML = '<div class="text-gray-600">正在分析中...</div>';
     
     try {
         const response = await fetch('/analyze_stock', {
@@ -312,33 +312,43 @@ async function handleAnalysis(event) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                symbol: symbol
+                symbol: symbol,
+                model: model
             })
         });
-        
-        const data = await response.json();
-        console.log('Analysis response:', data);
-        
-        if (data.error) {
-            alert(data.error);
-            return;
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
-        // 显示分析结果
-        const analysisContent = document.getElementById('analysisContent');
-        if (analysisContent) {
-            analysisContent.innerHTML = marked.parse(data.analysis);
-            document.getElementById('analysisResults').classList.remove('hidden');
-            console.log('Analysis results displayed');
-        } else {
-            console.error('Analysis content element not found');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let analysisText = '';
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, {stream: true});
+            try {
+                const data = JSON.parse(chunk.replace(/^data: /, ''));
+                if (data.error) {
+                    contentDiv.innerHTML = `<div class="text-red-500">分析出错: ${data.error}</div>`;
+                    return;
+                }
+                
+                if (data.content) {
+                    analysisText += data.content;
+                    contentDiv.innerHTML = marked(analysisText);
+                    contentDiv.scrollTop = contentDiv.scrollHeight;
+                }
+            } catch (e) {
+                console.warn('解析数据块失败:', e);
+            }
         }
         
     } catch (error) {
-        console.error('Analysis error:', error);
-        alert('分析过程发生错误: ' + error);
-    } finally {
-        document.getElementById('loading').classList.add('hidden');
+        contentDiv.innerHTML = `<div class="text-red-500">分析失败: ${error.message}</div>`;
     }
 }
 
@@ -459,7 +469,7 @@ function displayBacktestResults(data) {
             <div class="fade-in" style="animation-delay: 0.5s">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">当前信号</h3>
                 <div class="p-4 bg-gray-50 rounded-lg">
-                    <p class="text-gray-700">${data.signal}</p>
+                    <p class="text-gray-700">${data.signal} （ ${data.reason} ）</p>
                 </div>
             </div>
 
@@ -1039,4 +1049,138 @@ data.results.forEach((result, index) => {
             </div>
         </div>
     `;
+});
+
+// 处理每日选股表单提交
+async function handleDailyPicks(event) {
+    event.preventDefault();
+    console.log('Daily picks form submitted');
+    
+    const pickDate = document.getElementById('pickDate').value;
+    if (!pickDate) {
+        alert('请选择日期');
+        return;
+    }
+    
+    // 显示加载状态
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.innerHTML;
+    submitButton.disabled = true;
+    submitButton.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        加载中...
+    `;
+    
+    try {
+        // 格式化日期为YYYYMMDD格式
+        const date = new Date(pickDate);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const formattedDate = `${year}${month}${day}`;
+        
+        console.log('Formatted date:', formattedDate);
+        
+        const response = await fetch('/daily_picks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date: formattedDate
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Daily picks response:', data);
+        
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        // 显示选股结果
+        const dailyPicksContent = document.getElementById('dailyPicksContent');
+        if (dailyPicksContent) {
+            // 确保marked已经加载
+            if (typeof marked === 'undefined') {
+                console.error('Marked library not loaded');
+                alert('页面加载不完整，请刷新后重试');
+                return;
+            }
+            
+            // 设置marked选项
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+            
+            dailyPicksContent.innerHTML = marked.parse(data.content);
+            document.getElementById('dailyPicksResults').classList.remove('hidden');
+            
+            // 添加样式到markdown内容
+            const tables = dailyPicksContent.getElementsByTagName('table');
+            Array.from(tables).forEach(table => {
+                table.classList.add('min-w-full', 'divide-y', 'divide-gray-200', 'my-4');
+            });
+            
+            const headers = dailyPicksContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
+            Array.from(headers).forEach(header => {
+                header.classList.add('text-lg', 'font-semibold', 'text-gray-800', 'mt-6', 'mb-4');
+            });
+            
+            // 添加代码块样式
+            const codeBlocks = dailyPicksContent.getElementsByTagName('code');
+            Array.from(codeBlocks).forEach(block => {
+                block.classList.add('bg-gray-50', 'rounded', 'p-1', 'text-sm', 'font-mono');
+            });
+            
+            // 添加列表样式
+            const lists = dailyPicksContent.querySelectorAll('ul, ol');
+            Array.from(lists).forEach(list => {
+                list.classList.add('list-disc', 'list-inside', 'my-4', 'space-y-2');
+            });
+            
+            // 添加段落样式
+            const paragraphs = dailyPicksContent.getElementsByTagName('p');
+            Array.from(paragraphs).forEach(p => {
+                p.classList.add('my-2', 'text-gray-700', 'leading-relaxed');
+            });
+        }
+        
+    } catch (error) {
+        console.error('Daily picks error:', error);
+        alert('获取选股结果失败: ' + error.message);
+    } finally {
+        // 恢复按钮状态
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalButtonText;
+    }
+}
+
+// 在页面加载完成后设置默认日期
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
+    
+    // 设置每日选股的默认日期为今天
+    const pickDateInput = document.getElementById('pickDate');
+    if (pickDateInput) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        
+        pickDateInput.value = `${year}-${month}-${day}`;
+        pickDateInput.max = `${year}-${month}-${day}`; // 限制最大日期为今天
+    }
+    
+    // 初始化标签页
+    initializeTabs();
 });

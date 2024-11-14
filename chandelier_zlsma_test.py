@@ -127,13 +127,6 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     else:
         latest_zlsma = None
 
-    print("\n最新交易日交易建议:")
-    print(f"日期: {latest_date.strftime('%Y-%m-%d')}")
-    print(f"收盘价: {latest_close:.2f}")
-    print(f"开盘价: {data_df['Open'].iloc[-1]:.2f}")
-    print(f"最高价: {data_df['High'].iloc[-1]:.2f}")
-    print(f"最低价: {data_df['Low'].iloc[-1]:.2f}")
-    print(f"涨跌幅: {(latest_close - data_df['Close'].iloc[-2]) / data_df['Close'].iloc[-2] * 100:.2f}%")
     
     if hasattr(strat, 'chandelier_exit_long') and len(strat.chandelier_exit_long) > 0:
         latest_chandelier_exit_long = strat.chandelier_exit_long[0]
@@ -173,6 +166,13 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     else:
         signal_type = "无交易信号"
     
+    print("\n最新交易日交易建议:")
+    print(f"日期: {latest_date.strftime('%Y-%m-%d')}")
+    print(f"收盘价: {latest_close:.2f}")
+    print(f"开盘价: {data_df['Open'].iloc[-1]:.2f}")
+    print(f"最高价: {data_df['High'].iloc[-1]:.2f}")
+    print(f"最低价: {data_df['Low'].iloc[-1]:.2f}")
+    print(f"涨跌幅: {(latest_close - data_df['Close'].iloc[-2]) / data_df['Close'].iloc[-2] * 100:.2f}%")
     print(f"交易建议: {signal_type}")
 
 if __name__ == '__main__':

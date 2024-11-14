@@ -1,18 +1,21 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 import backtrader as bt
 from optimizer import optimize_strategy
 from data_fetch import (
     get_stock_data, 
     get_etf_data, 
     get_us_stock_data, 
-    get_stock_name
+    get_stock_name,
+    get_stock_basic_info
 )
 from strategies import ChandelierZlSmaStrategy
 import logging  # 添加日志模块
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
+import json
+from stock_analysis import ZhipuAIModel, KimiModel, analyze_stock
 
 
 # 配置日志
@@ -49,7 +52,10 @@ def optimize():
         
         if os.path.exists(optimization_file):
             file_mtime = datetime.fromtimestamp(os.path.getmtime(optimization_file))
-            if file_mtime > cutoff_time:
+            # 判断是否可以使用已有的优化结果文件
+            if (file_mtime > cutoff_time or 
+                (current_time < cutoff_time and 
+                 file_mtime.date() == current_time.date())):
                 logger.info(f'使用已有的优化结果文件: {optimization_file}')
                 df = pd.read_csv(optimization_file)
                 if not df.empty:
@@ -59,7 +65,9 @@ def optimize():
                         'bestParams': {
                             'period': int(best_row['period']),
                             'mult': round(float(best_row['mult']), 2),
-                            'investment_fraction': round(float(best_row['investment_fraction']), 2),
+                            'investment_fraction': round(
+                                float(best_row['investment_fraction']), 2
+                            ),
                             'max_pyramiding': int(best_row['max_pyramiding'])
                         },
                         'metrics': {
@@ -206,7 +214,7 @@ def backtest():
         # 检查是否存在优化参数文件
         optimization_file = f'results/{symbol}_optimization_results.csv'
         if os.path.exists(optimization_file):
-            # 读取优化参数
+            # 读取化参数
             opt_params = pd.read_csv(optimization_file).iloc[-1]
             result = chandelier_zlsma_test.run_backtest(
                 symbol=symbol,
@@ -316,6 +324,112 @@ def portfolio_analysis():
             'success': False,
             'error': f'分析失败: {str(e)}'
         }), 500
+
+
+@app.route('/daily_picks', methods=['POST'])
+def daily_picks():
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        # 调用portfolio_analysis.py的相关功能
+        result = run_daily_picks(date)  # 需要实现这个函数
+        
+        return jsonify({
+            'success': True,
+            'content': result
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/analyze_stock', methods=['POST'])
+def analyze_stock_route():
+    try:
+        logger.debug("开始处理股票分析请求")
+        data = request.get_json()
+        logger.debug(f"接收到的请求数据: {data}")
+        
+        symbol = data.get('symbol')
+        model_type = data.get('model', 'zhipu')
+        logger.debug(f"股票代码: {symbol}, 模型类型: {model_type}")
+        
+        if not symbol:
+            logger.warning("缺少股票代码参数")
+            return jsonify({
+                'success': False,
+                'error': '缺少股票代码参数'
+            }), 400
+            
+        # 计算日期范围
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
+        logger.debug(f"分析日期范围: {start_date} 到 {end_date}")
+        
+        # 初始化选择的AI模型
+        try:
+            if model_type == 'kimi':
+                logger.debug("使用 Kimi 模型")
+                model = KimiModel()
+            else:
+                logger.debug("使用 ZhipuAI 模型")
+                model = ZhipuAIModel()
+        except Exception as e:
+            logger.error(f"创建模型实例失败: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'error': f'创建模型实例失败: {str(e)}'
+            }), 500
+        
+        # 使用 analyze_stock 函数进行分析
+        try:
+            logger.debug("开始进行股票分析")
+            analysis_result = analyze_stock(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                model=model,
+                stream=False
+            )
+            logger.debug(f"分析结果长度: {len(analysis_result)}")
+        except Exception as e:
+            logger.error(f"股票分析失败: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'error': f'分析失败: {str(e)}'
+            }), 500
+        
+        logger.debug("分析完成，准备返回结果")
+        return jsonify({
+            'success': True,
+            'content': analysis_result
+        })
+        
+    except Exception as e:
+        logger.error(f"处理请求时发生错误: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'处理请求时发生错误: {str(e)}'
+        }), 500
+
+
+@app.route('/api/stock/basic_info/<stock_code>')
+def get_basic_info(stock_code):
+    """获取股票基本信息的API端点"""
+    info = get_stock_basic_info(stock_code)
+    if info:
+        return jsonify({
+            'status': 'success',
+            'data': info
+        })
+    else:
+        return jsonify({
+            'status': 'error',
+            'message': f'无法获取股票 {stock_code} 的基本信息'
+        }), 404
 
 
 def _convert_signal_to_text(signal):

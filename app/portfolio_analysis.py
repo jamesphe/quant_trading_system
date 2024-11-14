@@ -5,30 +5,7 @@ import requests
 from datetime import datetime, timedelta
 import argparse
 import os
-
-# 定义持仓股票清单
-portfolio = {
-    '000921': '海信家电',
-    '002229': '鸿博股份',
-    '600667': '太极实业',
-    '001286': '陕西能源',
-    '002779': '中坚科技',
-    '300762': '上海瀚讯',
-    '002747': '埃斯顿',
-    '600789': '鲁抗医药',
-    '002053': '云南能投',
-    '601519': '大智慧',
-    '300363': '博腾股份',
-    '300077': '国民技术',
-    '002786': '银宝山新',
-    '600580': '卧龙电驱',
-    'ARKK': 'ARK创新',
-    'VGT': '信息科技',
-    'TSLA': '特斯拉',
-    '601398': '工商银行',
-    '600678': '四川金顶',
-    '300315': '掌趣科技'
-}  # 可以根据实际情况修改
+import sys
 
 # 新增目标股票清单
 target_stocks = {
@@ -129,13 +106,26 @@ def send_to_wechat(content):
     else:
         print("发送失败")
 
+def load_portfolio():
+    """从CSV文件加载持仓股票信息"""
+    portfolio_file = os.path.join(os.path.dirname(__file__), 'portfolio_stocks.csv')
+    try:
+        df = pd.read_csv(portfolio_file)
+        return dict(zip(df['股票代码'].astype(str), df['股票名称']))
+    except Exception as e:
+        print(f"加载持仓股票文件时出错: {str(e)}")
+        return {}
+
 def main():
     args = parse_args()
     results = []
     
     # 根据模式选择股票清单
     if args.mode == 'portfolio':
-        stocks_to_analyze = portfolio
+        stocks_to_analyze = load_portfolio()
+        if not stocks_to_analyze:
+            print("无法加载持仓股票列表")
+            return
     else:
         try:
             # 转换日期格式：从 YYYY-MM-DD 到 YYYYMMDD

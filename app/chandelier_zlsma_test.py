@@ -156,6 +156,7 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
             -3: "减仓或清仓，收盘价低于多头止损价，但没有低于空头止损价。"
         }
         signal_type = signal_map.get(last_signal, "无交易信号，当前市场趋势不明确。")
+        reason = strat.reason
 
     # 获取当前持仓信息和持仓订单列表
     current_position = None
@@ -201,6 +202,7 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     if latest_zlsma is not None:
         print(f"ZLSMA: {latest_zlsma:.2f}")
     print(f"交易建议: {signal_type}")
+    print(f"原因: {reason}")
     
     return {
         'basic_info': {
@@ -237,6 +239,7 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
             }
         },
         'signal': signal_type,
+        'reason': reason,
         'current_position': current_position,
         'current_orders': current_orders
     }

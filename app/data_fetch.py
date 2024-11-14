@@ -131,8 +131,7 @@ def get_stock_name(symbol):
     try:
         # 尝试获取A股股票名称
         stock_list = ak.stock_info_a_code_name()
-        print(stock_list)
-        print(symbol)
+
         stock = stock_list[stock_list['code'] == symbol]
         print(stock)
         
@@ -346,7 +345,7 @@ def get_us_stock_list():
             
         us_stock_list['代码'] = us_stock_list['代码'].str.replace(r'^\d+\.', '', regex=True)
             
-        # 只返回股票代码code，和股票名称name，并将字��名称改名为英文名称
+        # 只返回股票代码code，和股票名称name，并将字名称改名为英文名称
         us_stock_list = us_stock_list[['代码', '名称']].rename(columns={'代码': 'code', '名称': 'name'})
         return us_stock_list
     except Exception as e:
@@ -412,3 +411,92 @@ def get_industry_stocks(industry_name):
     except Exception as e:
         print(f"获取 {industry_name} 行业板块成份股清单时发生错误: {e}")
         return pd.DataFrame()
+
+def get_stock_basic_info(stock_code: str) -> dict:
+    """
+    获取股票的基本信息，包括总市值、流通市值、行业等
+    
+    参数:
+        stock_code (str): 股票代码，例如 "000001"
+        
+    返回:
+        dict: 包含股票基本信息的字典，包括以下字段:
+            - 总市值 (float): 单位为亿元
+            - 流通市值 (float): 单位为亿元
+            - 行业 (str): 所属行业
+            - 上市时间 (str): 格式为YYYYMMDD
+            - 股票代码 (str)
+            - 股票简称 (str)
+            - 总股本 (float): 单位为亿股
+            - 流通股 (float): 单位为亿股
+    """
+    try:
+        # 获取股票信息
+        df = ak.stock_individual_info_em(symbol=stock_code)
+        
+        # 将 DataFrame 转换为字典
+        info_dict = dict(zip(df['item'], df['value']))
+        
+        # 格式化数值
+        if '总市值' in info_dict:
+            info_dict['总市值'] = float(info_dict['总市值']) / 100000000  # 转换为亿元
+        if '流通市值' in info_dict:
+            info_dict['流通市值'] = float(info_dict['流通市值']) / 100000000  # 转换为亿元
+        if '总股本' in info_dict:
+            info_dict['总股本'] = float(info_dict['总股本']) / 100000000  # 转换为亿股
+        if '流通股' in info_dict:
+            info_dict['流通股'] = float(info_dict['流通股']) / 100000000  # 转换为亿股
+            
+        return info_dict
+    except Exception as e:
+        print(f"获取股票 {stock_code} 的基本信息时发生错误: {str(e)}")
+        return {}
+
+def get_stock_news(stock_code: str, limit: int = 10) -> list:
+    """
+    获取指定股票的新闻资讯
+    
+    参数:
+        stock_code (str): 股票代码，例如 "300059"
+        limit (int): 返回的新闻条数，默认10条，最大100条
+        
+    返回:
+        list: 包含新闻信息的列表，每条新闻为一个字典，包含以下字段:
+            - keyword (str): 关键词
+            - title (str): 新闻标题
+            - content (str): 新闻内容
+            - publish_time (str): 发布时间
+            - source (str): 文章来源
+            - url (str): 新闻链接
+    """
+    try:
+        # 获取新闻数据
+        df = ak.stock_news_em(symbol=stock_code)
+        
+        # 重命名列
+        df = df.rename(columns={
+            '关键词': 'keyword',
+            '新闻标题': 'title',
+            '新闻内容': 'content',
+            '发布时间': 'publish_time',
+            '文章来源': 'source',
+            '新闻链接': 'url'
+        })
+        
+        # 限制返回条数
+        df = df.head(min(limit, len(df)))
+        
+        # 转换为字典列表
+        news_list = df.to_dict('records')
+        
+        # 清理数据：去除多余的空白字符
+        for news in news_list:
+            for key, value in news.items():
+                if isinstance(value, str):
+                    news[key] = value.strip()
+        
+        return news_list
+        
+    except Exception as e:
+        print(f"获取股票 {stock_code} 的新闻信息时发生错误: {str(e)}")
+        return []

@@ -110,6 +110,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
         # 初始化方向变量
         self.direction = 0  # 1 表示多头，-1 表示空头，0 表示中立
+        self.reason = ''
 
         # 计算 ZLSMA 指标，移除了 lag 参数
         self.zlsma = ZLSMA(self.datas[0].close, period=self.p.period)
@@ -154,26 +155,26 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         if current_close < prev_long_stop or current_close < prev_short_stop:
             current_direction = -1
             direction_name = '空头'
-            reason = f'收盘价 {current_close:.2f} 低于 '
+            self.reason = f'收盘价 {current_close:.2f} 低于 '
             if current_close < prev_long_stop:
-                reason += f'多头止损价 {prev_long_stop:.2f} '
+                self.reason += f'多头止损价 {prev_long_stop:.2f} '
             if current_close < prev_short_stop:
-                reason += f'空头止损价 {prev_short_stop:.2f}'
+                self.reason += f'空头止损价 {prev_short_stop:.2f}'
         elif current_close > prev_short_stop:
             current_direction = 1 if current_close > prev_long_stop else 2
             direction_name = '多头' if current_direction == 1 else '建仓预警'
-            reason = f'收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}'
+            self.reason = f'收盘价 {current_close:.2f} 高于 空头止损价 {prev_short_stop:.2f}'
             if current_direction == 1:
-                reason += f' 和 多头止损价 {prev_long_stop:.2f}'
+                self.reason += f' 和 多头止损价 {prev_long_stop:.2f}'
         else:
             current_direction = self.direction
             direction_map = {1: '多头', -1: '空头', 2: '建仓预警', -2: '清仓预警', 0: '中立'}
             direction_name = direction_map.get(self.direction, '中立')
-            reason = (f'收盘价 {current_close:.2f} 介于 多头止损价 {prev_long_stop:.2f} '
+            self.reason = (f'收盘价 {current_close:.2f} 介于 多头止损价 {prev_long_stop:.2f} '
                      f'和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
 
         # 记录日志
-        self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {reason}')
+        self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {self.reason}')
 
         # 检查方向是否发生变化
         direction_change = False
