@@ -7,5 +7,10 @@ from .macd_strategy import MACDStrategy
 from .turtle_strategy import TurtleStrategy
 from .chandelier_exit_strategy import ChandelierExitStrategy
 from .chandelier_zlsma_strategy import ChandelierZlSmaStrategy
+from .bollinger_rsi_macd_strategy import BollingerRsiMacdStrategy
 
-__all__ = ['SwingStrategy', 'BreakoutStrategy', 'MeanReversionStrategy', 'MACDStrategy', 'TurtleStrategy', 'ChandelierExitStrategy', 'ChandelierZlSmaStrategy']
+__all__ = [
+    'SwingStrategy', 'BreakoutStrategy', 'MeanReversionStrategy', 
+    'MACDStrategy', 'TurtleStrategy', 'ChandelierExitStrategy', 
+    'ChandelierZlSmaStrategy', 'BollingerRsiMacdStrategy'
+]

@@ -107,6 +107,231 @@
                 background-position: 0% 50%;
             }
         }
+
+        /* 下拉框悬停效果 */
+        .form-select:hover {
+            border-color: rgb(129, 140, 248);
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        /* 下拉框选项样式 */
+        .form-select option {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            color: #374151;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        /* 下拉框选项悬停效果 */
+        .form-select option:hover {
+            background-color: #F3F4F6;
+        }
+
+        /* 下拉框激活状态 */
+        .form-select:focus {
+            outline: none;
+            border-color: #6366F1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        /* 自定义滚动条 */
+        .form-select {
+            scrollbar-width: thin;
+            scrollbar-color: #E5E7EB transparent;
+        }
+
+        .form-select::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .form-select::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .form-select::-webkit-scrollbar-thumb {
+            background-color: #E5E7EB;
+            border-radius: 3px;
+        }
+
+        .form-select::-webkit-scrollbar-thumb:hover {
+            background-color: #D1D5DB;
+        }
+
+        /* 移除默认下拉箭头 */
+        .form-select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        /* Firefox 特定样式 */
+        @-moz-document url-prefix() {
+            .form-select {
+                text-indent: 0;
+                text-overflow: '';
+                padding-right: 2rem;
+            }
+        }
+
+        /* 添加选项图标的样式 */
+        .model-option {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+        }
+
+        .model-option-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 0.75rem;
+        }
+
+        /* 打字机效果 */
+        .typing-effect {
+            opacity: 0;
+            animation: fadeIn 0.5s ease-in forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 聊天消息容器样式 */
+        .chat-message-container {
+            margin-bottom: 1rem;
+        }
+
+        .chat-message {
+            background-color: #f9fafb;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .markdown-content {
+            line-height: 1.6;
+        }
+
+        /* 添加淡入动画 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        /* Toast 动画 */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Markdown 内容样式 */
+        .markdown-content h1 {
+            @apply text-2xl font-bold text-gray-900 mb-4 mt-6;
+        }
+
+        .markdown-content h2 {
+            @apply text-xl font-semibold text-gray-800 mb-3 mt-5;
+        }
+
+        .markdown-content h3 {
+            @apply text-lg font-medium text-gray-700 mb-2 mt-4;
+        }
+
+        .markdown-content p {
+            @apply text-gray-600 leading-relaxed mb-4;
+        }
+
+        .markdown-content ul {
+            @apply list-disc list-inside space-y-2 mb-4 ml-4;
+        }
+
+        .markdown-content ol {
+            @apply list-decimal list-inside space-y-2 mb-4 ml-4;
+        }
+
+        .markdown-content li {
+            @apply text-gray-600;
+        }
+
+        .markdown-content code {
+            @apply bg-gray-50 px-2 py-1 rounded text-sm font-mono text-gray-700;
+        }
+
+        .markdown-content pre {
+            @apply bg-gray-50 p-4 rounded-lg overflow-x-auto mb-4;
+        }
+
+        .markdown-content pre code {
+            @apply bg-transparent p-0;
+        }
+
+        .markdown-content blockquote {
+            @apply border-l-4 border-indigo-200 pl-4 italic text-gray-600 my-4;
+        }
+
+        .markdown-content table {
+            @apply min-w-full divide-y divide-gray-200 my-4;
+        }
+
+        .markdown-content th {
+            @apply px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+        }
+
+        .markdown-content td {
+            @apply px-6 py-4 whitespace-nowrap text-sm text-gray-500;
+        }
+
+        .markdown-content tr {
+            @apply hover:bg-gray-50 transition-colors duration-150;
+        }
+
+        /* 强调文本样式 */
+        .markdown-content strong {
+            @apply font-semibold text-gray-900;
+        }
+
+        .markdown-content em {
+            @apply italic text-gray-700;
+        }
+
+        /* 链接样式 */
+        .markdown-content a {
+            @apply text-indigo-600 hover:text-indigo-700 hover:underline;
+        }
+
+        /* 分割线样式 */
+        .markdown-content hr {
+            @apply my-6 border-t border-gray-200;
+        }
+
+        /* 代码块标题 */
+        .markdown-content pre:before {
+            content: "交易数据";
+            @apply block text-sm font-medium text-gray-500 mb-2;
+        }
+
+        /* 重要信息高亮 */
+        .markdown-content .highlight {
+            @apply bg-yellow-50 text-yellow-800 px-2 py-1 rounded;
+        }
+
+        /* 交易建议样式 */
+        .markdown-content h2:contains("交易建议") + * {
+            @apply bg-indigo-50 p-4 rounded-lg border border-indigo-100;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
@@ -312,20 +537,52 @@
                                 <label for="modelSelect" class="form-label block text-sm font-medium text-gray-700 mb-1">
                                     分析模型
                                 </label>
-                                <select id="modelSelect" 
-                                        name="model" 
-                                        class="form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="zhipu">智谱AI</option>
-                                    <option value="kimi">Kimi</option>
-                                </select>
+                                <div class="relative">
+                                    <select id="modelSelect" 
+                                            name="model" 
+                                            class="form-select appearance-none block w-full px-4 py-2 pr-10 rounded-lg border border-gray-300 
+                                                   bg-white shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 
+                                                   hover:border-indigo-400 transition-colors duration-200
+                                                   text-gray-700 cursor-pointer">
+                                        <option value="zhipu" class="py-2 flex items-center">
+                                            <span class="flex items-center">
+                                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                                                </svg>
+                                                智谱AI
+                                            </span>
+                                        </option>
+                                        <option value="kimi" class="py-2 flex items-center">
+                                            <span class="flex items-center">
+                                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+                                                </svg>
+                                                Kimi
+                                            </span>
+                                        </option>
+                                        <option value="openai" class="py-2 flex items-center">
+                                            <span class="flex items-center">
+                                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M13.5 2c-5.629 0-10.212 4.436-10.475 10h-3.025l4.537 5.917 4.463-5.917h-3.025c.26-3.902 3.508-7 7.525-7 4.178 0 7.573 3.395 7.573 7.573 0 4.178-3.395 7.573-7.573 7.573-1.396 0-2.7-.382-3.818-1.041l-1.939 2.047c1.611 1.187 3.588 1.891 5.727 1.891 5.356 0 9.727-4.371 9.727-9.727s-4.371-9.727-9.727-9.727z"/>
+                                                </svg>
+                                                OpenAI
+                                            </span>
+                                        </option>
+                                    </select>
+                                    <!-- 自定义下拉箭头 -->
+                                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-group flex items-end">
                                 <button type="submit" 
                                         class="w-full h-[38px] bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
                                     </svg>
                                     <span>开始分析</span>
                                 </button>
@@ -334,19 +591,18 @@
                     </form>
                 </div>
 
-                <!-- 分析结果展示 -->
+                <!-- 对话内容展示区域 -->
                 <div id="analysisResults" class="hidden">
                     <div class="bg-white rounded-xl shadow-lg p-6">
                         <div class="flex items-center space-x-3 mb-3 pb-2 border-b border-gray-100">
                             <div class="bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg p-2">
                                 <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
                                 </svg>
                             </div>
-                            <h3 class="text-lg font-semibold text-gray-800">分析结果</h3>
+                            <h3 class="text-lg font-semibold text-gray-800">分析对话</h3>
                         </div>
-                        <div id="analysisContent" class="prose max-w-none"></div>
+                        <div id="analysisContent" class="prose max-w-none space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar"></div>
                     </div>
                 </div>
             </div>
@@ -473,5 +729,38 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modelSelect = document.getElementById('modelSelect');
+        
+        // 添加选择变化时的视觉反馈
+        modelSelect.addEventListener('change', function() {
+            this.blur(); // 移除焦点，触发过渡效果
+            setTimeout(() => {
+                this.classList.add('ring-2', 'ring-indigo-200');
+                setTimeout(() => {
+                    this.classList.remove('ring-2', 'ring-indigo-200');
+                }, 200);
+            }, 50);
+        });
+
+        // 添加键盘导航支持
+        modelSelect.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                const options = this.options;
+                const currentIndex = this.selectedIndex;
+                
+                if (e.key === 'ArrowUp' && currentIndex > 0) {
+                    this.selectedIndex = currentIndex - 1;
+                } else if (e.key === 'ArrowDown' && currentIndex < options.length - 1) {
+                    this.selectedIndex = currentIndex + 1;
+                }
+                
+                this.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+    </script>
 </body>
 </html> 

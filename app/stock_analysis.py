@@ -10,6 +10,7 @@ import requests
 from abc import ABC, abstractmethod
 from config import Config
 import json
+from openai import AsyncOpenAI, OpenAI
 
 
 # 配置日志
@@ -107,6 +108,50 @@ class KimiModel(AIModelBase):
                         yield chunk
 
 
+class OpenAIModel(AIModelBase):
+    """OpenAI 模型实现"""
+    
+    def __init__(self):
+        config = Config()
+        api_key = config.get_api_key('openai')
+        self.client = OpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
+        self.async_client = AsyncOpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
+    
+    def analyze(
+        self,
+        prompt: str,
+        stream: bool = False
+    ) -> Union[str, Generator]:
+        """分析方法"""
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+        
+        response = self.client.chat.completions.create(
+            model="gpt-4o",  # 或使用其他可用模型
+            messages=messages,
+            stream=stream,
+            temperature=0.7
+        )
+        
+        if stream:
+            return self._handle_stream_response(response)
+        return response.choices[0].message.content
+    
+    def _handle_stream_response(self, response):
+        """处理流式响应"""
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+
 def get_stock_analysis_prompt(stock_data: pd.DataFrame, stock_name: str, basic_info: dict, news_list: list) -> str:
     """生成用于分析股票的prompt"""
     data_description = stock_data.to_string()
@@ -184,6 +229,8 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                 if chunk:
                     if isinstance(model, ZhipuAIModel):
                         content = chunk.choices[0].delta.content
+                    elif isinstance(model, OpenAIModel):
+                        content = chunk  # OpenAI 流式响应已在模型类中处理
                     else:  # KimiModel
                         content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
                     if content:
@@ -203,7 +250,7 @@ def main():
     parser.add_argument(
         '--model',
         type=str,
-        choices=['zhipu', 'kimi'],
+        choices=['zhipu', 'kimi', 'openai'],
         default='zhipu',
         help='选择AI模型'
     )
@@ -214,6 +261,8 @@ def main():
         # 初始化选择的AI模型
         if args.model == 'zhipu':
             model = ZhipuAIModel()
+        elif args.model == 'openai':
+            model = OpenAIModel()
         else:
             model = KimiModel()
         

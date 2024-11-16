@@ -295,15 +295,37 @@ async function handleAnalysis(event) {
     const model = document.getElementById('modelSelect').value;
     const resultsDiv = document.getElementById('analysisResults');
     const contentDiv = document.getElementById('analysisContent');
+    const submitButton = event.target.querySelector('button[type="submit"]');
     
     if (!symbol) {
-        alert('请输入股票代码');
+        showToast('请输入股票代码', 'warning');
         return;
     }
     
+    // 更新按钮状态
+    submitButton.disabled = true;
+    const originalButtonContent = submitButton.innerHTML;
+    submitButton.innerHTML = `
+        <div class="flex items-center justify-center space-x-2">
+            <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+            <span>分析中...</span>
+        </div>
+    `;
+    
     // 显示结果区域和加载提示
     resultsDiv.classList.remove('hidden');
-    contentDiv.innerHTML = '<div class="text-gray-600">正在分析中...</div>';
+    contentDiv.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8 space-y-4">
+            <div class="relative">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+                <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-indigo-200 opacity-20"></div>
+            </div>
+            <div class="text-center">
+                <p class="text-lg font-medium text-gray-600">AI正在分析 ${symbol}</p>
+                <p class="text-sm text-gray-500 mt-2">这可能需要一些时间...</p>
+            </div>
+        </div>
+    `;
     
     try {
         const response = await fetch('/analyze_stock', {
@@ -317,39 +339,222 @@ async function handleAnalysis(event) {
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        // 创建EventSource来处理流式响应
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let analysisText = '';
+        let isFirstChunk = true;
+        let hasReceivedAnalysis = false;
 
         while (true) {
             const {value, done} = await reader.read();
             if (done) break;
             
-            const chunk = decoder.decode(value, {stream: true});
-            try {
-                const data = JSON.parse(chunk.replace(/^data: /, ''));
-                if (data.error) {
-                    contentDiv.innerHTML = `<div class="text-red-500">分析出错: ${data.error}</div>`;
-                    return;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        if (data.error) {
+                            showToast(data.error, 'error');
+                            contentDiv.innerHTML = `
+                                <div class="flex items-center p-4 bg-red-50 rounded-lg">
+                                    <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span class="text-red-700">${data.error}</span>
+                                </div>
+                            `;
+                            return;
+                        }
+                        
+                        const content = data.content || '';
+                        
+                        // 检查是否是提示信息
+                        if (content.includes('正在获取股票数据') || content.includes('正在进行分析')) {
+                            if (!hasReceivedAnalysis) {
+                                contentDiv.innerHTML = `
+                                    <div class="flex items-center justify-center space-x-2 text-gray-600">
+                                        <div class="animate-spin rounded-full h-4 w-4 border-2 border-indigo-500 border-t-transparent"></div>
+                                        <span>${content}</span>
+                                    </div>
+                                `;
+                            }
+                            continue;
+                        }
+                        
+                        // 收到实际分析内容
+                        if (!hasReceivedAnalysis) {
+                            hasReceivedAnalysis = true;
+                            contentDiv.innerHTML = `
+                                <div class="chat-message-container fade-in">
+                                    <div class="chat-message">
+                                        <div class="markdown-content"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        // 累积文本内容
+                        analysisText += content;
+                        
+                        // 更新显示
+                        const markdownContent = contentDiv.querySelector('.markdown-content');
+                        markdownContent.innerHTML = marked.parse(analysisText);
+                        
+                        // 添加样式
+                        applyMarkdownStyles(markdownContent);
+                        
+                        // 平滑滚动到底部
+                        smoothScrollToBottom(contentDiv);
+                        
+                        // 添加打字机效果的CSS类
+                        markdownContent.classList.add('typing-effect');
+                        
+                    } catch (e) {
+                        console.warn('解析数据块失败:', e);
+                    }
                 }
-                
-                if (data.content) {
-                    analysisText += data.content;
-                    contentDiv.innerHTML = marked(analysisText);
-                    contentDiv.scrollTop = contentDiv.scrollHeight;
-                }
-            } catch (e) {
-                console.warn('解析数据块失败:', e);
             }
         }
         
     } catch (error) {
-        contentDiv.innerHTML = `<div class="text-red-500">分析失败: ${error.message}</div>`;
+        showToast(error.message, 'error');
+        contentDiv.innerHTML = `
+            <div class="flex items-center p-4 bg-red-50 rounded-lg">
+                <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="text-red-700">请求失败: ${error.message}</span>
+            </div>
+        `;
+    } finally {
+        // 恢复按钮状态
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalButtonContent;
     }
+}
+
+// 添加辅助函数
+function applyMarkdownStyles(element) {
+    // 添加容器类
+    element.classList.add('markdown-content', 'prose', 'prose-indigo', 'max-w-none');
+    
+    // 处理代码块
+    const preTags = element.getElementsByTagName('pre');
+    Array.from(preTags).forEach(pre => {
+        // 添加代码块样式
+        pre.classList.add('relative');
+        
+        // 如果包含表格数据，添加水平滚动
+        if (pre.textContent.includes('|')) {
+            pre.classList.add('overflow-x-auto');
+        }
+    });
+    
+    // 处理表格
+    const tables = element.getElementsByTagName('table');
+    Array.from(tables).forEach(table => {
+        table.classList.add('table-auto', 'border-collapse', 'w-full');
+        
+        // 添加表格容器以支持水平滚动
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('overflow-x-auto');
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+    });
+    
+    // 处理交易建议部分
+    const tradingAdvice = element.querySelector('h2:contains("交易建议")');
+    if (tradingAdvice) {
+        const nextElement = tradingAdvice.nextElementSibling;
+        if (nextElement) {
+            nextElement.classList.add('bg-indigo-50', 'p-4', 'rounded-lg', 'border', 'border-indigo-100');
+        }
+    }
+    
+    // 高亮重要信息
+    const paragraphs = element.getElementsByTagName('p');
+    Array.from(paragraphs).forEach(p => {
+        if (p.textContent.includes('建议') || 
+            p.textContent.includes('注意') || 
+            p.textContent.includes('风险')) {
+            p.classList.add('highlight');
+        }
+    });
+}
+
+function smoothScrollToBottom(element) {
+    const scrollHeight = element.scrollHeight;
+    const currentScroll = element.scrollTop;
+    const targetScroll = scrollHeight - element.clientHeight;
+    const scrollDistance = targetScroll - currentScroll;
+    
+    if (scrollDistance > 0) {
+        const duration = 300;
+        const startTime = performance.now();
+        
+        function scroll(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            element.scrollTop = currentScroll + scrollDistance * easeInOutCubic(progress);
+            
+            if (progress < 1) {
+                requestAnimationFrame(scroll);
+            }
+        }
+        
+        requestAnimationFrame(scroll);
+    }
+}
+
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 ease-in-out z-50 ${
+        type === 'error' ? 'bg-red-500' :
+        type === 'warning' ? 'bg-yellow-500' :
+        type === 'success' ? 'bg-green-500' :
+        'bg-blue-500'
+    } text-white`;
+    
+    toast.innerHTML = `
+        <div class="flex items-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="${
+                          type === 'error' ? 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' :
+                          type === 'warning' ? 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' :
+                          type === 'success' ? 'M5 13l4 4L19 7' :
+                          'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                      }"/>
+            </svg>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // 添加入场动画
+    requestAnimationFrame(() => {
+        toast.style.transform = 'translateX(0)';
+        toast.style.opacity = '1';
+    });
+    
+    // 3秒后移除
+    setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 function displayBacktestResults(data) {
@@ -420,7 +625,7 @@ function displayBacktestResults(data) {
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Chandelier Exit Long -->
                     <div class="p-4 bg-gray-50 rounded-lg">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">多头出场</h4>
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">多头出</h4>
                         <div class="space-y-2">
                             <div class="flex justify-between">
                                 <span class="text-sm text-gray-600">当前值:</span>
@@ -545,7 +750,7 @@ async function runBacktest() {
     }
 }
 
-// 添加错误显示函数
+// 添加错误显示函
 function showError(message) {
     const errorDiv = document.getElementById('error-message') || document.createElement('div');
     errorDiv.id = 'error-message';
@@ -873,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 添加动画相关的样式
 const style = document.createElement('style');
 style.textContent = `
-    /* 原有的样式保持不变 */
+    /* 原有的样式持不变 */
     .tab-button.active {
         color: #7C3AED;
         border-bottom: 2px solid #7C3AED;
