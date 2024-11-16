@@ -28,12 +28,12 @@ def parse_args():
                       help='是否发送结果到微信')
     return parser.parse_args()
 
-def optimize_and_backtest(symbol):
+def optimize_and_backtest(symbol, strategy_name='ChandelierZlSmaStrategy'):
     # 读取优化结果
-    opt_file = f"results/{symbol}_optimization_results.csv"
+    opt_file = f"results/{symbol}_{strategy_name}_optimization_results.csv"
     if not os.path.exists(opt_file):
         # 运行优化器
-        optimize_cmd = f"python optimizer.py --symbol {symbol}"
+        optimize_cmd = f"python optimizer.py --symbol {symbol} --strategy {strategy_name}"
         subprocess.run(optimize_cmd, shell=True, check=True)
         
     file_mtime = datetime.fromtimestamp(os.path.getmtime(opt_file))
@@ -42,7 +42,7 @@ def optimize_and_backtest(symbol):
     if file_mtime < today:
         print(f"股票 {symbol} 的优化结果已过期,需要重新生成")
         # 运行优化器
-        optimize_cmd = f"python optimizer.py --symbol {symbol}"
+        optimize_cmd = f"python optimizer.py --symbol {symbol} --strategy {strategy_name}"
         subprocess.run(optimize_cmd, shell=True, check=True)
         
     opt_results = pd.read_csv(opt_file)

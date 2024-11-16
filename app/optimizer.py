@@ -199,8 +199,25 @@ def main():
         default=datetime.now().strftime('%Y-%m-%d'),
         help='回测结束日期 (YYYY-MM-DD)'
     )
+    parser.add_argument(
+        '--strategy',
+        type=str,
+        default='ChandelierZlSmaStrategy',
+        choices=['ChandelierZlSmaStrategy', 'BollingerRsiMacdStrategy', 'MeanReversionStrategy'],
+        help='选择要使用的策略'
+    )
     args = parser.parse_args()
 
+    # 策略映射字典
+    strategy_mapping = {
+        'ChandelierZlSmaStrategy': ChandelierZlSmaStrategy,
+        'BollingerRsiMacdStrategy': BollingerRsiMacdStrategy,
+        'MeanReversionStrategy': MeanReversionStrategy
+    }
+
+    # 获取选择的策略
+    selected_strategy = strategy_mapping[args.strategy]
+    
     start_date = args.start_date
     end_date = args.end_date
     
@@ -309,7 +326,7 @@ def main():
             )
 
         data_feed = AkShareData(dataname=stock_data)
-        strategies = [ChandelierZlSmaStrategy, BollingerRsiMacdStrategy]
+        strategies = [selected_strategy]
         optimization_results = []
 
         for strat in strategies:
