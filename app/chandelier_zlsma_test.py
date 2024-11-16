@@ -1,4 +1,5 @@
 from strategies.chandelier_zlsma_strategy import ChandelierZlSmaStrategy
+from strategies.bollinger_rsi_macd_strategy import BollingerRsiMacdStrategy
 import backtrader as bt
 import pandas as pd
 from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
@@ -7,7 +8,59 @@ from datetime import datetime, timedelta
 import argparse
 import sys
 
-def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params):
+def get_best_params_from_file(symbol, strategy_name):
+    """
+    从优化结果文件中获取最佳参数
+    
+    参数：
+    - symbol: 股票代码
+    - strategy_name: 策略名称
+    
+    返回：
+    - 参数字典或 None（如果文件不存在或读取失败）
+    """
+    filename = f'results/{symbol}_{strategy_name}_optimization_results.csv'
+    
+    if not os.path.exists(filename):
+        print(f"未找到优化结果文件: {filename}")
+        return None
+        
+    try:
+        results_df = pd.read_csv(filename)
+        if results_df.empty:
+            print(f"优化结果文件为空: {filename}")
+            return None
+            
+        # 获取最新的优化结果（第一行）
+        best_result = results_df.iloc[0]
+        
+        if strategy_name == 'ChandelierZlSmaStrategy':
+            return {
+                'period': int(best_result['period']),
+                'mult': float(best_result['mult']),
+                'investment_fraction': float(best_result['investment_fraction']),
+                'max_pyramiding': int(best_result['max_pyramiding'])
+            }
+        elif strategy_name == 'BollingerRsiMacdStrategy':
+            return {
+                'bb_period': int(best_result['bb_period']),
+                'bb_devfactor': float(best_result['bb_devfactor']),
+                'rsi_period': int(best_result['rsi_period']),
+                'rsi_overbought': int(best_result['rsi_overbought']),
+                'rsi_oversold': int(best_result['rsi_oversold']),
+                'macd_fast': int(best_result['macd_fast']),
+                'macd_slow': int(best_result['macd_slow']),
+                'macd_signal': int(best_result['macd_signal']),
+                'investment_fraction': float(best_result['investment_fraction'])
+            }
+        
+        return None
+    except Exception as e:
+        print(f"读取优化结果文件时出错: {str(e)}")
+        return None
+
+def run_backtest(symbol, start_date, end_date, strategy_class=None, 
+                printlog=True, **strategy_params):
     """
     运行回测
 
@@ -15,9 +68,14 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     - symbol: 股票代码，例如 '600519'
     - start_date: 回测开始日期，格式 'YYYY-MM-DD'
     - end_date: 回测结束日期，格式 'YYYY-MM-DD'
+    - strategy_class: 策略类，默认为 ChandelierZlSmaStrategy
     - printlog: 是否打印日志
     - **strategy_params: 策略参数，用于初始化策略
     """
+    # 设置默认策略
+    if strategy_class is None:
+        strategy_class = ChandelierZlSmaStrategy
+
     # 获取股票数据
     if symbol.startswith(('51', '159')):  # ETF
         data_df = get_etf_data(symbol, start_date, end_date)
@@ -33,7 +91,7 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     cerebro = bt.Cerebro()
 
     # 添加策略，并传入策略参数
-    cerebro.addstrategy(ChandelierZlSmaStrategy, printlog=printlog, **strategy_params)
+    cerebro.addstrategy(strategy_class, printlog=printlog, **strategy_params)
 
     # 将 Pandas DataFrame 转为 Backtrader 数据格式
     data_bt = bt.feeds.PandasData(
@@ -147,14 +205,22 @@ def run_backtest(symbol, start_date, end_date, printlog=True, **strategy_params)
     signal_type = "无交易信号"
     if len(strat.signal) > 0:
         last_signal = strat.signal[0]
-        signal_map = {
-            1: "买入，方向从空头转为多头，且收盘价高于ZLSMA线。",
-            2: "买入，多头趋势中，ZLSMA上升。",
-            3: "建仓预警，收盘价高于空头止损价，但没有高于多头止损价。",
-            -1: "清仓，因为方向从多头转为空头。",
-            -2: "减仓预警，多头趋势中，但ZLSMA未上升。",
-            -3: "减仓或清仓，收盘价低于多头止损价，但没有低于空头止损价。"
-        }
+        if strategy_class == ChandelierZlSmaStrategy:
+            signal_map = {
+                1: "买入，方向从空头转为多头，且收盘价高于ZLSMA线。",
+                2: "买入，多头趋势中，ZLSMA上升。",
+                3: "建仓预警，收盘价高于空头止损价，但没有高于多头止损价。",
+                -1: "清仓，因为方向从多头转为空头。",
+                -2: "减仓预警，多头趋势中，但ZLSMA未上升。",
+                -3: "减仓或清仓，收盘价低于多头止损价，但没有低于空头止损价。"
+            }
+        elif strategy_class == BollingerRsiMacdStrategy:
+            signal_map = {
+                1: "买入信号：RSI超卖且MACD金叉，价格突破布林带下轨。",
+                2: "加仓信号：趋势向上，价格在布林带中轨上方。",
+                -1: "卖出信号：RSI超买且MACD死叉，价格突破布林带上轨。",
+                -2: "减仓信号：趋势向下，价格在布林带中轨下方。"
+            }
         signal_type = signal_map.get(last_signal, "无交易信号，当前市场趋势不明确。")
         reason = strat.reason
 
@@ -249,47 +315,98 @@ if __name__ == '__main__':
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='股票回测程序')
     parser.add_argument('symbol', type=str, help='股票代码')
-    parser.add_argument('-s', '--start', type=str, default=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'), help='开始日期')
-    parser.add_argument('-e', '--end', type=str, default=datetime.now().strftime('%Y-%m-%d'), help='结束日期')
-    parser.add_argument('-p', '--period', type=int, default=14, help='ATR、CE和ZLSMA周期')
-    parser.add_argument('-m', '--mult', type=float, default=2, help='ATR倍数')
-    parser.add_argument('-i', '--inv', type=float, default=0.8, help='资金比例')
-    parser.add_argument('-y', '--pyr', type=int, default=0, help='最大加仓次数')
+    parser.add_argument(
+        '--strategy', 
+        type=str, 
+        choices=['chandelier', 'bollinger'],
+        default='chandelier',
+        help='选择策略：chandelier (ChandelierZlSma) 或 '
+             'bollinger (BollingerRsiMacd)'
+    )
+    parser.add_argument('-s', '--start', type=str, 
+                       default=(datetime.now() - 
+                               timedelta(days=365)).strftime('%Y-%m-%d'),
+                       help='开始日期')
+    parser.add_argument('-e', '--end', type=str,
+                       default=datetime.now().strftime('%Y-%m-%d'),
+                       help='结束日期')
+    
+    # Chandelier策略参数
+    parser.add_argument('-p', '--period', type=int, default=14,
+                       help='ATR、CE和ZLSMA周期 (Chandelier策略)')
+    parser.add_argument('-m', '--mult', type=float, default=2,
+                       help='ATR倍数 (Chandelier策略)')
+    parser.add_argument('-i', '--inv', type=float, default=0.8,
+                       help='资金比例')
+    parser.add_argument('-y', '--pyr', type=int, default=0,
+                       help='最大加仓次数 (Chandelier策略)')
+    
+    # Bollinger策略参数
+    parser.add_argument('--bb-period', type=int, default=20,
+                       help='布林带周期 (Bollinger策略)')
+    parser.add_argument('--bb-dev', type=float, default=2.0,
+                       help='布林带标准差倍数 (Bollinger策略)')
+    parser.add_argument('--rsi-period', type=int, default=14,
+                       help='RSI周期 (Bollinger策略)')
+    parser.add_argument('--macd-fast', type=int, default=12,
+                       help='MACD快线周期 (Bollinger策略)')
+    parser.add_argument('--macd-slow', type=int, default=26,
+                       help='MACD慢线周期 (Bollinger策略)')
+    parser.add_argument('--macd-signal', type=int, default=9,
+                       help='MACD信号线周期 (Bollinger策略)')
+    
     parser.add_argument('--log', action='store_true', help='打印日志')
     args = parser.parse_args()
 
-    print(f"开始回测股票: {args.symbol}")
+    # 选择策略类
+    strategy_map = {
+        'chandelier': ChandelierZlSmaStrategy,
+        'bollinger': BollingerRsiMacdStrategy
+    }
+    selected_strategy = strategy_map[args.strategy]
 
-    # 检查是否存在优化结果文件
-    optimization_file = f"results/{args.symbol}_optimization_results.csv"
-    if os.path.exists(optimization_file) and len(sys.argv) == 2:
-        print(f"发现优化结果文件：{optimization_file}，正在加载参数...")
-        opt_results = pd.read_csv(optimization_file)
-        if not opt_results.empty:
-            best_params = opt_results.iloc[0]
-            args.start = args.start  # 保持默认值
-            args.end = args.end  # 保持默认值
-            args.period = int(best_params['period'])
-            args.mult = float(best_params['mult'])
-            args.inv = float(best_params['investment_fraction'])
-            args.pyr = int(best_params['max_pyramiding'])
-            args.log = True
-            print("已加载优化参数。")
-        else:
-            print("优化结果文件为空，使用默认参数。")
+    # 尝试从文件加载最佳参数
+    best_params = get_best_params_from_file(
+        args.symbol,
+        selected_strategy.__name__
+    )
+    
+    if best_params:
+        print(f"\n从优化结果文件加载了最佳参数:")
+        for param, value in best_params.items():
+            print(f"  {param}: {value}")
+        strategy_params = best_params
     else:
-        print("未找到优化结果文件或提供了其他参数，使用命令行参数。")
+        print("\n使用命令行参数:")
+        # 根据选择的策略准备参数
+        if args.strategy == 'chandelier':
+            strategy_params = {
+                'period': args.period,
+                'mult': args.mult,
+                'investment_fraction': args.inv,
+                'max_pyramiding': args.pyr
+            }
+        else:  # bollinger
+            strategy_params = {
+                'bb_period': args.bb_period,
+                'bb_devfactor': args.bb_dev,
+                'rsi_period': args.rsi_period,
+                'macd_fast': args.macd_fast,
+                'macd_slow': args.macd_slow,
+                'macd_signal': args.macd_signal,
+                'investment_fraction': args.inv
+            }
+        for param, value in strategy_params.items():
+            print(f"  {param}: {value}")
 
     # 运行回测
     results = run_backtest(
         symbol=args.symbol,
         start_date=args.start,
         end_date=args.end,
-        period=args.period,
-        mult=args.mult,
-        investment_fraction=args.inv,
-        max_pyramiding=args.pyr,
-        printlog=True
+        strategy_class=selected_strategy,
+        printlog=True,
+        **strategy_params
     )
     
     if results:

@@ -40,7 +40,7 @@ def save_industry_fund_flow(sector_type="行业资金流", output_file=None):
 
 if __name__ == "__main__":
     # 示例用法
-    sector_types = ["行业资金流"]
+    sector_types = ["行业资金流","概念资金流"]
     
     for sector_type in sector_types:
         saved_file = save_industry_fund_flow(sector_type)

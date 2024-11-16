@@ -18,7 +18,8 @@ from data_fetch import (
     get_us_stock_list,
     get_a_share_list,
     get_industry_stocks,
-    get_stock_news
+    get_stock_news,
+    get_stock_data
 )
 
 def test_get_vgt_data():
@@ -208,7 +209,7 @@ def test_get_stock_news():
         print(f"成功获取股票 {symbol} 的新闻资讯")
         print(f"获取到的新闻数量: {len(news_list)}")
         
-        # 显��前3条新闻的基本信息
+        # 显前3条新闻的基本信息
         print("\n前3条新闻:")
         for i, news in enumerate(news_list[:3], 1):
             print(f"\n第{i}条新闻:")
@@ -391,7 +392,7 @@ def test_get_industry_stocks():
         stocks = get_industry_stocks(industry_name)
         
         if not stocks.empty:
-            print(f"成功获取{industry_name}行业的成份���")
+            print(f"成功获取{industry_name}行业的成份股")
             print(f"获取到的股票数量: {len(stocks)}")
             print("\n数据前5行:")
             print(stocks.head())
@@ -438,6 +439,84 @@ def test_get_industry_stocks():
         print(f"测试过程中发生错误: {str(e)}")
         raise
 
+def test_get_stock_data():
+    """
+    测试获取股票历史行情数据功能，包括akshare和baostock两种数据源
+    """
+    print("\n开始测试获取股票历史行情数据...")
+    
+    # 测试参数
+    symbol = "300059"  # 东方财富
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    
+    # 测试两种数据源
+    data_sources = ['akshare', 'baostock']
+    
+    for source in data_sources:
+        print(f"\n测试{source}数据源:")
+        try:
+            stock_data = get_stock_data(symbol, start_date, end_date, source=source)
+            
+            if not stock_data.empty:
+                # 确保Volume列为float64类型
+                stock_data['Volume'] = stock_data['Volume'].astype('float64')
+                
+                print(f"成功获取股票 {symbol} 从 {start_date} 到 {end_date} 的数据")
+                print(f"数据行数: {len(stock_data)}")
+                print("\n数据前5行:")
+                print(stock_data.head())
+                
+                # 检查数据列
+                expected_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                                  'Amount', 'Pct_change']
+                for col in expected_columns:
+                    assert col in stock_data.columns, f"缺少必要的列 '{col}'"
+                print("\n数据列检查通过")
+                
+                # 检查数据类型
+                assert stock_data.index.dtype == 'datetime64[ns]', "索引不是日期时间类型"
+                numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                                 'Amount', 'Pct_change']
+                for col in numeric_columns:
+                    assert stock_data[col].dtype == 'float64', \
+                        f"{col}列不是浮点数类型"
+                print("数据类型检查通过")
+                
+                # 检查数据范围
+                assert stock_data.index.min().strftime('%Y-%m-%d') >= start_date, \
+                    "数据开始日期早于请求的开始日期"
+                assert stock_data.index.max().strftime('%Y-%m-%d') <= end_date, \
+                    "数据结束日期晚于请求的结束日期"
+                print("数据范围检查通过")
+                
+                # 检查数值有效性
+                assert all(stock_data['Open'] > 0), "存在无效的开盘价"
+                assert all(stock_data['Close'] > 0), "存在无效的收盘价"
+                assert all(stock_data['High'] >= stock_data['Low']), \
+                    "最高价小于最低价"
+                assert all(stock_data['Volume'] >= 0), "存在负的成交量"
+                assert all(stock_data['Amount'] >= 0), "存在负的成交额"
+                print("数值有效性检查通过")
+                
+                print(f"\n{source}数据源测试通过！")
+            else:
+                print(f"未能获取股票 {symbol} 的数据")
+                
+        except Exception as e:
+            print(f"测试{source}数据源时发生错误: {str(e)}")
+            raise
+    
+    # 测试无效股票代码
+    print("\n测试无效股票代码:")
+    invalid_symbol = "000000"
+    invalid_data = get_stock_data(invalid_symbol, start_date, end_date)
+    assert isinstance(invalid_data, pd.DataFrame), "对于无效股票代码应返回空DataFrame"
+    assert invalid_data.empty, "对于无效股票代码应返回空DataFrame"
+    print("无效股票代码测试通过")
+    
+    print("\n所有测试完成！")
+
 if __name__ == "__main__":
     #test_get_a_share_list()
     #test_get_vgt_data()
@@ -456,4 +535,6 @@ if __name__ == "__main__":
     #print("\n" + "="*50 + "\n")
     #test_get_us_stock_list()
     #print("\n" + "="*50 + "\n")
-    test_get_stock_news()
+    #test_get_stock_news()
+    test_get_stock_data()
+    print("\n" + "="*50 + "\n")

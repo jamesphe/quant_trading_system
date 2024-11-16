@@ -2,6 +2,7 @@
 
 import akshare as ak
 import pandas as pd
+import baostock as bs
 from datetime import datetime
 
 def get_a_share_list():
@@ -18,7 +19,7 @@ def get_a_share_list():
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()
 
-def get_stock_data(symbol, start_date, end_date):
+def get_stock_data(symbol, start_date, end_date, source='akshare'):
     """
     获取A股股票历史行情数据
 
@@ -26,13 +27,97 @@ def get_stock_data(symbol, start_date, end_date):
     - symbol: 股票代码，例如 '600519'
     - start_date: 开始日期，格式 'YYYY-MM-DD'
     - end_date: 结束日期，格式 'YYYY-MM-DD'
+    - source: 数据源，可选 'akshare' 或 'baostock'，默认为 'akshare'
 
     返回：
     - stock_data: 经过预处理的DataFrame
     """
+    if source == 'baostock':
+        return _get_stock_data_baostock(symbol, start_date, end_date)
+    else:
+        return _get_stock_data_akshare(symbol, start_date, end_date)
+
+def _get_stock_data_baostock(symbol, start_date, end_date):
+    """使用baostock获取股票数据"""
+    try:
+        # 登录baostock
+        # baostock不需要账号密码,直接调用login()即可
+        # 返回值为BaoStockLoginResult对象,可以通过error_code和error_msg查看登录状态
+        login_result = bs.login()
+        if login_result.error_code != '0':
+            print(f'baostock登录失败: {login_result.error_msg}')
+            return pd.DataFrame()
+        
+        # baostock需要特定格式的股票代码
+        if symbol.startswith('6'):
+            bs_symbol = f"sh.{symbol}"
+        else:
+            bs_symbol = f"sz.{symbol}"
+            
+        # 获取数据
+        rs = bs.query_history_k_data_plus(
+            bs_symbol,
+            "date,open,high,low,close,volume,amount,pctChg",
+            start_date=start_date,
+            end_date=end_date,
+            frequency="d",
+            adjustflag="2"  # 前复权
+        )
+        
+        if rs.error_code != '0':
+            print(f"baostock获取数据失败: {rs.error_msg}")
+            return pd.DataFrame()
+            
+        # 转换为DataFrame
+        stock_data = pd.DataFrame(rs.data, columns=rs.fields)
+        
+        if stock_data.empty:
+            print(f"股票 {symbol} 无有效数据。")
+            return pd.DataFrame()
+            
+        # 重命名列
+        stock_data.rename(columns={
+            'date': 'Date',
+            'open': 'Open',
+            'close': 'Close',
+            'high': 'High',
+            'low': 'Low',
+            'volume': 'Volume',
+            'amount': 'Amount',
+            'pctChg': 'Pct_change'
+        }, inplace=True)
+        
+        # 将'Date'列转换为日期格式并设置为索引
+        stock_data['Date'] = pd.to_datetime(stock_data['Date'])
+        stock_data.set_index('Date', inplace=True)
+        
+        # 将数据类型转换为数值类型
+        numeric_cols = ['Open', 'Close', 'High', 'Low', 'Volume', 'Amount', 'Pct_change']
+        stock_data[numeric_cols] = stock_data[numeric_cols].apply(pd.to_numeric, errors='coerce')
+        
+        # 按日期排序
+        stock_data.sort_index(inplace=True)
+        
+        return stock_data[['Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'Pct_change']]
+        
+    except Exception as e:
+        print(f"获取股票 {symbol} 数据失败: {e}")
+        return pd.DataFrame()
+    finally:
+        # 退出baostock
+        bs.logout()
+
+def _get_stock_data_akshare(symbol, start_date, end_date):
+    """使用akshare获取股票数据（原有的实现）"""
     try:
         # 获取数据，复权类型为前复权（qfq）
-        stock_data = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date=start_date.replace('-', ''), end_date=end_date.replace('-', ''), adjust="qfq")
+        stock_data = ak.stock_zh_a_hist(
+            symbol=symbol, 
+            period="daily", 
+            start_date=start_date.replace('-', ''), 
+            end_date=end_date.replace('-', ''), 
+            adjust="qfq"
+        )
         
         if stock_data.empty:
             print(f"股票 {symbol} 无有效数据。")

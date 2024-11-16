@@ -363,50 +363,55 @@ def analyze_stock_route():
                 'success': False,
                 'error': '缺少股票代码参数'
             }), 400
-            
-        # 计算日期范围
-        end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
-        logger.debug(f"分析日期范围: {start_date} 到 {end_date}")
-        
-        # 初始化选择的AI模型
-        try:
-            if model_type == 'kimi':
-                logger.debug("使用 Kimi 模型")
-                model = KimiModel()
-            else:
-                logger.debug("使用 ZhipuAI 模型")
-                model = ZhipuAIModel()
-        except Exception as e:
-            logger.error(f"创建模型实例失败: {str(e)}", exc_info=True)
-            return jsonify({
-                'success': False,
-                'error': f'创建模型实例失败: {str(e)}'
-            }), 500
-        
-        # 使用 analyze_stock 函数进行分析
-        try:
-            logger.debug("开始进行股票分析")
-            analysis_result = analyze_stock(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                model=model,
-                stream=False
-            )
-            logger.debug(f"分析结果长度: {len(analysis_result)}")
-        except Exception as e:
-            logger.error(f"股票分析失败: {str(e)}", exc_info=True)
-            return jsonify({
-                'success': False,
-                'error': f'分析失败: {str(e)}'
-            }), 500
-        
-        logger.debug("分析完成，准备返回结果")
-        return jsonify({
-            'success': True,
-            'content': analysis_result
-        })
+
+        def generate():
+            try:
+                # 发送初始消息
+                yield 'data: {"content": "正在获取股票数据..."}\n\n'
+                
+                # 计算日期范围
+                end_date = datetime.now().strftime('%Y-%m-%d')
+                start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
+                
+                # 初始化选择的AI模型
+                if model_type == 'kimi':
+                    model = KimiModel()
+                else:
+                    model = ZhipuAIModel()
+                
+                yield 'data: {"content": "正在进行分析..."}\n\n'
+                
+                # 使用生成器方式获取分析结果
+                for chunk in analyze_stock(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    model=model,
+                    stream=True
+                ):
+                    if chunk:
+                        # 确保chunk是JSON格式的字符串
+                        if isinstance(chunk, str):
+                            yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
+                        else:
+                            yield f'data: {json.dumps({"content": chunk})}\n\n'
+                
+                # 发送完成消息
+                yield 'data: {"content": "\\n\\n分析完成"}\n\n'
+                
+            except Exception as e:
+                logger.error(f"生成分析内容时出错: {str(e)}", exc_info=True)
+                error_msg = json.dumps({"error": str(e)})
+                yield f"data: {error_msg}\n\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'  # 禁用 Nginx 缓冲
+            }
+        )
         
     except Exception as e:
         logger.error(f"处理请求时发生错误: {str(e)}", exc_info=True)

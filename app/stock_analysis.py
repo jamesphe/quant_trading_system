@@ -121,7 +121,7 @@ def get_stock_analysis_prompt(stock_data: pd.DataFrame, stock_name: str, basic_i
     ])
     
     prompt = f"""
-请作为一位专业的股票分析师，综合分析以下股票 {stock_name} 的各项数据：
+请作为一位专业的股票分析师，综合分析以下股票 {stock_name} 的各项数据，并对下一个交易日的走势进行预判：
 
 1. 基本面信息：
 {basic_info_text}
@@ -139,57 +139,62 @@ def get_stock_analysis_prompt(stock_data: pd.DataFrame, stock_name: str, basic_i
 4. 成交量分析
 5. 技术指标分析（基于提供的数据）
 6. 主要支撑位和压力位
-7. 短期投资建议
 
-请用专业的角度进行分析，给出具体的数据支持，并在分析的最后给出明确的投资建议。
+请重点关注以下内容：
+1. 下一个交易日可能的走势预判（涨跌空间、波动区间等）
+2. 主要影响因素分析（利好/利空）
+3. 具体的应对策略建议：
+   - 建仓/加仓时机和价位
+   - 减仓/止盈价位
+   - 止损位设置
+   - 仓位控制建议
+
+请用专业的角度进行分析，给出具体的数据支持，并在分析的最后给出明确的操作建议。
 """
     return prompt
 
 
-def analyze_stock(
-    symbol: str,
-    start_date: str,
-    end_date: str,
-    model: AIModelBase,
-    stream: bool = False
-) -> Union[str, Generator]:
-    """
-    分析股票数据并返回分析结果
-    
-    参数:
-    - symbol: 股票代码
-    - start_date: 开始日期
-    - end_date: 结束日期
-    - model: AI模型实例
-    - stream: 是否使用流式输出
-    
-    返回:
-    - 如果stream=False，返回完整的分析文本
-    - 如果stream=True，返回生成器，用于流式输出
-    """
+def analyze_stock(symbol, start_date, end_date, model, stream=False):
     try:
-        # 获取股票行情数据
-        stock_data = get_stock_data(symbol, start_date, end_date)
+        # 获取股票数据
+        if symbol.startswith(('51', '159')):
+            stock_data = get_etf_data(symbol, start_date, end_date)
+        elif symbol.isdigit():
+            stock_data = get_stock_data(symbol, start_date, end_date)
+        else:
+            stock_data = get_us_stock_data(symbol, start_date, end_date)
+            
         if stock_data.empty:
-            raise ValueError(f"无法获取股票 {symbol} 的数据")
-        
-        # 获取股票名称
+            yield "未找到股票数据"
+            return
+
+        # 获取股票名称和基本信息
         stock_name = get_stock_name(symbol)
-        
-        # 获取股票基本信息
         basic_info = get_stock_basic_info(symbol)
         
         # 获取最近的新闻（限制为5条）
         news_list = get_stock_news(symbol, limit=5)
-        
-        # 生成分析提示
+
+        # 构建提示信息，使用Markdown格式
         prompt = get_stock_analysis_prompt(stock_data, stock_name, basic_info, news_list)
         
-        return model.analyze(prompt, stream)
+        if stream:
+            # 流式输出
+            for chunk in model.analyze(prompt, stream=True):
+                if chunk:
+                    if isinstance(model, ZhipuAIModel):
+                        content = chunk.choices[0].delta.content
+                    else:  # KimiModel
+                        content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                    if content:
+                        yield content
+        else:
+            # 一次性输出
+            return model.analyze(prompt, stream=False)
             
     except Exception as e:
-        logger.error(f"分析过程发生错误: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"分析股票时发生错误: {str(e)}", exc_info=True)
+        yield f"分析过程中发生错误: {str(e)}"
 
 
 def main():
@@ -225,13 +230,8 @@ def main():
                 model,
                 stream=True
             ):
-                if args.model == 'zhipu':
-                    content = chunk.choices[0].delta.content
-                else:
-                    content = chunk["choices"][0]["delta"]["content"]
-                    
-                if content:
-                    print(content, end='', flush=True)
+                if chunk:
+                    print(chunk, end='', flush=True)
         else:
             # 阻塞模式
             result = analyze_stock(

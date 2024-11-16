@@ -13,7 +13,11 @@ import importlib.util
 import os
 
 from data_fetch import get_stock_data, get_etf_data, get_us_stock_data
-from strategies import MeanReversionStrategy, ChandelierZlSmaStrategy
+from strategies import (
+    MeanReversionStrategy, 
+    ChandelierZlSmaStrategy,
+    BollingerRsiMacdStrategy
+)
 
 # 股票清单
 STOCK_LIST = [
@@ -115,6 +119,37 @@ def objective(trial, strategy, data_feed):
             'mult': mult,
             'investment_fraction': inv_fraction,
             'max_pyramiding': max_pyramiding,
+            'printlog': False
+        }
+    elif strategy == BollingerRsiMacdStrategy:
+        # 布林带参数
+        bb_period = trial.suggest_int('bb_period', 15, 25)
+        bb_devfactor = trial.suggest_float('bb_devfactor', 1.5, 2.5)
+        
+        # RSI参数
+        rsi_period = trial.suggest_int('rsi_period', 10, 20)
+        rsi_overbought = trial.suggest_int('rsi_overbought', 60, 75)
+        rsi_oversold = trial.suggest_int('rsi_oversold', 25, 40)
+        
+        # MACD参数
+        macd_fast = trial.suggest_int('macd_fast', 8, 16)
+        macd_slow = trial.suggest_int('macd_slow', 20, 30)
+        macd_signal = trial.suggest_int('macd_signal', 7, 12)
+        
+        # 资金管理参数
+        investment_fraction = trial.suggest_float('investment_fraction', 0.5, 0.9)
+        
+        params = {
+            'bb_period': bb_period,
+            'bb_devfactor': bb_devfactor,
+            'rsi_period': rsi_period,
+            'rsi_overbought': rsi_overbought,
+            'rsi_oversold': rsi_oversold,
+            'macd_fast': macd_fast,
+            'macd_slow': macd_slow,
+            'macd_signal': macd_signal,
+            'investment_fraction': investment_fraction,
+            'min_trade_unit': 100,
             'printlog': False
         }
     else:
@@ -274,7 +309,7 @@ def main():
             )
 
         data_feed = AkShareData(dataname=stock_data)
-        strategies = [ChandelierZlSmaStrategy]
+        strategies = [ChandelierZlSmaStrategy, BollingerRsiMacdStrategy]
         optimization_results = []
 
         for strat in strategies:
@@ -301,6 +336,20 @@ def main():
                     'investment_fraction':
                         round(best_trial.params['investment_fraction'], 2),
                     'max_pyramiding': int(best_trial.params['max_pyramiding'])
+                }
+            elif strat == BollingerRsiMacdStrategy:
+                best_params = {
+                    'bb_period': int(best_trial.params['bb_period']),
+                    'bb_devfactor': round(best_trial.params['bb_devfactor'], 2),
+                    'rsi_period': int(best_trial.params['rsi_period']),
+                    'rsi_overbought': int(best_trial.params['rsi_overbought']),
+                    'rsi_oversold': int(best_trial.params['rsi_oversold']),
+                    'macd_fast': int(best_trial.params['macd_fast']),
+                    'macd_slow': int(best_trial.params['macd_slow']),
+                    'macd_signal': int(best_trial.params['macd_signal']),
+                    'investment_fraction': round(
+                        best_trial.params['investment_fraction'], 2
+                    )
                 }
 
             # 打印结果
@@ -336,9 +385,27 @@ def main():
             all_optimization_results.append(result)
 
         # 保存当前股票的结果
+        for strategy_name in set(result['strategy'] for result in optimization_results):
+            # 为每个策略筛选结果
+            strategy_results = [
+                r for r in optimization_results if r['strategy'] == strategy_name
+            ]
+            strategy_df = pd.DataFrame(strategy_results)
+            
+            # 创建 results 目录（如果不存在）
+            os.makedirs('results', exist_ok=True)
+            
+            # 生成文件名
+            filename = f'results/{symbol}_{strategy_name}_optimization_results.csv'
+            
+            # 保存到 CSV 文件
+            strategy_df.to_csv(filename, index=False)
+            print(f"已保存 {symbol} 的 {strategy_name} 优化结果到: {filename}")
+
+        # 同时保存一个包含所有策略的汇总文件
         stock_df = pd.DataFrame(optimization_results)
         stock_df.to_csv(
-            f'results/{symbol}_optimization_results.csv',
+            f'results/{symbol}_all_strategies_results.csv',
             index=False
         )
 
@@ -380,22 +447,41 @@ def main():
         ))
         
         # 2. 最优参数汇总
-        params_summary = all_results_df.groupby(['name', 'symbol']).agg({
-            'period': 'first',
-            'mult': 'first',
-            'investment_fraction': 'first',
-            'max_pyramiding': 'first'
-        }).round(2)
-        
-        params_summary.columns = ['周期', '倍数', '投资比例', '金字塔等级']
-        
-        print("\n【最优参数】")
-        print("-" * 80)
-        print(params_summary.to_string(
-            float_format=lambda x: '{:,.2f}'.format(x),
-            justify='center'
-        ))
-        
+        params_columns = {
+            'ChandelierZlSmaStrategy': ['period', 'mult', 'investment_fraction', 'max_pyramiding'],
+            'BollingerRsiMacdStrategy': ['bb_period', 'bb_devfactor', 'rsi_period', 'investment_fraction']
+        }
+
+        for strategy_name, columns in params_columns.items():
+            strategy_results = all_results_df[
+                all_results_df['strategy'] == strategy_name
+            ]
+            if not strategy_results.empty:
+                params_summary = strategy_results.groupby(['name', 'symbol']).agg({
+                    col: 'first' for col in columns
+                }).round(2)
+                
+                column_names = {
+                    'bb_period': '布林周期',
+                    'bb_devfactor': '标准差倍数',
+                    'rsi_period': 'RSI周期',
+                    'investment_fraction': '投资比例',
+                    'period': '周期',
+                    'mult': '倍数',
+                    'max_pyramiding': '金字塔等级'
+                }
+                
+                params_summary.columns = [
+                    column_names.get(col, col) for col in columns
+                ]
+                
+                print(f"\n【{strategy_name}最优参数】")
+                print("-" * 80)
+                print(params_summary.to_string(
+                    float_format=lambda x: '{:,.2f}'.format(x),
+                    justify='center'
+                ))
+
         print("=" * 100)
         
         # 3. 统计摘要

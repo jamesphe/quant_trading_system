@@ -20,7 +20,7 @@ def get_kimi_analysis(stock_data):
     - str，Kimi的分析结果
     """
     client = OpenAI(
-        api_key="sk-mZyZTW8RmwaDNM1yG6OAh46Av22yRaPknNucnT2606iLWDye",
+        api_key="sk-5WISVUa4tF2lypG13gvpqmzZ3j3ASGlpK4yyxLur4itEpyeb",
         base_url="https://api.moonshot.cn/v1",
     )
     
@@ -49,7 +49,7 @@ def get_stock_web_analysis(symbol):
     - str，基于网络搜索的分析结果
     """
     client = OpenAI(
-        api_key="sk-mZyZTW8RmwaDNM1yG6OAh46Av22yRaPknNucnT2606iLWDye",
+        api_key="sk-5WISVUa4tF2lypG13gvpqmzZ3j3ASGlpK4yyxLur4itEpyeb",
         base_url="https://api.moonshot.cn/v1",
     )
     
@@ -160,7 +160,7 @@ def stream_kimi_analysis(prompt):
     - prompt: str，发送给Kimi的提示词
     """
     client = OpenAI(
-        api_key="sk-mZyZTW8RmwaDNM1yG6OAh46Av22yRaPknNucnT2606iLWDye",
+        api_key="sk-5WISVUa4tF2lypG13gvpqmzZ3j3ASGlpK4yyxLur4itEpyeb",
         base_url="https://api.moonshot.cn/v1",
     )
     
@@ -227,8 +227,7 @@ def get_csv_analysis_prompt(df, industry_fund_flow):
     - str，分析提示词
     """
     return f"""
-    请分析行业资金流数据和个股数据，以个股投资潜力为主要考虑因素，同时参考行业资金流向，
-    筛选出最具投资价值的5只股票。
+    请对提供的全部股票进行全面的对比分析，从中筛选出最适合建仓的5只股票。分析过程需要对每只股票的各项指标进行横向比较，综合评估后给出最终推荐名单。
 
     行业资金流数据:
     {industry_fund_flow.to_string() if industry_fund_flow is not None 
@@ -284,9 +283,7 @@ def get_csv_analysis_prompt(df, industry_fund_flow):
 
     最后请给出:
     1. 投资组合配置建议
-    2. 仓位控制策略
-    3. 风险控制要点
-    4. 止盈止损建议
+    2. 止盈止损建议
     """
 
 
