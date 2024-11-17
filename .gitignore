@@ -3,7 +3,6 @@
 **/*.csv
 **/*.pyc
 /buy_signals_latest_day.xlsx
-/requirements.txt
 /results
 /app/results
 

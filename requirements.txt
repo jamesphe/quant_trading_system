@@ -1,0 +1,10 @@
+flask
+backtrader
+pandas
+numpy
+optuna
+akshare
+requests
+python-dotenv
+zhipuai
+openai
