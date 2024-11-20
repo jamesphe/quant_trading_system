@@ -212,7 +212,7 @@ def backtest():
         # 导入并执行回测脚本
         import chandelier_zlsma_test
         # 检查是否存在优化参数文件
-        optimization_file = f'results/{symbol}_optimization_results.csv'
+        optimization_file = f'results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv'
         if os.path.exists(optimization_file):
             # 读取化参数
             opt_params = pd.read_csv(optimization_file).iloc[-1]
@@ -397,7 +397,7 @@ def analyze_stock_route():
                             yield f'data: {json.dumps({"content": chunk})}\n\n'
                 
                 # 发送完成消息
-                yield 'data: {"content": "\\n\\n分析完成"}\n\n'
+                yield 'data: {"content": "\\n\\n============================\\n\\n分析完成"}\n\n'
                 
             except Exception as e:
                 logger.error(f"生成分析内容时出错: {str(e)}", exc_info=True)

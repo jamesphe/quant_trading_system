@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from config import Config
 import json
 from openai import AsyncOpenAI, OpenAI
+import os
 
 
 # 配置日志
@@ -152,7 +153,7 @@ class OpenAIModel(AIModelBase):
                 yield chunk.choices[0].delta.content
 
 
-def get_stock_analysis_prompt(stock_data: pd.DataFrame, stock_name: str, basic_info: dict, news_list: list) -> str:
+def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name: str, basic_info: dict, news_list: list, include_backtest: bool = True) -> str:
     """生成用于分析股票的prompt"""
     data_description = stock_data.to_string()
     
@@ -196,7 +197,76 @@ def get_stock_analysis_prompt(stock_data: pd.DataFrame, stock_name: str, basic_i
 
 请用专业的角度进行分析，给出具体的数据支持，并在分析的最后给出明确的操作建议。
 """
+
+    if include_backtest:
+        backtest_results = get_backtest_results(symbol)
+        prompt += f"""
+
+4. 回测结果分析：
+{json.dumps(backtest_results, indent=2, ensure_ascii=False)}
+
+请结合回测结果对策略的有效性进行分析。
+"""
+    
     return prompt
+
+def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):
+    """
+    调用回测函数获取指定股票的回测结果
+    
+    参数：
+    - symbol: str，股票代码
+    - start_date: str，可选，开始日期，格式'YYYY-MM-DD'，默认一年前
+    - end_date: str，可选，结束日期，格式'YYYY-MM-DD'，默认当前日期
+    - strategy_params: dict，可选，策略参数字典
+    
+    返回：
+    - dict，回测结果
+    """
+    from chandelier_zlsma_test import run_backtest
+    
+    # 如果未指定日期，使用默认值
+    if not start_date:
+        start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+    if not end_date:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        
+    # 如果未指定策略参数，检查是否存在优化参数文件
+    if strategy_params is None:
+        optimization_file = f'results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv'
+        if os.path.exists(optimization_file):
+            # 读取优化参数
+            opt_params = pd.read_csv(optimization_file).iloc[-1]
+            strategy_params = {
+                'period': int(opt_params['period']),
+                'mult': float(opt_params['mult']), 
+                'investment_fraction': float(opt_params['investment_fraction']),
+                'max_pyramiding': int(opt_params['max_pyramiding'])
+            }
+        else:
+            # 使用默认参数
+            strategy_params = {
+                'period': 14,
+                'mult': 2.0,
+                'investment_fraction': 0.8,
+                'max_pyramiding': 0
+            }
+            
+    try:
+        # 调用回测函数
+        results = run_backtest(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            printlog=True,
+            **strategy_params
+        )
+        
+        return results
+    except Exception as e:
+        return {
+            'error': f'回测过程发生错误: {str(e)}'
+        }
 
 
 def analyze_stock(symbol, start_date, end_date, model, stream=False):
@@ -221,7 +291,7 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
         news_list = get_stock_news(symbol, limit=5)
 
         # 构建提示信息，使用Markdown格式
-        prompt = get_stock_analysis_prompt(stock_data, stock_name, basic_info, news_list)
+        prompt = get_stock_analysis_prompt(symbol, stock_data, stock_name, basic_info, news_list)
         
         if stream:
             # 流式输出

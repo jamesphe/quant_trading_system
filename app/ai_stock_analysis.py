@@ -1,5 +1,5 @@
 import pandas as pd
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from data_fetch import get_stock_data
 from datetime import datetime, timedelta
 import sys
@@ -7,6 +7,65 @@ import argparse
 import os
 import zhipuai
 from zhipuai import ZhipuAI
+from abc import ABC, abstractmethod
+from config import Config
+from typing import Union, Generator
+
+class AIModelBase(ABC):
+    """AI模型基类"""
+    
+    @abstractmethod
+    def analyze(
+        self,
+        prompt: str,
+        stream: bool = False
+    ) -> Union[str, Generator]:
+        """分析方法"""
+        pass
+
+
+class OpenAIModel(AIModelBase):
+    """OpenAI 模型实现"""
+    
+    def __init__(self):
+        config = Config()
+        api_key = config.get_api_key('openai')
+        self.client = OpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
+        self.async_client = AsyncOpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
+    
+    def analyze(
+        self,
+        prompt: str,
+        stream: bool = False
+    ) -> Union[str, Generator]:
+        """分析方法"""
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+        
+        response = self.client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            stream=stream,
+            temperature=0.7
+        )
+        
+        if stream:
+            return self._handle_stream_response(response)
+        return response.choices[0].message.content
+    
+    def _handle_stream_response(self, response):
+        """处理流式响应"""
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
 
 
 def get_kimi_analysis(stock_data):
@@ -40,7 +99,7 @@ def get_kimi_analysis(stock_data):
 
 def get_stock_web_analysis(symbol):
     """
-    使��Kimi的网络搜索功能获取股票的最新市场分析
+    使用Kimi的网络搜索功能获取股票的最新市场分析
     
     参数：
     - symbol: str，股票代码（例如：'600519'）
@@ -128,7 +187,6 @@ def read_industry_fund_flow(date):
     else:
         print(f"文件不存在: {file_name}")
         return None
-
 
 def save_analysis_to_markdown(analysis_result, symbol=None, date=None):
     """
@@ -294,7 +352,7 @@ def analyze_csv_stocks(csv_file, date, ai_provider="kimi"):
     参数:
     - csv_file: str, CSV文件的路径
     - date: datetime对象,表示分析的日期
-    - ai_provider: str, 使用的AI提供商 ("kimi" 或 "zhipu")
+    - ai_provider: str, 使用的AI提供商 ("kimi", "zhipu" 或 "openai")
     
     返回:
     - str, 分析结果
@@ -311,8 +369,10 @@ def analyze_csv_stocks(csv_file, date, ai_provider="kimi"):
     # 根据AI提供商选择不同的分析方法
     if ai_provider == "kimi":
         return stream_kimi_analysis(prompt)
-    else:
+    elif ai_provider == "zhipu":
         return stream_zhipu_analysis(prompt)
+    else:  # openai
+        return stream_openai_analysis(prompt)
 
 
 def get_zhipu_analysis(stock_data):
@@ -396,6 +456,49 @@ def stream_zhipu_analysis(prompt):
         return error_msg
 
 
+def get_openai_analysis(stock_data):
+    """
+    使用OpenAI接口进行股票分析
+    
+    参数：
+    - stock_data: DataFrame，包含股票历史数据
+    
+    返回：
+    - str，OpenAI的分析结果
+    """
+    model = OpenAIModel()
+    prompt = get_stock_analysis_prompt(stock_data)
+    
+    try:
+        return model.analyze(prompt)
+    except Exception as e:
+        return f"OpenAI分析时发生错误: {str(e)}"
+
+
+def stream_openai_analysis(prompt):
+    """
+    使用OpenAI接口进行流式分析输出
+    
+    参数：
+    - prompt: str，发送给OpenAI的提示词
+    """
+    model = OpenAIModel()
+    
+    try:
+        full_response = ""
+        for chunk in model.analyze(prompt, stream=True):
+            if chunk:
+                full_response += chunk
+                print(chunk, end='', flush=True)
+        print()
+        
+        return full_response
+    except Exception as e:
+        error_msg = f"OpenAI流式分析时发生错误: {str(e)}"
+        print(error_msg)
+        return error_msg
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="股票分析工具")
     parser.add_argument(
@@ -412,9 +515,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--ai", 
-        choices=["kimi", "zhipu"], 
+        choices=["kimi", "zhipu", "openai"], 
         default="kimi",
-        help="选择使用的AI接口: kimi 或 zhipu, 默认为kimi"
+        help="选择使用的AI接口: kimi、zhipu 或 openai, 默认为kimi"
     )
     args = parser.parse_args()
 
@@ -445,12 +548,14 @@ if __name__ == "__main__":
             print(f"股票 {args.symbol} 的AI分析结果：")
             if args.ai == "kimi":
                 analysis_result = stream_kimi_analysis(prompt)
-            else:
+            elif args.ai == "zhipu":
                 analysis_result = stream_zhipu_analysis(prompt)
+            else:  # openai
+                analysis_result = stream_openai_analysis(prompt)
             save_analysis_to_markdown(analysis_result, args.symbol, date)
     
     elif args.mode == "csv":
-        csv_file = f"updated_target_stocks_{date.strftime('%Y-%m-%d')}.csv"
+        csv_file = f"updated_target_stocks_{args.ai}_{date.strftime('%Y-%m-%d')}.csv"
         try:
             analysis_result = analyze_csv_stocks(csv_file, date, args.ai)
             if analysis_result:
