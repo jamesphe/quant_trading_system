@@ -199,7 +199,7 @@ def save_analysis_to_markdown(analysis_result, symbol=None, date=None):
     """
     date_str = date.strftime('%Y%m%d') if date else datetime.now().strftime('%Y%m%d')
     file_name = (f"stock_analysis_{symbol}_{date_str}.md" if symbol 
-                 else f"stocks_analysis_{date_str}.md")
+                 else f"stocks_analysis_{args.ai}_{date_str}.md")
     
     with open(file_name, 'w', encoding='utf-8') as f:
         f.write(f"# 股票分析报告 {date_str}\n\n")
@@ -555,7 +555,7 @@ if __name__ == "__main__":
             save_analysis_to_markdown(analysis_result, args.symbol, date)
     
     elif args.mode == "csv":
-        csv_file = f"updated_target_stocks_{args.ai}_{date.strftime('%Y-%m-%d')}.csv"
+        csv_file = f"updated_target_stocks_{date.strftime('%Y-%m-%d')}.csv"
         try:
             analysis_result = analyze_csv_stocks(csv_file, date, args.ai)
             if analysis_result:
