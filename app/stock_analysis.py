@@ -194,6 +194,8 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
    - 减仓/止盈价位
    - 止损位设置
    - 仓位控制建议
+4、对下一个交易日开盘走势（高开、低开、平开）进行预判,并针对各种可能的走势给出相应的对策。
+
 
 请用专业的角度进行分析，给出具体的数据支持，并在分析的最后给出明确的操作建议。
 """

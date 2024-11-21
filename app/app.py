@@ -111,7 +111,7 @@ def optimize():
         study = optimize_strategy(
             ChandelierZlSmaStrategy, 
             data_feed, 
-            n_trials=100, 
+            n_trials=50, 
             n_jobs=1
         )
         best_trial = study.best_trial
@@ -171,7 +171,7 @@ def optimize():
             os.makedirs(results_dir)
         # 保存优化结果到CSV文件
         df.to_csv(
-            f'{results_dir}/{symbol}_optimization_results.csv',
+            f'{results_dir}/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv',
             index=False
         )
 

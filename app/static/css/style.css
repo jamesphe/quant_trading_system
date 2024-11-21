@@ -81,6 +81,7 @@ button:hover {
 /* 基础样式 */
 body {
     font-family: 'Noto Sans SC', sans-serif;
+    font-size: 1rem;
 }
 
 /* 输入框样式 */
@@ -152,6 +153,7 @@ body {
 @media (max-width: 768px) {
     .container {
         @apply px-4;
+        padding: 1rem;
     }
     
     .metric-item {
@@ -160,6 +162,15 @@ body {
     
     .metric-value, .signal-badge {
         min-width: 100px;
+    }
+
+    .tab-button {
+        font-size: 0.875rem;
+        padding: 0.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
     }
 }
 
@@ -287,10 +298,11 @@ body {
 
 /* 标签页导航 */
 .tab-nav {
-    @apply flex gap-1 p-0.5 rounded-lg relative;
+    @apply flex gap-1 p-0.5 rounded-lg relative overflow-x-auto;
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(226, 232, 240, 0.4);
+    white-space: nowrap;
 }
 
 /* 标签按钮基础样式 */
@@ -391,5 +403,16 @@ body {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* 隐藏不必要的元素 */
+.hidden-mobile {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .hidden-mobile {
+        display: block;
     }
 }

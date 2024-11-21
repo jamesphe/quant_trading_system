@@ -108,7 +108,7 @@ def send_to_wechat(content):
 
 def load_portfolio():
     """从CSV文件加载持仓股票信息"""
-    portfolio_file = os.path.join(os.path.dirname(__file__), 'portfolio_stocks.csv')
+    portfolio_file = os.path.join(os.path.dirname(__file__), 'config/portfolio_stocks.csv')
     try:
         df = pd.read_csv(portfolio_file)
         return dict(zip(df['股票代码'].astype(str), df['股票名称']))

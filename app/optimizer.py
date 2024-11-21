@@ -334,7 +334,7 @@ def main():
             print(f'\n策略: {strategy_name}')
             print('-'*50)
             
-            study = optimize_strategy(strat, data_feed, n_trials=100, n_jobs=1)
+            study = optimize_strategy(strat, data_feed, n_trials=50, n_jobs=1)
             best_trial = study.best_trial
 
             # 设置最优参数
