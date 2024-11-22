@@ -416,3 +416,180 @@ body {
         display: block;
     }
 }
+
+/* 基础样式 */
+.form-input {
+    @apply block w-full rounded-lg border-gray-300 shadow-sm transition-colors duration-200;
+}
+
+.form-select {
+    @apply block w-full rounded-lg border-gray-300 shadow-sm transition-colors duration-200;
+}
+
+.metric-item {
+    @apply flex justify-between items-center py-2;
+}
+
+.metric-label {
+    @apply text-sm text-gray-600 transition-colors duration-200;
+}
+
+.metric-value {
+    @apply px-2 py-1 rounded text-sm font-medium transition-colors duration-200;
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+    /* 调整字体大小 */
+    .text-lg {
+        font-size: 1rem;
+    }
+    
+    /* 调整按钮大小 */
+    button {
+        min-height: 44px; /* 移动端最小点击区域 */
+    }
+    
+    /* 调整表单元素 */
+    .form-input {
+        font-size: 16px; /* 防止iOS自动缩放 */
+        height: 44px;
+    }
+    
+    /* 调整卡片内边距 */
+    .card {
+        padding: 1rem;
+    }
+    
+    /* 优化表格显示 */
+    .table-responsive {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 调整图表大小 */
+    .chart-container {
+        height: 300px;
+    }
+    
+    /* 调整标签页导航 */
+    .tab-nav {
+        gap: 0.5rem;
+    }
+    
+    /* 调整卡片间距 */
+    .grid {
+        gap: 1rem;
+    }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) {
+    .hover\:scale-105 {
+        transform: none !important;
+    }
+    
+    /* 增加点击反馈 */
+    .active-state {
+        opacity: 0.7;
+    }
+    
+    /* 优化按钮触摸反馈 */
+    button:active {
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .dark\:bg-gray-800 {
+        background-color: #1f2937;
+    }
+    
+    .dark\:text-white {
+        color: #ffffff;
+    }
+}
+
+/* 加载动画 */
+.loading-dots:after {
+    content: '.';
+    animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+    0%, 20% {
+        content: '.';
+    }
+    40% {
+        content: '..';
+    }
+    60% {
+        content: '...';
+    }
+    80%, 100% {
+        content: '';
+    }
+}
+
+/* 滚动条美化 */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c4b5fd;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a78bfa;
+}
+
+/* 表格响应式处理 */
+.responsive-table {
+    @apply w-full overflow-x-auto;
+}
+
+.responsive-table table {
+    @apply min-w-full divide-y divide-gray-200;
+}
+
+/* 卡片动画效果 */
+.card-hover {
+    @apply transition-all duration-300 ease-in-out;
+}
+
+.card-hover:hover {
+    @apply transform -translate-y-1 shadow-lg;
+}
+
+/* Toast 消息样式 */
+.toast {
+    @apply fixed top-4 right-4 z-50 rounded-lg shadow-lg transform transition-all duration-300;
+}
+
+.toast-enter {
+    @apply translate-x-full opacity-0;
+}
+
+.toast-enter-active {
+    @apply translate-x-0 opacity-100;
+}
+
+.toast-exit {
+    @apply translate-x-0 opacity-100;
+}
+
+.toast-exit-active {
+    @apply translate-x-full opacity-0;
+}

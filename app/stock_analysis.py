@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from zhipuai import ZhipuAI
 import sys
-from data_fetch import get_stock_data, get_stock_name, get_stock_basic_info, get_stock_news
+from data_fetch import get_stock_data, get_stock_name, get_stock_basic_info, get_stock_news, get_etf_data, get_us_stock_data
 import logging
 from typing import Union, Generator
 import requests
