@@ -15,7 +15,7 @@ import os
 from datetime import datetime, timedelta
 import subprocess
 import json
-from stock_analysis import ZhipuAIModel, KimiModel, analyze_stock
+from stock_analysis import ZhipuAIModel, KimiModel, OpenAIModel, analyze_stock
 
 
 # 配置日志
@@ -376,9 +376,10 @@ def analyze_stock_route():
                 # 初始化选择的AI模型
                 if model_type == 'kimi':
                     model = KimiModel()
+                elif model_type == 'openai':
+                    model = OpenAIModel() 
                 else:
                     model = ZhipuAIModel()
-                
                 yield 'data: {"content": "正在进行分析..."}\n\n'
                 
                 # 使用生成器方式获取分析结果
