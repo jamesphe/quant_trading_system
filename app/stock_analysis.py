@@ -273,6 +273,50 @@ def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params
 
 def analyze_stock(symbol, start_date, end_date, model, stream=False):
     try:
+        # 检查是否存在当天的分析结果文件
+        now = datetime.now()
+        today = now.strftime('%Y%m%d')
+        model_name = model.__class__.__name__.lower().replace('model','')
+        result_file = f"AIResult/{symbol}_{today}_{model_name}.md"
+        
+        # 确保AIResult目录存在
+        os.makedirs('AIResult', exist_ok=True)
+        
+        if os.path.exists(result_file):
+            # 判断当前时间是否超过下午4点
+            current_hour = now.hour
+            
+            # 获取文件最后修改时间
+            file_mtime = datetime.fromtimestamp(os.path.getmtime(result_file))
+            
+            # 如果当前时间超过下午4点,需要确保文件是在当天下午4点后生成的
+            if current_hour >= 16:
+                file_date = file_mtime.date()
+                file_hour = file_mtime.hour
+                
+                if file_date == now.date() and file_hour >= 16:
+                    # 文件是在当天下午4点后生成的,可以直接使用
+                    with open(result_file, "r", encoding="utf-8") as f:
+                        content = f.read()
+                        
+                    if stream:
+                        for char in content:
+                            yield char
+                    else:
+                        yield content
+                    return
+            else:
+                # 当前时间未超过下午4点,可以直接使用已有文件
+                with open(result_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    
+                if stream:
+                    for char in content:
+                        yield char
+                else:
+                    yield content
+                return
+            
         # 获取股票数据
         if symbol.startswith(('51', '159')):
             stock_data = get_etf_data(symbol, start_date, end_date)
@@ -295,8 +339,13 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
         # 构建提示信息，使用Markdown格式
         prompt = get_stock_analysis_prompt(symbol, stock_data, stock_name, basic_info, news_list)
         
+        # 生成输出文件名
+        output_file = f"AIResult/{symbol}_{today}_{model_name}.md"
+        
+        # 获取分析结果
         if stream:
-            # 流式输出
+            # 流式分析,同时输出和收集结果
+            result = []
             for chunk in model.analyze(prompt, stream=True):
                 if chunk:
                     if isinstance(model, ZhipuAIModel):
@@ -306,10 +355,21 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                     else:  # KimiModel
                         content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
                     if content:
-                        yield content
+                        result.append(content)
+                        yield content  # 流式输出每个片段
+                        
+            # 完整结果保存到文件
+            complete_result = "".join(result)
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(complete_result)
+                
         else:
-            # 一次性输出
-            return model.analyze(prompt, stream=False)
+            # 一次性分析
+            result = model.analyze(prompt, stream=False)
+            # 保存分析结果到文件
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(result)
+            yield result
             
     except Exception as e:
         logger.error(f"分析股票时发生错误: {str(e)}", exc_info=True)
@@ -342,8 +402,15 @@ def main():
         end_date = datetime.now().strftime('%Y-%m-%d')
         start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
         
+        # 确保AIResult目录存在
+        os.makedirs('AIResult', exist_ok=True)
+        
+        # 生成输出文件名
+        output_file = f"AIResult/{args.symbol}_{datetime.now().strftime('%Y%m%d')}_{args.model}.md"
+        
         if args.stream:
-            # 流式输出
+            # 流式输出并保存
+            result_chunks = []
             for chunk in analyze_stock(
                 args.symbol,
                 start_date,
@@ -353,6 +420,11 @@ def main():
             ):
                 if chunk:
                     print(chunk, end='', flush=True)
+                    result_chunks.append(chunk)
+            
+            # 将流式结果写入文件
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(''.join(result_chunks))
         else:
             # 阻塞模式
             result = analyze_stock(
@@ -363,6 +435,10 @@ def main():
                 stream=False
             )
             print(result)
+            
+            # 保存结果到文件
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(result)
             
     except Exception as e:
         logger.error(f"程序执行错误: {str(e)}", exc_info=True)
