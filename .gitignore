@@ -7,3 +7,5 @@
 /app/results
 /app/*.md
 
+# 添加例外规则
+!app/config/portfolio_stocks.csv
