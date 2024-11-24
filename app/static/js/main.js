@@ -185,20 +185,30 @@ document.addEventListener('DOMContentLoaded', function() {
     if (portfolioButton) {
         portfolioButton.addEventListener('click', runPortfolioAnalysis);
     }
+    
+    // 设置每日选股的默认日期为今天
+    const pickDateInput = document.getElementById('pickDate');
+    if (pickDateInput) {
+        pickDateInput.value = today.toISOString().split('T')[0];
+        pickDateInput.max = today.toISOString().split('T')[0]; // 限制最大日期为今天
+    }
 });
 
-// 添加初始化标签页的函数
+// 修改初始化标签页的函数
 function initializeTabs() {
-    // 从 URL 获取当前标签页，如果没有则默认为 'optimization'
+    // 默认显示个股分析标签页
+    const defaultTab = 'analysis-tab';
+    
+    // 从 URL 获取当前标签页，如果没有则使用默认值
     const urlParams = new URLSearchParams(window.location.search);
-    const currentTab = urlParams.get('tab') || 'optimization';
+    const currentTab = urlParams.get('tab') || defaultTab;
     
     // 手动调用切换函数
     switchTab(currentTab);
     
     console.log('Tabs initialized:', {
         currentTab,
-        selectedTabExists: !!document.getElementById(`${currentTab}-tab`),
+        selectedTabExists: !!document.getElementById(`${currentTab}`),
         activeButtonExists: !!document.querySelector(`[data-tab="${currentTab}"]`)
     });
 }
@@ -862,136 +872,8 @@ function runPortfolioAnalysis(event) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            let html = '<div class="grid gap-4">';
-            data.results.forEach((result, index) => {
-                const tradeData = parseTradeData(result.content);
-                const signalStyle = getSignalStyle(tradeData['交易建议']);
-                
-                // 从股票名称中提取股票代码
-                const stockCode = result.stock.match(/（([^)]+)）/)?.[1] || '';
-                
-                html += `
-                    <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
-                        <div class="p-4">
-                            <!-- 标题行：股票名称和分析按钮 -->
-                            <div class="flex justify-between items-center mb-4">
-                                <div class="flex items-center space-x-2">
-                                    <h3 class="text-lg font-semibold text-gray-800">${result.stock}</h3>
-                                    <span class="px-2 py-1 rounded-full text-sm ${parseFloat(tradeData['涨跌幅']) >= 0 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'}">
-                                        ${tradeData['涨跌幅'] || '0.00%'}
-                                    </span>
-                                </div>
-                                <!-- 分析按钮组 -->
-                                <div class="flex space-x-2">
-                                    <button onclick="switchToTechnicalAnalysis('${stockCode}')"
-                                            class="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                                        </svg>
-                                        <span>技术分析</span>
-                                    </button>
-                                    <button onclick="switchToAIAnalysis('${stockCode}')"
-                                            class="px-2.5 py-1 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                        </svg>
-                                        <span>AI分析</span>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- 交易建议部分 -->
-                            <div class="mb-4 ${signalStyle.bg} rounded-lg p-3 border ${signalStyle.border}">
-                                <div class="flex items-center">
-                                    <svg class="w-5 h-5 ${signalStyle.color} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${signalStyle.icon}"/>
-                                    </svg>
-                                    <p class="text-sm font-medium ${signalStyle.color}">
-                                        ${tradeData['交易建议'] || '无交易建议'}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-4 mb-4">
-                                <div class="space-y-1">
-                                    <p class="text-sm text-gray-500">日期</p>
-                                    <p class="font-medium">${tradeData['日期'] || '-'}</p>
-                                </div>
-                                <div class="space-y-1">
-                                    <p class="text-sm text-gray-500">收盘价</p>
-                                    <p class="font-medium">${tradeData['收盘价'] || '-'}</p>
-                                </div>
-                            </div>
-                            
-                            <!-- 详情按钮 -->
-                            <div class="mt-4">
-                                <button onclick="toggleDetails(${index})" 
-                                        class="details-toggle-btn group w-full py-2 px-4 rounded-md
-                                               bg-blue-50 hover:bg-blue-100 transition-all duration-200 
-                                               flex items-center justify-center space-x-2">
-                                    <span class="text-sm font-medium text-blue-600 group-hover:text-blue-700">
-                                        <span class="details-text">查看详情</span>
-                                    </span>
-                                    <svg class="details-icon w-4 h-4 text-blue-600 group-hover:text-blue-700 transition-transform duration-200" 
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                    </svg>
-                                </button>
-                            </div>
-                            
-                            <!-- 详情内容区域 -->
-                            <div id="details-${index}" class="hidden mt-4">
-                                <div class="border-t border-gray-100 pt-4">
-                                    <div class="bg-gray-50 rounded-lg p-6 space-y-4">
-                                        <!-- 价格区间信息 -->
-                                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                            <div class="bg-white rounded-lg p-3 shadow-sm">
-                                                <div class="text-sm text-gray-500 mb-1">最高价</div>
-                                                <div class="font-medium text-gray-900">${tradeData['最高价'] || '-'}</div>
-                                            </div>
-                                            <div class="bg-white rounded-lg p-3 shadow-sm">
-                                                <div class="text-sm text-gray-500 mb-1">最低价</div>
-                                                <div class="font-medium text-gray-900">${tradeData['最低价'] || '-'}</div>
-                                            </div>
-                                            <div class="bg-white rounded-lg p-3 shadow-sm">
-                                                <div class="text-sm text-gray-500 mb-1">开盘价</div>
-                                                <div class="font-medium text-gray-900">${tradeData['开盘价'] || '-'}</div>
-                                            </div>
-                                        </div>
-
-                                        <!-- 技术指标信息 -->
-                                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                            <div class="bg-white rounded-lg p-3 shadow-sm">
-                                                <div class="text-sm text-gray-500 mb-1">多头止损</div>
-                                                <div class="font-medium text-gray-900">${tradeData['多头止损'] || '-'}</div>
-                                            </div>
-                                            <div class="bg-white rounded-lg p-3 shadow-sm">
-                                                <div class="text-sm text-gray-500 mb-1">空头止损</div>
-                                                <div class="font-medium text-gray-900">${tradeData['空头止损'] || '-'}</div>
-                                            </div>
-                                            <div class="bg-white rounded-lg p-3 shadow-sm">
-                                                <div class="text-sm text-gray-500 mb-1">ZLSMA</div>
-                                                <div class="font-medium text-gray-900">${tradeData['ZLSMA'] || '-'}</div>
-                                            </div>
-                                        </div>
-
-                                        <!-- 策略参数 -->
-                                        <div class="bg-white rounded-lg p-4 shadow-sm">
-                                            <div class="text-sm text-gray-500 mb-2">策略参数</div>
-                                            <div class="text-sm font-mono bg-gray-50 p-3 rounded">
-                                                ${result.content.split('\n').find(line => line.includes('period:')) || '无参数信息'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
+            // 使用displayPortfolioResults函数生成HTML
+            const html = displayPortfolioResults(data);
             resultsDiv.innerHTML = html;
             
             // 更新时间戳
@@ -1283,132 +1165,142 @@ function getSignalStyle(signal) {
     };
 }
 
-// 修改生成HTML的部分，更新交易建议的样式
-data.results.forEach((result, index) => {
-    const tradeData = parseTradeData(result.content);
-    const signalStyle = getSignalStyle(tradeData['交易建议']);
+// 修改生成HTML的部分，确保data变量的作用域
+function displayPortfolioResults(data) {  // 添加data参数
+    let html = '<div class="grid gap-4">';
     
-    html += `
-        <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
-            <div class="p-4">
-                <!-- 标题行：股票名称和分析按钮 -->
-                <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center space-x-2">
-                        <h3 class="text-lg font-semibold text-gray-800">${result.stock}</h3>
-                        <span class="px-2 py-1 rounded-full text-sm ${parseFloat(tradeData['涨跌幅']) >= 0 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'}">
-                            ${tradeData['涨跌幅'] || '0.00%'}
-                        </span>
+    data.results.forEach((result, index) => {
+        const tradeData = parseTradeData(result.content);
+        const signalStyle = getSignalStyle(tradeData['交易建议']);
+        
+        // 从股票名称中提取股票代码
+        const stockCode = result.stock.match(/（([^)]+)）/)?.[1] || '';
+        
+        html += `
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
+                <div class="p-4">
+                    <!-- 标题行：股票名称和分析按钮 -->
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center space-x-2">
+                            <h3 class="text-lg font-semibold text-gray-800">${result.stock}</h3>
+                            <span class="px-2 py-1 rounded-full text-sm ${parseFloat(tradeData['涨跌幅']) >= 0 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'}">
+                                ${tradeData['涨跌幅'] || '0.00%'}
+                            </span>
+                        </div>
+                        <!-- 分析按钮组 -->
+                        <div class="flex space-x-2">
+                            <button onclick="switchToTechnicalAnalysis('${stockCode}')"
+                                    class="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                <span>技术分析</span>
+                            </button>
+                            <button onclick="switchToAIAnalysis('${stockCode}')"
+                                    class="px-2.5 py-1 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <span>AI分析</span>
+                            </button>
+                        </div>
                     </div>
-                    <!-- 分析按钮组 -->
-                    <div class="flex space-x-2">
-                        <button onclick="switchToTechnicalAnalysis('${stockCode}')"
-                                class="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    
+                    <!-- 交易建议部分 -->
+                    <div class="mb-4 ${signalStyle.bg} rounded-lg p-3 border ${signalStyle.border}">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 ${signalStyle.color} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${signalStyle.icon}"/>
                             </svg>
-                            <span>技术分析</span>
-                        </button>
-                        <button onclick="switchToAIAnalysis('${stockCode}')"
-                                class="px-2.5 py-1 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            <p class="text-sm font-medium ${signalStyle.color}">
+                                ${tradeData['交易建议'] || '无交易建议'}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="space-y-1">
+                            <p class="text-sm text-gray-500">日期</p>
+                            <p class="font-medium">${tradeData['日期'] || '-'}</p>
+                        </div>
+                        <div class="space-y-1">
+                            <p class="text-sm text-gray-500">收盘价</p>
+                            <p class="font-medium">${tradeData['收盘价'] || '-'}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 详情按钮 -->
+                    <div class="mt-4">
+                        <button onclick="toggleDetails(${index})" 
+                                class="details-toggle-btn group w-full py-2 px-4 rounded-md
+                                       bg-blue-50 hover:bg-blue-100 transition-all duration-200 
+                                       flex items-center justify-center space-x-2">
+                            <span class="text-sm font-medium text-blue-600 group-hover:text-blue-700">
+                                <span class="details-text">查看详情</span>
+                            </span>
+                            <svg class="details-icon w-4 h-4 text-blue-600 group-hover:text-blue-700 transition-transform duration-200" 
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
-                            <span>AI分析</span>
                         </button>
                     </div>
-                </div>
-                
-                <!-- 交易建议部分 -->
-                <div class="mb-4 ${signalStyle.bg} rounded-lg p-3 border ${signalStyle.border}">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 ${signalStyle.color} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${signalStyle.icon}"/>
-                        </svg>
-                        <p class="text-sm font-medium ${signalStyle.color}">
-                            ${tradeData['交易建议'] || '无交易建议'}
-                        </p>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="space-y-1">
-                        <p class="text-sm text-gray-500">日期</p>
-                        <p class="font-medium">${tradeData['日期'] || '-'}</p>
-                    </div>
-                    <div class="space-y-1">
-                        <p class="text-sm text-gray-500">收盘价</p>
-                        <p class="font-medium">${tradeData['收盘价'] || '-'}</p>
-                    </div>
-                </div>
-                
-                <!-- 详情按钮 -->
-                <div class="mt-4">
-                    <button onclick="toggleDetails(${index})" 
-                            class="details-toggle-btn group w-full py-2 px-4 rounded-md
-                                   bg-blue-50 hover:bg-blue-100 transition-all duration-200 
-                                   flex items-center justify-center space-x-2">
-                        <span class="text-sm font-medium text-blue-600 group-hover:text-blue-700">
-                            <span class="details-text">查看详情</span>
-                        </span>
-                        <svg class="details-icon w-4 h-4 text-blue-600 group-hover:text-blue-700 transition-transform duration-200" 
-                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </button>
-                </div>
-                
-                <!-- 详情内容区域 -->
-                <div id="details-${index}" class="hidden mt-4">
-                    <div class="border-t border-gray-100 pt-4">
-                        <div class="bg-gray-50 rounded-lg p-6 space-y-4">
-                            <!-- 价格区间信息 -->
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div class="bg-white rounded-lg p-3 shadow-sm">
-                                    <div class="text-sm text-gray-500 mb-1">最高价</div>
-                                    <div class="font-medium text-gray-900">${tradeData['最高价'] || '-'}</div>
+                    
+                    <!-- 详情内容区域 -->
+                    <div id="details-${index}" class="hidden mt-4">
+                        <div class="border-t border-gray-100 pt-4">
+                            <div class="bg-gray-50 rounded-lg p-6 space-y-4">
+                                <!-- 价格区间信息 -->
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                                        <div class="text-sm text-gray-500 mb-1">最高价</div>
+                                        <div class="font-medium text-gray-900">${tradeData['最高价'] || '-'}</div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                                        <div class="text-sm text-gray-500 mb-1">最低价</div>
+                                        <div class="font-medium text-gray-900">${tradeData['最低价'] || '-'}</div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                                        <div class="text-sm text-gray-500 mb-1">开盘价</div>
+                                        <div class="font-medium text-gray-900">${tradeData['开盘价'] || '-'}</div>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-lg p-3 shadow-sm">
-                                    <div class="text-sm text-gray-500 mb-1">最低价</div>
-                                    <div class="font-medium text-gray-900">${tradeData['最低价'] || '-'}</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-3 shadow-sm">
-                                    <div class="text-sm text-gray-500 mb-1">开盘价</div>
-                                    <div class="font-medium text-gray-900">${tradeData['开盘价'] || '-'}</div>
-                                </div>
-                            </div>
 
-                            <!-- 技术指标信息 -->
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div class="bg-white rounded-lg p-3 shadow-sm">
-                                    <div class="text-sm text-gray-500 mb-1">多头止损</div>
-                                    <div class="font-medium text-gray-900">${tradeData['多头止损'] || '-'}</div>
+                                <!-- 技术指标信息 -->
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                                        <div class="text-sm text-gray-500 mb-1">多头止损</div>
+                                        <div class="font-medium text-gray-900">${tradeData['多头止损'] || '-'}</div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                                        <div class="text-sm text-gray-500 mb-1">空头止损</div>
+                                        <div class="font-medium text-gray-900">${tradeData['空头止损'] || '-'}</div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                                        <div class="text-sm text-gray-500 mb-1">ZLSMA</div>
+                                        <div class="font-medium text-gray-900">${tradeData['ZLSMA'] || '-'}</div>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-lg p-3 shadow-sm">
-                                    <div class="text-sm text-gray-500 mb-1">空头止损</div>
-                                    <div class="font-medium text-gray-900">${tradeData['空头止损'] || '-'}</div>
-                                </div>
-                                <div class="bg-white rounded-lg p-3 shadow-sm">
-                                    <div class="text-sm text-gray-500 mb-1">ZLSMA</div>
-                                    <div class="font-medium text-gray-900">${tradeData['ZLSMA'] || '-'}</div>
-                                </div>
-                            </div>
 
-                            <!-- 策略参数 -->
-                            <div class="bg-white rounded-lg p-4 shadow-sm">
-                                <div class="text-sm text-gray-500 mb-2">策略参数</div>
-                                <div class="text-sm font-mono bg-gray-50 p-3 rounded">
-                                    ${result.content.split('\n').find(line => line.includes('period:')) || '无参数信息'}
+                                <!-- 策略参数 -->
+                                <div class="bg-white rounded-lg p-4 shadow-sm">
+                                    <div class="text-sm text-gray-500 mb-2">策略参数</div>
+                                    <div class="text-sm font-mono bg-gray-50 p-3 rounded">
+                                        ${result.content.split('\n').find(line => line.includes('period:')) || '无参数信息'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
-});
+        `;
+    });
+    
+    html += '</div>';
+    return html;  // 返回生成的HTML
+}
 
 // 处理每日选股表单提交
 async function handleDailyPicks(event) {
