@@ -593,3 +593,186 @@ body {
 .toast-exit-active {
     @apply translate-x-full opacity-0;
 }
+
+.analysis-container {
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.analysis-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.markdown-body {
+    font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+}
+
+.markdown-body h1 {
+    padding-bottom: .3em;
+    border-bottom: 1px solid #eaecef;
+    margin-bottom: 16px;
+}
+
+.markdown-body h2 {
+    padding-bottom: .3em;
+    border-bottom: 1px solid #eaecef;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+.markdown-body table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    margin: 16px 0;
+    width: 100%;
+}
+
+.markdown-body table th,
+.markdown-body table td {
+    padding: 6px 13px;
+    border: 1px solid #dfe2e5;
+}
+
+.markdown-body table tr:nth-child(2n) {
+    background-color: #f6f8fa;
+}
+
+.error {
+    color: #dc3545;
+    padding: 10px;
+    border: 1px solid #dc3545;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* 每日选股页面特定样式 */
+.daily-picks-container {
+    @apply max-w-4xl mx-auto;
+}
+
+/* 渐变背景动画 */
+.gradient-animate {
+    background-size: 200% 200%;
+    animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Markdown 内容样式优化 */
+.markdown-body {
+    @apply text-gray-800 leading-relaxed;
+}
+
+.markdown-body h1 {
+    @apply text-2xl font-bold mb-6 text-purple-900 border-b border-purple-100 pb-2;
+}
+
+.markdown-body h2 {
+    @apply text-xl font-semibold mb-4 text-purple-800 mt-8;
+}
+
+.markdown-body h3 {
+    @apply text-lg font-medium mb-3 text-purple-700 mt-6;
+}
+
+.markdown-body p {
+    @apply mb-4 text-gray-700;
+}
+
+.markdown-body ul {
+    @apply list-disc list-inside mb-4 space-y-2;
+}
+
+.markdown-body ol {
+    @apply list-decimal list-inside mb-4 space-y-2;
+}
+
+.markdown-body table {
+    @apply min-w-full divide-y divide-purple-200 my-6;
+}
+
+.markdown-body th {
+    @apply px-6 py-3 bg-purple-50 text-left text-xs font-medium text-purple-500 uppercase tracking-wider;
+}
+
+.markdown-body td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-600 border-b border-purple-100;
+}
+
+.markdown-body tr:hover {
+    @apply bg-purple-50 transition-colors duration-150;
+}
+
+/* 自定义滚动条 */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-purple-50 rounded;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-purple-300 rounded hover:bg-purple-400 transition-colors duration-200;
+}
+
+/* 输入控件悬停效果 */
+.form-input:hover, .form-select:hover {
+    @apply border-purple-300 transition-colors duration-200;
+}
+
+/* 按钮动画效果 */
+.btn-animate {
+    @apply transform transition-all duration-200;
+}
+
+.btn-animate:hover {
+    @apply -translate-y-0.5 shadow-lg;
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+    @apply transition-all duration-300;
+}
+
+.card-hover:hover {
+    @apply transform -translate-y-1 shadow-lg;
+}
+
+/* 日期选择器样式 */
+.form-input[readonly] {
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.form-input[readonly]:hover {
+    border-color: #9333ea;
+}
+
+.form-input[readonly]:focus {
+    border-color: #9333ea;
+    ring: 2px;
+    ring-color: rgba(147, 51, 234, 0.2);
+}
+
+/* 日期显示格式化 */
+.date-display {
+    font-family: 'Noto Sans SC', sans-serif;
+    letter-spacing: 0.5px;
+}

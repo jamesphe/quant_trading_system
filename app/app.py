@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 import subprocess
 import json
 from stock_analysis import ZhipuAIModel, KimiModel, OpenAIModel, analyze_stock
+import markdown
+from pathlib import Path
 
 
 # 配置日志
@@ -80,7 +82,7 @@ def optimize():
                     }
                     return jsonify(result)
 
-        # 如果没有最新的优化结果文件，执行优化流程
+        # 如果没有最新的优化��果文件，执行优化流程
         # 根据股票类型获取数据
         if symbol.startswith(('51', '159')):
             stock_data = get_etf_data(symbol, start_date, end_date)
@@ -330,20 +332,42 @@ def portfolio_analysis():
 def daily_picks():
     try:
         data = request.get_json()
-        date = data.get('date')
+        model = data.get('model', 'zhipu')  # 默认使用智谱模型
+        date = data.get('date', datetime.now().strftime('%Y%m%d'))
         
-        # 调用portfolio_analysis.py的相关功能
-        result = run_daily_picks(date)  # 需要实现这个函数
+        # 构建文件路径
+        file_name = f'stocks_analysis_{model}_{date}.md'
+        file_path = Path(__file__).parent / 'AIResult' / file_name
         
+        if not file_path.exists():
+            return jsonify({
+                'success': False,
+                'error': f'未找到{date}日的{model}分析结果'
+            })
+            
+        # 读取markdown文件
+        with open(file_path, 'r', encoding='utf-8') as f:
+            md_content = f.read()
+            
+        # 将markdown转换为HTML
+        html_content = markdown.markdown(
+            md_content,
+            extensions=['tables', 'fenced_code', 'codehilite']
+        )
+            
         return jsonify({
             'success': True,
-            'content': result
+            'date': date,
+            'model': model,
+            'content': html_content
         })
+        
     except Exception as e:
+        logger.error(f'获取每日选股分析发生错误: {str(e)}', exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)
-        }), 400
+        }), 500
 
 
 @app.route('/analyze_stock', methods=['POST'])

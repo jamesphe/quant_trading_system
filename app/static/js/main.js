@@ -192,7 +192,59 @@ document.addEventListener('DOMContentLoaded', function() {
         pickDateInput.value = today.toISOString().split('T')[0];
         pickDateInput.max = today.toISOString().split('T')[0]; // 限制最大日期为今天
     }
+    
+    // 初始化日期选择器
+    const pickDateInput = document.getElementById('pickDate');
+    if (pickDateInput) {
+        // 设置默认日期为今天
+        const today = new Date();
+        pickDateInput.value = formatDate(today);
+        
+        // 添加点击事件
+        pickDateInput.addEventListener('click', function() {
+            // 创建日期选择器
+            const datePicker = document.createElement('input');
+            datePicker.type = 'date';
+            datePicker.style.opacity = '0';
+            datePicker.style.position = 'absolute';
+            datePicker.style.top = '0';
+            datePicker.style.left = '0';
+            datePicker.style.width = '100%';
+            datePicker.style.height = '100%';
+            
+            // 设置最大日期为今天
+            datePicker.max = formatDate(today);
+            
+            // 如果已有选择的日期，则设置为当前值
+            if (pickDateInput.dataset.value) {
+                datePicker.value = pickDateInput.dataset.value;
+            }
+            
+            // 监听日期变化
+            datePicker.addEventListener('change', function(e) {
+                const selectedDate = e.target.value;
+                pickDateInput.dataset.value = selectedDate;
+                pickDateInput.value = formatDisplayDate(selectedDate);
+                datePicker.remove();
+            });
+            
+            // 添加到DOM并触发点击
+            pickDateInput.parentNode.appendChild(datePicker);
+            datePicker.click();
+        });
+    }
 });
+
+// 格式化日期为YYYY-MM-DD
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+// 格式化显示日期为YYYY年MM月DD日
+function formatDisplayDate(dateStr) {
+    const date = new Date(dateStr);
+    return `${date.getFullYear()}年${(date.getMonth() + 1).toString().padStart(2, '0')}月${date.getDate().toString().padStart(2, '0')}日`;
+}
 
 // 修改初始化标签页的函数
 function initializeTabs() {
@@ -592,7 +644,7 @@ function displayBacktestResults(data) {
                         </span>
                     </div>
                     <div class="metric-item">
-                        <span class="metric-label">收益率</span>
+                        <span class="metric-label">收益���</span>
                         <span class="metric-value ${data.basic_info.roi >= 0 ? 'text-green-600' : 'text-red-600'}">
                             ${data.basic_info.roi.toFixed(2)}%
                         </span>
@@ -726,7 +778,7 @@ function displayBacktestResults(data) {
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
     
-    // 使用 requestAnimationFrame 确保过渡效果正常工作
+    // 使用 requestAnimationFrame ���保过渡效果正常工作
     requestAnimationFrame(() => {
         backtestResults.style.transition = 'all 0.5s ease-in-out';
         backtestResults.style.opacity = '1';
@@ -782,7 +834,7 @@ function startOptimization() {
     // ... 发送优化请求的代码 ...
 }
 
-// 处理优化结果时更新显示
+// 处理优化结果时新显示
 function handleOptimizationResponse(response) {
     if (response.error) {
         // ... 错误处理代码 ...
@@ -1303,135 +1355,80 @@ function displayPortfolioResults(data) {  // 添加data参数
 }
 
 // 处理每日选股表单提交
-async function handleDailyPicks(event) {
+function handleDailyPicks(event) {
     event.preventDefault();
-    console.log('Daily picks form submitted');
     
-    const pickDate = document.getElementById('pickDate').value;
-    if (!pickDate) {
-        alert('请选择日期');
-        return;
-    }
+    const dateInput = document.getElementById('pickDate');
+    const date = dateInput.dataset.value?.replace(/-/g, '') || 
+                formatDate(new Date()).replace(/-/g, '');
+    const model = document.getElementById('analysisModel').value;
+    const resultsDiv = document.getElementById('dailyPicksResults');
+    const contentDiv = document.getElementById('dailyPicksContent');
     
-    // 显示加载状态
-    const submitButton = event.target.querySelector('button[type="submit"]');
-    const originalButtonText = submitButton.innerHTML;
-    submitButton.disabled = true;
-    submitButton.innerHTML = `
-        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        加载中...
+    // 显示加载动画
+    resultsDiv.classList.remove('hidden');
+    contentDiv.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8 space-y-4">
+            <div class="relative">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-teal-500 border-t-transparent"></div>
+                <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-teal-200 opacity-20"></div>
+            </div>
+            <div class="text-center">
+                <p class="text-lg font-medium text-gray-600">正在加载选股结果...</p>
+                <p class="text-sm text-gray-500 mt-2">请稍候...</p>
+            </div>
+        </div>
     `;
     
-    try {
-        // 格式化日期为YYYYMMDD格式
-        const date = new Date(pickDate);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const formattedDate = `${year}${month}${day}`;
-        
-        console.log('Formatted date:', formattedDate);
-        
-        const response = await fetch('/daily_picks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                date: formattedDate
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    fetch('/daily_picks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            date: date,
+            model: model
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            contentDiv.innerHTML = data.content;
+            // 添加样式
+            contentDiv.classList.add('markdown-body');
+        } else {
+            contentDiv.innerHTML = `
+                <div class="bg-red-50 border-l-4 border-red-500 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-red-700">${data.error}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
-        
-        const data = await response.json();
-        console.log('Daily picks response:', data);
-        
-        if (data.error) {
-            alert(data.error);
-            return;
-        }
-        
-        // 显示选股结果
-        const dailyPicksContent = document.getElementById('dailyPicksContent');
-        if (dailyPicksContent) {
-            // 确保marked已经加载
-            if (typeof marked === 'undefined') {
-                console.error('Marked library not loaded');
-                alert('页面加载不完整，请刷新后重试');
-                return;
-            }
-            
-            // 设置marked选项
-            marked.setOptions({
-                breaks: true,
-                gfm: true
-            });
-            
-            dailyPicksContent.innerHTML = marked.parse(data.content);
-            document.getElementById('dailyPicksResults').classList.remove('hidden');
-            
-            // 添加样式到markdown内容
-            const tables = dailyPicksContent.getElementsByTagName('table');
-            Array.from(tables).forEach(table => {
-                table.classList.add('min-w-full', 'divide-y', 'divide-gray-200', 'my-4');
-            });
-            
-            const headers = dailyPicksContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
-            Array.from(headers).forEach(header => {
-                header.classList.add('text-lg', 'font-semibold', 'text-gray-800', 'mt-6', 'mb-4');
-            });
-            
-            // 添加代码块样式
-            const codeBlocks = dailyPicksContent.getElementsByTagName('code');
-            Array.from(codeBlocks).forEach(block => {
-                block.classList.add('bg-gray-50', 'rounded', 'p-1', 'text-sm', 'font-mono');
-            });
-            
-            // 添加列表样式
-            const lists = dailyPicksContent.querySelectorAll('ul, ol');
-            Array.from(lists).forEach(list => {
-                list.classList.add('list-disc', 'list-inside', 'my-4', 'space-y-2');
-            });
-            
-            // 添加段落样式
-            const paragraphs = dailyPicksContent.getElementsByTagName('p');
-            Array.from(paragraphs).forEach(p => {
-                p.classList.add('my-2', 'text-gray-700', 'leading-relaxed');
-            });
-        }
-        
-    } catch (error) {
-        console.error('Daily picks error:', error);
-        alert('获取选股结果失败: ' + error.message);
-    } finally {
-        // 恢复按钮状态
-        submitButton.disabled = false;
-        submitButton.innerHTML = originalButtonText;
-    }
+    })
+    .catch(error => {
+        contentDiv.innerHTML = `
+            <div class="bg-red-50 border-l-4 border-red-500 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700">加载失败: ${error.message}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
 }
-
-// 在页面加载完成后设置默认日期
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing...');
-    
-    // 设置每日选股的默认日期为今天
-    const pickDateInput = document.getElementById('pickDate');
-    if (pickDateInput) {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        
-        pickDateInput.value = `${year}-${month}-${day}`;
-        pickDateInput.max = `${year}-${month}-${day}`; // 限制最大日期为今天
-    }
-    
-    // 初始化标签页
-    initializeTabs();
-});

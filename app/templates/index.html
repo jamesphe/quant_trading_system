@@ -354,42 +354,45 @@
             </div>
 
             <!-- 标签页导航 -->
-            <div class="mb-4 sm:mb-6 overflow-x-auto">
-                <nav class="tab-nav flex space-x-2 sm:space-x-4 min-w-max border-b border-gray-200" aria-label="Tabs">
-                    <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base" 
-                            data-tab="optimization-tab">
-                        <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
-                        参数优化
-                    </button>
-                    <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
-                            data-tab="analysis-tab">
-                        <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                        个股分析
-                    </button>
-                    <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
-                            data-tab="portfolio-tab">
-                        <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                        持仓分析
-                    </button>
-                    <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
-                            data-tab="daily-picks-tab">
-                        <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <nav class="tab-nav flex space-x-2 sm:space-x-4 min-w-max border-b border-gray-200 mb-6" aria-label="Tabs">
+                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base" 
+                        data-tab="optimization-tab">
+                    <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    参数优化
+                </button>
+                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
+                        data-tab="analysis-tab">
+                    <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    个股分析
+                </button>
+                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
+                        data-tab="portfolio-tab">
+                    <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    持仓分析
+                </button>
+                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base" 
+                        data-tab="daily-picks-tab">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                   d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
-                        每日选股
-                    </button>
-                </nav>
-            </div>
+                        <span>每日选股</span>
+                        <div class="hidden sm:block px-2 py-0.5 ml-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full">
+                            AI
+                        </div>
+                    </div>
+                </button>
+            </nav>
 
             <!-- 数优化页面 -->
             <div id="optimization-tab" class="tab-content">
@@ -680,48 +683,96 @@
 
             <!-- 每日选股页面 -->
             <div id="daily-picks-tab" class="tab-content hidden">
-                <div class="bg-white rounded-xl shadow-lg p-4 mb-6">
-                    <form id="dailyPicksForm" onsubmit="handleDailyPicks(event)">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div class="form-group">
-                                <label for="pickDate" class="form-label block text-sm font-medium text-gray-700 mb-1">
-                                    选择日期
+                <div class="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-lg p-6 mb-6">
+                    <div class="mb-4">
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                            AI选股分析
+                        </h2>
+                        <p class="text-sm text-gray-600 mt-1">使用AI模型分析市场,为您推荐优质标的</p>
+                    </div>
+
+                    <form id="dailyPicksForm" onsubmit="handleDailyPicks(event)" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- 日期选择 -->
+                            <div class="bg-white rounded-lg p-4 shadow-sm border border-purple-100 hover:border-purple-200 transition-all duration-300">
+                                <label for="pickDate" class="block text-sm font-medium text-gray-700 mb-2">
+                                    选择分析日期
                                 </label>
                                 <div class="relative">
-                                    <input type="date" 
+                                    <input type="text" 
                                            id="pickDate" 
-                                           class="form-input block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" 
-                                           required>
+                                           class="form-input block w-full rounded-lg border-gray-300 shadow-sm 
+                                                  focus:border-purple-500 focus:ring-purple-500 
+                                                  cursor-pointer pl-4 pr-10 py-2"
+                                           readonly
+                                           placeholder="选择日期">
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                        </svg>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="form-group flex items-end">
-                                <button type="submit" 
-                                        class="w-full h-[38px] bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                    </svg>
-                                    <span>查看选股结果</span>
-                                </button>
+                            <!-- AI模型选择 -->
+                            <div class="bg-white rounded-lg p-4 shadow-sm border border-purple-100 hover:border-purple-200 transition-all duration-300">
+                                <label for="analysisModel" class="block text-sm font-medium text-gray-700 mb-2">
+                                    选择AI模型
+                                </label>
+                                <div class="relative">
+                                    <select id="analysisModel" 
+                                            class="form-select appearance-none block w-full rounded-lg border-gray-300 shadow-sm 
+                                                   focus:border-purple-500 focus:ring-purple-500 hover:border-purple-300 
+                                                   transition-colors duration-200 pr-10">
+                                        <option value="zhipu" class="py-2">智谱AI</option>
+                                        <option value="kimi" class="py-2">Kimi</option>
+                                        <option value="openai" class="py-2">OpenAI</option>
+                                    </select>
+                                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- 提交按钮 -->
+                        <button type="submit" 
+                                class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 
+                                       text-white font-medium rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 
+                                       transition-all duration-200 flex items-center justify-center space-x-3">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            <span class="text-lg">开始分析</span>
+                        </button>
                     </form>
                 </div>
 
                 <!-- 选股结果展示区域 -->
                 <div id="dailyPicksResults" class="hidden">
                     <div class="bg-white rounded-xl shadow-lg p-6">
-                        <div class="flex items-center space-x-3 mb-3 pb-2 border-b border-gray-100">
-                            <div class="bg-gradient-to-br from-teal-100 to-teal-50 rounded-lg p-2">
-                                <svg class="w-5 h-5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-gray-100">
+                            <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg p-2">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                           d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                 </svg>
                             </div>
-                            <h3 class="text-lg font-semibold text-gray-800">选股结果</h3>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">AI选股结果</h3>
+                                <p class="text-sm text-gray-500">基于多维度分析的股票推荐</p>
+                            </div>
                         </div>
-                        <div id="dailyPicksContent" class="prose max-w-none"></div>
+                        <div id="dailyPicksContent" class="prose max-w-none markdown-body custom-scrollbar 
+                                                  bg-gradient-to-br from-white to-purple-50 rounded-lg p-6"></div>
                     </div>
                 </div>
             </div>
