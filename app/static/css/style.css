@@ -817,3 +817,235 @@ body {
 .tab-button:hover:not(.active) {
     color: #7C3AED;
 }
+
+/* 移动端适配样式 */
+@media (max-width: 640px) {
+    /* 隐藏滚动条但保持功能 */
+    .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* 调整内容间距 */
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* 调整标签页样式 */
+    .tab-button {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    /* 调整表单元素大小 */
+    .form-input,
+    .form-select {
+        height: 2.5rem;
+        font-size: 0.875rem;
+    }
+    
+    /* 调整按钮大小 */
+    button {
+        min-height: 2.5rem;
+        font-size: 0.875rem;
+    }
+    
+    /* 调整markdown内容显示 */
+    .markdown-body {
+        padding: 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .markdown-body h1 {
+        font-size: 1.5rem;
+    }
+    
+    .markdown-body h2 {
+        font-size: 1.25rem;
+    }
+    
+    .markdown-body table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 优化触摸交互 */
+    .form-input,
+    .form-select,
+    button {
+        touch-action: manipulation;
+    }
+    
+    /* 增加点击区域 */
+    .tab-button,
+    .form-input,
+    .form-select,
+    button {
+        min-height: 44px; /* iOS最小点击区域 */
+    }
+}
+
+/* 适配深色模式 */
+@media (prefers-color-scheme: dark) {
+    .dark\:bg-gray-900 {
+        background-color: #1a1a1a;
+    }
+    
+    .dark\:text-gray-100 {
+        color: #f3f4f6;
+    }
+}
+
+/* 优化加载动画在移动端的显示 */
+@media (max-width: 640px) {
+    .loading-spinner {
+        width: 2rem;
+        height: 2rem;
+    }
+    
+    .loading-text {
+        font-size: 0.875rem;
+    }
+}
+
+/* 适配不同屏幕高度 */
+@media (max-height: 700px) {
+    .container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    
+    .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 1rem;
+    }
+}
+
+/* 下拉框容器样式 */
+.select-container {
+    position: relative;
+    width: 100%;
+}
+
+/* 下拉框样式 */
+.form-select {
+    appearance: none;
+    width: 100%;
+    background-color: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+/* 下拉框选项样式 */
+.form-select option {
+    padding: 0.5rem 1rem;
+    background-color: white;
+    color: #374151;
+}
+
+/* 下拉框展开时的位置和样式 */
+.form-select:focus {
+    outline: none;
+    border-color: #9333ea;
+    box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
+}
+
+/* 确保下拉选项显示在正确位置 */
+.form-select optgroup,
+.form-select option {
+    position: relative;
+    z-index: 50;
+    background-color: white;
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+    .form-select {
+        font-size: 16px; /* 防止iOS缩放 */
+        padding: 0.75rem 2.5rem 0.75rem 1rem;
+    }
+}
+
+/* 下拉框基础样式 */
+select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* 下拉框容器 */
+.select-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+/* 下拉框本身 */
+.form-select {
+    width: 100%;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #374151;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+/* 下拉框悬停状态 */
+.form-select:hover {
+    border-color: #9333ea;
+}
+
+/* 下拉框焦点状态 */
+.form-select:focus {
+    outline: none;
+    border-color: #9333ea;
+    box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
+}
+
+/* 下拉选项样式 */
+.form-select option {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    color: #374151;
+    background-color: #ffffff;
+}
+
+/* 下拉选项悬停状态 */
+.form-select option:hover {
+    background-color: #f3f4f6;
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+    .form-select {
+        font-size: 16px;
+        padding: 0.75rem 2.5rem 0.75rem 1rem;
+    }
+}
+
+/* 确保下拉选项显示在其他元素之上 */
+.form-select, 
+.form-select option {
+    position: relative;
+    z-index: 10;
+}
+
+/* 禁用状态样式 */
+.form-select:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}

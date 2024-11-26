@@ -190,46 +190,40 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeDatePicker(today);
 });
 
-// 添加日期选择器初始化函数
+// 修改日期选择器初始化函数
 function initializeDatePicker(today) {
     const pickDateInput = document.getElementById('pickDate');
     if (pickDateInput) {
         // 设置默认日期为今天
-        pickDateInput.value = formatDisplayDate(formatDate(today));
-        pickDateInput.dataset.value = formatDate(today);
+        const defaultDate = formatDate(today);
+        pickDateInput.value = formatDisplayDate(defaultDate);
+        pickDateInput.dataset.value = defaultDate;
+        
+        // 创建隐藏的日期选择器
+        const datePicker = document.createElement('input');
+        datePicker.type = 'date';
+        datePicker.style.position = 'absolute';
+        datePicker.style.width = '100%';
+        datePicker.style.height = '100%';
+        datePicker.style.top = '0';
+        datePicker.style.left = '0';
+        datePicker.style.opacity = '0';
+        datePicker.max = defaultDate; // 限制最大日期为今天
+        
+        // 添加日期变化事件
+        datePicker.addEventListener('change', function(e) {
+            const selectedDate = e.target.value;
+            pickDateInput.dataset.value = selectedDate;
+            pickDateInput.value = formatDisplayDate(selectedDate);
+        });
         
         // 添加点击事件
         pickDateInput.addEventListener('click', function() {
-            // 创建日期选择器
-            const datePicker = document.createElement('input');
-            datePicker.type = 'date';
-            datePicker.style.opacity = '0';
-            datePicker.style.position = 'absolute';
-            datePicker.style.top = '0';
-            datePicker.style.left = '0';
-            datePicker.style.width = '100%';
-            datePicker.style.height = '100%';
-            
-            // 设置最大日期为今天
-            datePicker.max = formatDate(today);
-            
-            // 如果已有选择的日期，则设置为当前值
-            if (pickDateInput.dataset.value) {
-                datePicker.value = pickDateInput.dataset.value;
-            }
-            
-            // 监听日期变化
-            datePicker.addEventListener('change', function(e) {
-                const selectedDate = e.target.value;
-                pickDateInput.dataset.value = selectedDate;
-                pickDateInput.value = formatDisplayDate(selectedDate);
-                datePicker.remove();
-            });
-            
-            // 添加到DOM并触发点击
-            pickDateInput.parentNode.appendChild(datePicker);
-            datePicker.click();
+            datePicker.showPicker();
         });
+        
+        // 将日期选择器添加到容器中
+        pickDateInput.parentNode.appendChild(datePicker);
     }
 }
 
@@ -1337,14 +1331,21 @@ function displayPortfolioResults(data) {  // 添加data参数
     return html;  // 返回生成的HTML
 }
 
-// 处理每日选股表单提交
+// 修改处理每日选股表单提交的函数
 function handleDailyPicks(event) {
     event.preventDefault();
     
     const dateInput = document.getElementById('pickDate');
-    const date = dateInput.dataset.value?.replace(/-/g, '') || 
-                formatDate(new Date()).replace(/-/g, '');
-    const model = document.getElementById('analysisModel').value;
+    const modelSelect = document.getElementById('analysisModel');
+    
+    if (!dateInput.dataset.value) {
+        showToast('请选择分析日期', 'warning');
+        return;
+    }
+    
+    const date = dateInput.dataset.value.replace(/-/g, '');
+    const model = modelSelect.value;
+    
     const resultsDiv = document.getElementById('dailyPicksResults');
     const contentDiv = document.getElementById('dailyPicksContent');
     
@@ -1353,16 +1354,17 @@ function handleDailyPicks(event) {
     contentDiv.innerHTML = `
         <div class="flex flex-col items-center justify-center py-8 space-y-4">
             <div class="relative">
-                <div class="animate-spin rounded-full h-12 w-12 border-4 border-teal-500 border-t-transparent"></div>
-                <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-teal-200 opacity-20"></div>
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-purple-200 opacity-20"></div>
             </div>
             <div class="text-center">
-                <p class="text-lg font-medium text-gray-600">正在加载选股结果...</p>
+                <p class="text-lg font-medium text-gray-600">正在获取${modelSelect.options[modelSelect.selectedIndex].text}分析结果</p>
                 <p class="text-sm text-gray-500 mt-2">请稍候...</p>
             </div>
         </div>
     `;
     
+    // 发送请求...
     fetch('/daily_picks', {
         method: 'POST',
         headers: {
@@ -1377,41 +1379,31 @@ function handleDailyPicks(event) {
     .then(data => {
         if (data.success) {
             contentDiv.innerHTML = data.content;
-            // 添加样式
             contentDiv.classList.add('markdown-body');
         } else {
-            contentDiv.innerHTML = `
-                <div class="bg-red-50 border-l-4 border-red-500 p-4">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-red-700">${data.error}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
+            showError(contentDiv, data.error);
         }
     })
     .catch(error => {
-        contentDiv.innerHTML = `
-            <div class="bg-red-50 border-l-4 border-red-500 p-4">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-red-700">加载失败: ${error.message}</p>
-                    </div>
+        showError(contentDiv, `加载失败: ${error.message}`);
+    });
+}
+
+// 添加错误显示函数
+function showError(container, message) {
+    container.innerHTML = `
+        <div class="bg-red-50 border-l-4 border-red-500 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700">${message}</p>
                 </div>
             </div>
-        `;
-    });
+        </div>
+    `;
 }

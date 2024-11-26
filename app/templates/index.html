@@ -332,6 +332,57 @@
         .markdown-content h2:contains("交易建议") + * {
             @apply bg-indigo-50 p-4 rounded-lg border border-indigo-100;
         }
+
+        /* 下拉框容器样式 */
+        .select-container {
+            position: relative;
+            width: 100%;
+        }
+
+        /* 下拉框样式 */
+        .form-select {
+            appearance: none;
+            width: 100%;
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 0.5rem 2.5rem 0.5rem 1rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* 下拉框选项样式 */
+        .form-select option {
+            padding: 0.5rem 1rem;
+            background-color: white;
+            color: #374151;
+        }
+
+        /* 下拉框展开时的位置和样式 */
+        .form-select:focus {
+            outline: none;
+            border-color: #9333ea;
+            box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
+        }
+
+        /* 确保下拉选项显示在正确位置 */
+        .form-select optgroup,
+        .form-select option {
+            position: relative;
+            z-index: 50;
+            background-color: white;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 640px) {
+            .form-select {
+                font-size: 16px; /* 防止iOS缩放 */
+                padding: 0.75rem 2.5rem 0.75rem 1rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
@@ -354,14 +405,17 @@
             </div>
 
             <!-- 标签页导航 -->
-            <nav class="tab-nav flex space-x-2 sm:space-x-4 min-w-max border-b border-gray-200 mb-6" aria-label="Tabs">
-                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base" 
+            <nav class="tab-nav flex overflow-x-auto hide-scrollbar space-x-1 sm:space-x-4 border-b border-gray-200 mb-6 -mx-4 sm:mx-0 px-4 sm:px-0" aria-label="Tabs">
+                <button class="tab-button whitespace-nowrap flex-shrink-0 px-2 sm:px-4 py-2 text-sm sm:text-base" 
                         data-tab="optimization-tab">
-                    <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                    参数优化
+                    <div class="flex items-center space-x-1 sm:space-x-2">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <span class="hidden sm:inline">参数</span>
+                        <span class="sm:hidden">优化</span>
+                    </div>
                 </button>
                 <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
                         data-tab="analysis-tab">
@@ -683,7 +737,7 @@
 
             <!-- 每日选股页面 -->
             <div id="daily-picks-tab" class="tab-content hidden">
-                <div class="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-lg p-6 mb-6">
+                <div class="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-lg p-3 sm:p-6 mb-4 sm:mb-6">
                     <div class="mb-4">
                         <h2 class="text-xl font-bold text-gray-800 flex items-center">
                             <svg class="w-6 h-6 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -695,19 +749,18 @@
                         <p class="text-sm text-gray-600 mt-1">使用AI模型分析市场,为您推荐优质标的</p>
                     </div>
 
-                    <form id="dailyPicksForm" onsubmit="handleDailyPicks(event)" class="space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form id="dailyPicksForm" onsubmit="handleDailyPicks(event)" class="space-y-4 sm:space-y-6">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
                             <!-- 日期选择 -->
-                            <div class="bg-white rounded-lg p-4 shadow-sm border border-purple-100 hover:border-purple-200 transition-all duration-300">
-                                <label for="pickDate" class="block text-sm font-medium text-gray-700 mb-2">
+                            <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
+                                <label for="pickDate" class="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                                     选择分析日期
                                 </label>
                                 <div class="relative">
                                     <input type="text" 
                                            id="pickDate" 
-                                           class="form-input block w-full rounded-lg border-gray-300 shadow-sm 
-                                                  focus:border-purple-500 focus:ring-purple-500 
-                                                  cursor-pointer pl-4 pr-10 py-2"
+                                           class="form-input block w-full rounded-lg text-sm sm:text-base pl-4 pr-10 py-2 
+                                                  border border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                                            readonly
                                            placeholder="选择日期">
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -720,22 +773,23 @@
                             </div>
 
                             <!-- AI模型选择 -->
-                            <div class="bg-white rounded-lg p-4 shadow-sm border border-purple-100 hover:border-purple-200 transition-all duration-300">
-                                <label for="analysisModel" class="block text-sm font-medium text-gray-700 mb-2">
+                            <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-purple-100">
+                                <label for="analysisModel" class="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                                     选择AI模型
                                 </label>
                                 <div class="relative">
                                     <select id="analysisModel" 
-                                            class="form-select appearance-none block w-full rounded-lg border-gray-300 shadow-sm 
-                                                   focus:border-purple-500 focus:ring-purple-500 hover:border-purple-300 
-                                                   transition-colors duration-200 pr-10">
-                                        <option value="zhipu" class="py-2">智谱AI</option>
-                                        <option value="kimi" class="py-2">Kimi</option>
-                                        <option value="openai" class="py-2">OpenAI</option>
+                                            class="block w-full rounded-lg border border-gray-300 
+                                                   bg-white px-4 py-2 pr-8 text-base 
+                                                   focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200
+                                                   cursor-pointer appearance-none">
+                                        <option value="zhipu">智谱AI</option>
+                                        <option value="kimi">Kimi</option>
+                                        <option value="openai">OpenAI</option>
                                     </select>
-                                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
+                                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                         </svg>
                                     </div>
                                 </div>
@@ -758,7 +812,7 @@
 
                 <!-- 选股结果展示区域 -->
                 <div id="dailyPicksResults" class="hidden">
-                    <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="bg-white rounded-xl shadow-lg p-3 sm:p-6">
                         <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-gray-100">
                             <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg p-2">
                                 <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,8 +825,8 @@
                                 <p class="text-sm text-gray-500">基于多维度分析的股票推荐</p>
                             </div>
                         </div>
-                        <div id="dailyPicksContent" class="prose max-w-none markdown-body custom-scrollbar 
-                                                  bg-gradient-to-br from-white to-purple-50 rounded-lg p-6"></div>
+                        <div id="dailyPicksContent" class="prose prose-sm sm:prose max-w-none markdown-body custom-scrollbar 
+                                                  bg-gradient-to-br from-white to-purple-50 rounded-lg p-3 sm:p-6"></div>
                     </div>
                 </div>
             </div>
