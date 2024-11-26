@@ -44,7 +44,7 @@ def update_target_stocks():
         # 默认为当天日期
         date_suffix = datetime.now().strftime("%Y-%m-%d")
 
-    df = pd.read_csv(f'target_stocks_{date_suffix}.csv', dtype={'symbol': str})
+    df = pd.read_csv(f'stock_data/target_stocks_{date_suffix}.csv', dtype={'symbol': str})
     
     # 添加新列
     df['latest_price'] = None
@@ -118,9 +118,13 @@ def update_target_stocks():
     # 按涨跌幅降序排序
     df = df.sort_values(by='最新涨跌幅', ascending=False)
     
-    # 保存更新后的数据
-    df.to_csv(f'updated_target_stocks_{date_suffix}.csv', index=False)
-    print(f"数据更新完成，已保存到 updated_target_stocks_{date_suffix}.csv")
+    # 确保stock_data目录存在
+    os.makedirs('stock_data', exist_ok=True)
+    
+    # 保存更新后的数据到stock_data目录
+    save_path = os.path.join('stock_data', f'updated_target_stocks_{date_suffix}.csv')
+    df.to_csv(save_path, index=False)
+    print(f"数据更新完成，已保存到 {save_path}")
 
 if __name__ == "__main__":
     update_target_stocks()

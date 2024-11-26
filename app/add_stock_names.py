@@ -40,8 +40,8 @@ def main():
         date_suffix = sys.argv[1]
     else:
         date_suffix = datetime.now().strftime('%Y-%m-%d')
-    input_file = f'all_stocks_optimization_results_{date_suffix}.csv'
-    output_file = f'target_stocks_{date_suffix}.csv'
+    input_file = f'stock_data/all_stocks_optimization_results_{date_suffix}.csv'
+    output_file = f'stock_data/target_stocks_{date_suffix}.csv'
     add_stock_names(input_file, output_file)
 
 if __name__ == "__main__":

@@ -118,8 +118,14 @@ def main():
     market_str = "all_stocks" if args.market == 'A' else "us_stocks"
     filename = (f'{market_str}_optimization_results_'
                f'{datetime.now().strftime("%Y-%m-%d")}.csv')
-    results_df.to_csv(filename, index=False)
-    print(f"优化完成，结果已保存到 {filename}")
+    
+    # 确保stock_data目录存在
+    os.makedirs('stock_data', exist_ok=True)
+    
+    # 保存到stock_data目录
+    save_path = os.path.join('stock_data', filename)
+    results_df.to_csv(save_path, index=False)
+    print(f"优化完成，结果已保存到 {save_path}")
 
 if __name__ == '__main__':
     main()

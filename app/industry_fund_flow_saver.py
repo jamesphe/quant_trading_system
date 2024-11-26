@@ -29,8 +29,13 @@ def save_industry_fund_flow(sector_type="行业资金流", output_file=None):
             output_file = f"{sector_type}_{current_time}.csv"
         
         # 保存数据到CSV文件
-        industry_flow_data.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"数据已成功保存到文件: {output_file}")
+        # 确保stock_data目录存在
+        os.makedirs('stock_data', exist_ok=True)
+        
+        # 保存到stock_data目录
+        save_path = os.path.join('stock_data', output_file)
+        industry_flow_data.to_csv(save_path, index=False, encoding='utf-8-sig')
+        print(f"数据已成功保存到文件: {save_path}")
         
         return output_file
     

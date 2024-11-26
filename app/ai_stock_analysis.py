@@ -201,7 +201,12 @@ def save_analysis_to_markdown(analysis_result, symbol=None, date=None):
     file_name = (f"stock_analysis_{symbol}_{date_str}.md" if symbol 
                  else f"stocks_analysis_{args.ai}_{date_str}.md")
     
-    with open(file_name, 'w', encoding='utf-8') as f:
+    # 确保AIResult目录存在
+    os.makedirs('AIResult', exist_ok=True)
+    
+    # 保存到AIResult目录
+    save_path = os.path.join('AIResult', file_name)
+    with open(save_path, 'w', encoding='utf-8') as f:
         f.write(f"# 股票分析报告 {date_str}\n\n")
         if symbol:
             f.write(f"## 股票代码：{symbol}\n\n")
@@ -555,7 +560,7 @@ if __name__ == "__main__":
             save_analysis_to_markdown(analysis_result, args.symbol, date)
     
     elif args.mode == "csv":
-        csv_file = f"updated_target_stocks_{date.strftime('%Y-%m-%d')}.csv"
+        csv_file = os.path.join('stock_data', f"updated_target_stocks_{date.strftime('%Y-%m-%d')}.csv")
         try:
             analysis_result = analyze_csv_stocks(csv_file, date, args.ai)
             if analysis_result:
