@@ -776,3 +776,44 @@ body {
     font-family: 'Noto Sans SC', sans-serif;
     letter-spacing: 0.5px;
 }
+
+/* 标签页切换动画 */
+.tab-content {
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.tab-content.hidden {
+    opacity: 0;
+    transform: translateY(10px);
+    display: none;
+}
+
+.tab-content:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* 标签按钮样式 */
+.tab-button {
+    position: relative;
+    transition: all 0.3s ease-in-out;
+}
+
+.tab-button::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: transparent;
+    transition: all 0.3s ease-in-out;
+}
+
+.tab-button.active::after {
+    background-color: #7C3AED;
+}
+
+.tab-button:hover:not(.active) {
+    color: #7C3AED;
+}

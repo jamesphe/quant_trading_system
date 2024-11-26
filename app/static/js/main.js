@@ -186,19 +186,17 @@ document.addEventListener('DOMContentLoaded', function() {
         portfolioButton.addEventListener('click', runPortfolioAnalysis);
     }
     
-    // 设置每日选股的默认日期为今天
-    const pickDateInput = document.getElementById('pickDate');
-    if (pickDateInput) {
-        pickDateInput.value = today.toISOString().split('T')[0];
-        pickDateInput.max = today.toISOString().split('T')[0]; // 限制最大日期为今天
-    }
-    
     // 初始化日期选择器
+    initializeDatePicker(today);
+});
+
+// 添加日期选择器初始化函数
+function initializeDatePicker(today) {
     const pickDateInput = document.getElementById('pickDate');
     if (pickDateInput) {
         // 设置默认日期为今天
-        const today = new Date();
-        pickDateInput.value = formatDate(today);
+        pickDateInput.value = formatDisplayDate(formatDate(today));
+        pickDateInput.dataset.value = formatDate(today);
         
         // 添加点击事件
         pickDateInput.addEventListener('click', function() {
@@ -233,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
             datePicker.click();
         });
     }
-});
+}
 
 // 格式化日期为YYYY-MM-DD
 function formatDate(date) {
@@ -248,25 +246,27 @@ function formatDisplayDate(dateStr) {
 
 // 修改初始化标签页的函数
 function initializeTabs() {
-    // 默认显示个股分析标签页
-    const defaultTab = 'analysis-tab';
-    
-    // 从 URL 获取当前标签页，如果没有则使用默认值
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentTab = urlParams.get('tab') || defaultTab;
-    
-    // 手动调用切换函数
-    switchTab(currentTab);
-    
-    console.log('Tabs initialized:', {
-        currentTab,
-        selectedTabExists: !!document.getElementById(`${currentTab}`),
-        activeButtonExists: !!document.querySelector(`[data-tab="${currentTab}"]`)
+    // 为所有标签按钮添加点击事件
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            console.log('Tab button clicked:', tabId); // 调试日志
+            switchTab(tabId);
+        });
     });
+    
+    // 默认显示第一个标签页
+    const firstTab = document.querySelector('.tab-button');
+    if (firstTab) {
+        const defaultTabId = firstTab.getAttribute('data-tab');
+        switchTab(defaultTabId);
+    }
 }
 
 // 修改 switchTab 函数
 function switchTab(tabId) {
+    console.log('Switching to tab:', tabId); // 调试日志
+    
     // 隐藏所有标签页内容
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.add('hidden');
@@ -288,7 +288,7 @@ function switchTab(tabId) {
     }
     
     // 激活对应的标签按钮
-    const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
+    const activeButton = document.querySelector(`button[data-tab="${tabId}"]`);
     if (activeButton) {
         activeButton.classList.add('active');
         activeButton.classList.add('text-purple-600');
@@ -644,7 +644,7 @@ function displayBacktestResults(data) {
                         </span>
                     </div>
                     <div class="metric-item">
-                        <span class="metric-label">收益���</span>
+                        <span class="metric-label">收益</span>
                         <span class="metric-value ${data.basic_info.roi >= 0 ? 'text-green-600' : 'text-red-600'}">
                             ${data.basic_info.roi.toFixed(2)}%
                         </span>
@@ -778,7 +778,7 @@ function displayBacktestResults(data) {
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
     
-    // 使用 requestAnimationFrame ���保过渡效果正常工作
+    // 使用 requestAnimationFrame 保过渡效果正常工作
     requestAnimationFrame(() => {
         backtestResults.style.transition = 'all 0.5s ease-in-out';
         backtestResults.style.opacity = '1';
@@ -1041,27 +1041,10 @@ function toggleDetails(index) {
 
 // 在文档加载完成后初始化标签页
 document.addEventListener('DOMContentLoaded', function() {
-    // 添加签页切换事件监听器
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            switchTab(button.getAttribute('data-tab'));
-        });
-    });
+    console.log('DOM loaded, initializing tabs...'); // 调试日志
+    initializeTabs();
     
-    // 初始化表单事件监听器
-    const portfolioForm = document.getElementById('portfolioForm');
-    if (portfolioForm) {
-        portfolioForm.addEventListener('submit', runPortfolioAnalysis);
-        
-        // 设置默认日期为今天
-        const dateInput = document.getElementById('analysisDate');
-        if (dateInput) {
-            dateInput.value = new Date().toISOString().split('T')[0];
-        }
-    }
-    
-    // 默认显示第一个标签页
-    switchTab('optimization-tab');
+    // 其他初始化代码...
 });
 
 // 添加动画相关的样式
