@@ -188,6 +188,27 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化日期选择器
     initializeDatePicker(today);
+    
+    // 日期控件初始化
+    const datePicker = document.getElementById('analysisDate');
+    if (datePicker) {
+        // 使用已经定义的 today 变量，而不是重新声明
+        const dateString = today.toISOString().split('T')[0];
+        datePicker.value = dateString;
+        
+        // 添加触摸事件支持
+        datePicker.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            this.focus();
+        });
+        
+        // 处理日期变化
+        datePicker.addEventListener('change', function(e) {
+            const selectedDate = e.target.value;
+            // 这里可以添加日期变化后的处理逻辑
+            updateAnalysis(selectedDate);
+        });
+    }
 });
 
 // 修改日期选择器初始化函数
@@ -1406,4 +1427,30 @@ function showError(container, message) {
             </div>
         </div>
     `;
+}
+
+// 更新分析结果的函数
+function updateAnalysis(date) {
+    // 发送请求获取新的分析结果
+    fetch('/daily_picks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            date: date.replace(/-/g, '')
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新页面内容
+            document.getElementById('analysisContent').innerHTML = data.content;
+        } else {
+            console.error('获取分析结果失败:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('请求失败:', error);
+    });
 }

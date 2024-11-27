@@ -1,4 +1,11 @@
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    jsonify, 
+    Response, 
+    stream_with_context
+)
 import backtrader as bt
 from optimizer import optimize_strategy
 from data_fetch import (
@@ -48,9 +55,14 @@ def optimize():
         logger.info(f'股票名称: {stock_name}')
 
         # 检查是否存在优化参数文件且是当天15:00后生成的
-        optimization_file = f'results/{symbol}_optimization_results.csv'
+        optimization_file = get_optimization_file(symbol)
         current_time = datetime.now()
-        cutoff_time = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
+        cutoff_time = current_time.replace(
+            hour=15, 
+            minute=0, 
+            second=0, 
+            microsecond=0
+        )
         
         if os.path.exists(optimization_file):
             file_mtime = datetime.fromtimestamp(os.path.getmtime(optimization_file))
@@ -82,7 +94,7 @@ def optimize():
                     }
                     return jsonify(result)
 
-        # 如果没有最新的优化��果文件，执行优化流程
+        # 如果没有最新的优化果文件，执行优化流程
         # 根据股票类型获取数据
         if symbol.startswith(('51', '159')):
             stock_data = get_etf_data(symbol, start_date, end_date)
@@ -214,7 +226,7 @@ def backtest():
         # 导入并执行回测脚本
         import chandelier_zlsma_test
         # 检查是否存在优化参数文件
-        optimization_file = f'results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv'
+        optimization_file = get_optimization_file(symbol)
         if os.path.exists(optimization_file):
             # 读取化参数
             opt_params = pd.read_csv(optimization_file).iloc[-1]
@@ -498,6 +510,10 @@ def _convert_signal_to_text(signal):
         }
     }
     return signal_map.get(signal, {'text': "未知信号", 'color': 'gray'})
+
+
+def get_optimization_file(symbol, strategy="ChandelierZlSmaStrategy"):
+    return f'results/{symbol}_{strategy}_optimization_results.csv'
 
 
 if __name__ == '__main__':
