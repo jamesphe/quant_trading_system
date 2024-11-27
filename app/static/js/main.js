@@ -209,6 +209,15 @@ document.addEventListener('DOMContentLoaded', function() {
             updateAnalysis(selectedDate);
         });
     }
+    
+    // 设置每日选股日期控件的默认值和最大值
+    const pickDateInput = document.getElementById('pickDate');
+    if (pickDateInput) {
+        const today = new Date();
+        const dateString = today.toISOString().split('T')[0];
+        pickDateInput.value = dateString;
+        pickDateInput.max = dateString;
+    }
 });
 
 // 修改日期选择器初始化函数
@@ -1359,12 +1368,12 @@ function handleDailyPicks(event) {
     const dateInput = document.getElementById('pickDate');
     const modelSelect = document.getElementById('analysisModel');
     
-    if (!dateInput.dataset.value) {
+    if (!dateInput.value) {
         showToast('请选择分析日期', 'warning');
         return;
     }
     
-    const date = dateInput.dataset.value.replace(/-/g, '');
+    const date = dateInput.value.replace(/-/g, '');
     const model = modelSelect.value;
     
     const resultsDiv = document.getElementById('dailyPicksResults');
