@@ -339,6 +339,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化其他组件
     initializeOtherComponents();
+    
+    // 绑定持仓分析按钮事件
+    const portfolioForm = document.getElementById('portfolioForm');
+    if (portfolioForm) {
+        console.log('找到持仓分析表单，添加提交事件监听器');
+        portfolioForm.addEventListener('submit', function(event) {
+            console.log('持仓分析表单提交被触发');
+            runPortfolioAnalysis(event);
+        });
+    } else {
+        console.warn('未找到持仓分析表单');
+    }
 });
 
 // 添加日期更新处理函数
@@ -457,7 +469,7 @@ function initializeDatePicker(today) {
             if (this.type === 'date') {
                 return; // 原生日期选择器会自动打开
             }
-            // 对于不支持原生日期选择器的设备，可以在这里添加自定义日期选择器
+            // 对于不支持原生日期择器的设备，可以在这里添加自定义日期选择器
         });
     }
 }
@@ -467,7 +479,7 @@ function formatDate(date) {
     return date.toISOString().split('T')[0];
 }
 
-// 格式化显示日期为YYYY年MM月DD日
+// 格式化显示日��为YYYY年MM月DD日
 function formatDisplayDate(dateStr) {
     const date = new Date(dateStr);
     return `${date.getFullYear()}年${(date.getMonth() + 1).toString().padStart(2, '0')}月${date.getDate().toString().padStart(2, '0')}日`;
@@ -1159,26 +1171,30 @@ function runPortfolioAnalysis(event) {
     const form = document.getElementById('portfolioForm');
     const button = document.getElementById('runPortfolioAnalysis');
     const resultsDiv = document.getElementById('portfolioResults');
-    const timestampDiv = document.getElementById('analysisTimestamp');
+    
+    if (!form || !button || !resultsDiv) {
+        showToast('系统错误：找不到必要的页面元素', 'error');
+        return;
+    }
     
     // 获取表单数据
     const formData = new FormData(form);
     const sendToWechat = document.getElementById('sendToWechat').checked;
     
     const analysisParams = {
-        mode: formData.get('mode'),
+        mode: formData.get('mode') || 'portfolio',
         date: formData.get('date') || new Date().toISOString().split('T')[0],
-        sendToWechat: sendToWechat  // 直接使用checkbox的checked状态
+        sendToWechat: sendToWechat
     };
     
-    // 更新按钮状态加载动画
+    // 更新按钮状态和显示加载动画
     button.disabled = true;
+    const originalButtonContent = button.innerHTML;
     button.innerHTML = `
-        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        分析中...
+        <div class="flex items-center justify-center space-x-2">
+            <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+            <span>分析中...</span>
+        </div>
     `;
     
     // 显示加载提示
@@ -1195,6 +1211,7 @@ function runPortfolioAnalysis(event) {
         </div>
     `;
     
+    // 发送请求
     fetch('/portfolio_analysis', {
         method: 'POST',
         headers: {
@@ -1202,32 +1219,19 @@ function runPortfolioAnalysis(event) {
         },
         body: JSON.stringify(analysisParams)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
-            // 使用displayPortfolioResults函数生成HTML
             const html = displayPortfolioResults(data);
             resultsDiv.innerHTML = html;
-            
-            // 更新时间戳
-            if (timestampDiv) {
-                timestampDiv.textContent = `最后更新时间: ${data.timestamp}`;
-            }
+            showToast('分析完成', 'success');
         } else {
-            resultsDiv.innerHTML = `
-                <div class="bg-red-50 border-l-4 border-red-500 p-4">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-red-700">分析失败: ${data.error}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
+            throw new Error(data.error || '分析失败，未知错误');
         }
     })
     .catch(error => {
@@ -1240,21 +1244,17 @@ function runPortfolioAnalysis(event) {
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <p class="text-sm text-red-700">请求失败: ${error}</p>
+                        <p class="text-sm text-red-700">分析失败: ${error.message}</p>
                     </div>
                 </div>
             </div>
         `;
+        showToast('分析失败: ' + error.message, 'error');
     })
     .finally(() => {
+        // 恢复按钮状态
         button.disabled = false;
-        button.innerHTML = `
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            <span>运行分析</span>
-        `;
+        button.innerHTML = originalButtonContent;
     });
 }
 
@@ -1632,7 +1632,7 @@ async function handleDailyPicks(event) {
         return;
     }
 
-    // 转换日期格式�� YYYYMMDD
+    // 转换日期格式为 YYYYMMDD
     const formattedDate = pickDate.replace(/-/g, '');
 
     try {

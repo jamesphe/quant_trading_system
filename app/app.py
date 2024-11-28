@@ -105,7 +105,7 @@ def optimize():
             stock_data = get_us_stock_data(symbol, start_date, end_date)
         
         if stock_data.empty:
-            logger.warning(f'股票 {symbol} 没有可用的数��进行回测')
+            logger.warning(f'股票 {symbol} 没有可用的数进行回测')
             return jsonify({'error': f'股票 {symbol} 没有可用的数据进行回测。'})
 
         # 定义数据源类
@@ -282,7 +282,6 @@ def backtest():
 @app.route('/portfolio_analysis', methods=['POST'])
 def portfolio_analysis():
     try:
-        logger.info('开始执行持仓分析')
         data = request.get_json()
         
         # 构建命令行参数
@@ -292,15 +291,19 @@ def portfolio_analysis():
         if data.get('date'):
             cmd.extend(['--date', data['date']])
         if data.get('sendToWechat'):
-            cmd.append('--send-wechat')  # 添加发送到微信的参数
+            cmd.append('--send-wechat')
             
         # 运行portfolio_analysis.py
         result = subprocess.run(
             cmd,
             capture_output=True, 
-            text=True
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
         )
         
+        if result.returncode != 0:
+            raise Exception(f'分析脚本执行失败: {result.stderr}')
+            
         # 解析输出内容
         output_lines = result.stdout.split('\n')
         analysis_results = []
@@ -308,9 +311,9 @@ def portfolio_analysis():
         current_content = []
         
         for line in output_lines:
-            if line.startswith('==='):  # 跳过标题行
+            if line.startswith('==='):
                 continue
-            if '（' in line and '）' in line:  # 新的股票开始
+            if '（' in line and '）' in line:
                 if current_stock:
                     analysis_results.append({
                         'stock': current_stock,
@@ -321,7 +324,7 @@ def portfolio_analysis():
             elif line.strip():
                 current_content.append(line.strip())
                 
-        if current_stock:  # 添加最后一个股票的数据
+        if current_stock:
             analysis_results.append({
                 'stock': current_stock,
                 'content': '\n'.join(current_content)
@@ -334,7 +337,6 @@ def portfolio_analysis():
         })
         
     except Exception as e:
-        logger.error(f'持仓分析过程发生错误: {str(e)}', exc_info=True)
         return jsonify({
             'success': False,
             'error': f'分析失败: {str(e)}'
