@@ -2,6 +2,7 @@ import pandas as pd
 import akshare as ak
 import sys
 from datetime import datetime
+import os
 
 def get_stock_data(symbol):
     try:

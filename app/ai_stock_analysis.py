@@ -179,7 +179,7 @@ def read_industry_fund_flow(date):
     返回:
     - DataFrame,包含行业资金流数据,如果文件不存在则返回None
     """
-    file_name = f"行业资金流_{date.strftime('%Y%m%d')}.csv"
+    file_name = os.path.join('stock_data', f"行业资金流_{date.strftime('%Y%m%d')}.csv")
     print(f"尝试读取文件: {file_name}")
     if os.path.exists(file_name):
         print(f"文件存在,正在读取...")

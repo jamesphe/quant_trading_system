@@ -22,4 +22,5 @@ COPY . .
 EXPOSE 5100
 
 # 启动命令
-CMD ["python", "app/app.py"] 
+WORKDIR /app/app
+CMD ["python", "app.py"]

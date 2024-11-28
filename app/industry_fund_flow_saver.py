@@ -1,6 +1,7 @@
 import pandas as pd
 from data_fetch import get_industry_fund_flow_rank
 from datetime import datetime
+import os
 
 def save_industry_fund_flow(sector_type="行业资金流", output_file=None):
     """
