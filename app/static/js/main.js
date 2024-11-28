@@ -188,13 +188,15 @@ class DatePicker {
         
         // 创建容器
         const container = document.createElement('div');
-        container.className = 'date-picker-container';
+        container.className = 'date-picker-container relative';
         input.parentNode.replaceChild(container, input);
         
         // 创建显示输入框
         this.displayInput = document.createElement('input');
         this.displayInput.type = 'text';
-        this.displayInput.className = 'date-picker-input';
+        this.displayInput.className = `date-picker-input w-full px-3 py-2 border rounded-lg 
+            focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500
+            hover:border-purple-300 transition-colors duration-200`;
         this.displayInput.placeholder = this.options.placeholder;
         this.displayInput.readOnly = true;
         
@@ -202,10 +204,7 @@ class DatePicker {
         this.hiddenInput = document.createElement('input');
         this.hiddenInput.type = 'date';
         this.hiddenInput.id = this.options.inputId;
-        this.hiddenInput.style.position = 'absolute';
-        this.hiddenInput.style.width = '1px';
-        this.hiddenInput.style.height = '1px';
-        this.hiddenInput.style.opacity = '0';
+        this.hiddenInput.className = 'absolute opacity-0 -z-10 pointer-events-none';
         
         // 设置日期范围
         if (this.options.minDate) {
@@ -217,9 +216,9 @@ class DatePicker {
         
         // 添加日期图标
         const icon = document.createElement('div');
-        icon.className = 'date-picker-icon';
+        icon.className = 'date-picker-icon absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none';
         icon.innerHTML = `
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
@@ -242,7 +241,18 @@ class DatePicker {
     bindEvents() {
         // 点击显示输入框时打开日期选择器
         this.displayInput.addEventListener('click', () => {
-            this.hiddenInput.showPicker();
+            // 在移动端，我们需要确保隐藏输入框可以接收点击事件
+            this.hiddenInput.style.opacity = '0.01';
+            this.hiddenInput.style.pointerEvents = 'auto';
+            this.hiddenInput.style.position = 'absolute';
+            this.hiddenInput.style.top = '0';
+            this.hiddenInput.style.left = '0';
+            this.hiddenInput.style.width = '100%';
+            this.hiddenInput.style.height = '100%';
+            
+            // 触发原生日期选择器
+            this.hiddenInput.focus();
+            this.hiddenInput.click();
         });
         
         // 监听日期变化
@@ -250,9 +260,20 @@ class DatePicker {
             const date = new Date(e.target.value);
             this.setDate(date);
             
+            // 重置隐藏输入框的样式
+            this.hiddenInput.style.opacity = '0';
+            this.hiddenInput.style.pointerEvents = 'none';
+            
             if (typeof this.options.onChange === 'function') {
                 this.options.onChange(date, e.target.value);
             }
+        });
+        
+        // 处理触摸事件
+        this.displayInput.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.hiddenInput.focus();
+            this.hiddenInput.click();
         });
     }
     
@@ -284,46 +305,47 @@ function initializeDatePickers() {
     const lastYear = new Date();
     lastYear.setFullYear(today.getFullYear() - 1);
     
-    // 初始化每日选股日期选择器
-    new DatePicker({
-        inputId: 'pickDate',
-        defaultDate: today,
-        maxDate: today,
-        onChange: (date, dateString) => {
-            console.log('每日选股日期已更改:', dateString);
-            updateDailyPicks(dateString);
+    // 初始化所有日期选择器
+    const datePickerConfigs = [
+        {
+            inputId: 'pickDate',
+            defaultDate: today,
+            maxDate: today,
+            onChange: (date, dateString) => {
+                console.log('每日选股日期已更改:', dateString);
+                updateDailyPicks(dateString);
+            }
+        },
+        {
+            inputId: 'analysisDate',
+            defaultDate: today,
+            maxDate: today,
+            onChange: (date, dateString) => {
+                console.log('分析日期已更改:', dateString);
+                updateAnalysis(dateString);
+            }
+        },
+        {
+            inputId: 'startDate',
+            defaultDate: lastYear,
+            maxDate: today,
+            onChange: (date, dateString) => {
+                console.log('开始日期已更改:', dateString);
+            }
+        },
+        {
+            inputId: 'endDate',
+            defaultDate: today,
+            maxDate: today,
+            onChange: (date, dateString) => {
+                console.log('结束日期已更改:', dateString);
+            }
         }
-    });
+    ];
     
-    // 初始化分析日期选择器
-    new DatePicker({
-        inputId: 'analysisDate',
-        defaultDate: today,
-        maxDate: today,
-        onChange: (date, dateString) => {
-            console.log('分析日期已更改:', dateString);
-            updateAnalysis(dateString);
-        }
-    });
-    
-    // 初始化开始日期选择器
-    new DatePicker({
-        inputId: 'startDate',
-        defaultDate: lastYear,
-        maxDate: today,
-        onChange: (date, dateString) => {
-            console.log('开始日期已更改:', dateString);
-        }
-    });
-    
-    // 初始化结束日期选择器
-    new DatePicker({
-        inputId: 'endDate',
-        defaultDate: today,
-        maxDate: today,
-        onChange: (date, dateString) => {
-            console.log('结束日期已更改:', dateString);
-        }
+    // 初始化每个日期选择器
+    datePickerConfigs.forEach(config => {
+        new DatePicker(config);
     });
 }
 
@@ -479,7 +501,7 @@ function formatDate(date) {
     return date.toISOString().split('T')[0];
 }
 
-// 格式化显示日��为YYYY年MM月DD日
+// 格式化显示日为YYYY年MM月DD日
 function formatDisplayDate(dateStr) {
     const date = new Date(dateStr);
     return `${date.getFullYear()}年${(date.getMonth() + 1).toString().padStart(2, '0')}月${date.getDate().toString().padStart(2, '0')}日`;
@@ -1145,7 +1167,7 @@ function startBacktest() {
     document.getElementById('loadingText').innerHTML = `正在回测分析 ${symbol}...`;
     document.getElementById('loadingSection').style.display = 'block';
     
-    // ... 发送回测请求的代码 ...
+    // ... 发送回测请求���代码 ...
 }
 
 function handleBacktestResponse(response) {
