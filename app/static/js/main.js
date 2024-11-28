@@ -165,95 +165,300 @@ function formatParamName(key) {
     return nameMap[key] || key;
 }
 
-// 修改 DOMContentLoaded 事件处理函数
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing...');
+// 日期选择器类
+class DatePicker {
+    constructor(options) {
+        this.options = {
+            inputId: '',
+            defaultDate: new Date(),
+            minDate: null,
+            maxDate: new Date(),
+            onChange: null,
+            format: 'YYYY-MM-DD',
+            placeholder: '选择日期',
+            ...options
+        };
+        
+        this.init();
+    }
     
-    // 设置默认日期
+    init() {
+        const input = document.getElementById(this.options.inputId);
+        if (!input) return;
+        
+        // 创建容器
+        const container = document.createElement('div');
+        container.className = 'date-picker-container';
+        input.parentNode.replaceChild(container, input);
+        
+        // 创建显示输入框
+        this.displayInput = document.createElement('input');
+        this.displayInput.type = 'text';
+        this.displayInput.className = 'date-picker-input';
+        this.displayInput.placeholder = this.options.placeholder;
+        this.displayInput.readOnly = true;
+        
+        // 创建隐藏的原生日期输入框
+        this.hiddenInput = document.createElement('input');
+        this.hiddenInput.type = 'date';
+        this.hiddenInput.id = this.options.inputId;
+        this.hiddenInput.style.position = 'absolute';
+        this.hiddenInput.style.width = '1px';
+        this.hiddenInput.style.height = '1px';
+        this.hiddenInput.style.opacity = '0';
+        
+        // 设置日期范围
+        if (this.options.minDate) {
+            this.hiddenInput.min = this.formatDate(this.options.minDate);
+        }
+        if (this.options.maxDate) {
+            this.hiddenInput.max = this.formatDate(this.options.maxDate);
+        }
+        
+        // 添加日期图标
+        const icon = document.createElement('div');
+        icon.className = 'date-picker-icon';
+        icon.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+        `;
+        
+        // 组装组件
+        container.appendChild(this.displayInput);
+        container.appendChild(this.hiddenInput);
+        container.appendChild(icon);
+        
+        // 设置默认值
+        if (this.options.defaultDate) {
+            this.setDate(this.options.defaultDate);
+        }
+        
+        // 绑定事件
+        this.bindEvents();
+    }
+    
+    bindEvents() {
+        // 点击显示输入框时打开日期选择器
+        this.displayInput.addEventListener('click', () => {
+            this.hiddenInput.showPicker();
+        });
+        
+        // 监听日期变化
+        this.hiddenInput.addEventListener('change', (e) => {
+            const date = new Date(e.target.value);
+            this.setDate(date);
+            
+            if (typeof this.options.onChange === 'function') {
+                this.options.onChange(date, e.target.value);
+            }
+        });
+    }
+    
+    setDate(date) {
+        const formattedDate = this.formatDate(date);
+        this.hiddenInput.value = formattedDate;
+        this.displayInput.value = this.formatDisplayDate(date);
+    }
+    
+    getDate() {
+        return this.hiddenInput.value ? new Date(this.hiddenInput.value) : null;
+    }
+    
+    formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+    
+    formatDisplayDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}年${month}月${day}日`;
+    }
+}
+
+// 初始化所有日期选择器
+function initializeDatePickers() {
     const today = new Date();
     const lastYear = new Date();
     lastYear.setFullYear(today.getFullYear() - 1);
     
-    document.getElementById('endDate').value = today.toISOString().split('T')[0];
-    document.getElementById('startDate').value = lastYear.toISOString().split('T')[0];
+    // 初始化每日选股日期选择器
+    new DatePicker({
+        inputId: 'pickDate',
+        defaultDate: today,
+        maxDate: today,
+        onChange: (date, dateString) => {
+            console.log('每日选股日期已更改:', dateString);
+            updateDailyPicks(dateString);
+        }
+    });
+    
+    // 初始化分析日期选择器
+    new DatePicker({
+        inputId: 'analysisDate',
+        defaultDate: today,
+        maxDate: today,
+        onChange: (date, dateString) => {
+            console.log('分析日期已更改:', dateString);
+            updateAnalysis(dateString);
+        }
+    });
+    
+    // 初始化开始日期选择器
+    new DatePicker({
+        inputId: 'startDate',
+        defaultDate: lastYear,
+        maxDate: today,
+        onChange: (date, dateString) => {
+            console.log('开始日期已更改:', dateString);
+        }
+    });
+    
+    // 初始化结束日期选择器
+    new DatePicker({
+        inputId: 'endDate',
+        defaultDate: today,
+        maxDate: today,
+        onChange: (date, dateString) => {
+            console.log('结束日期已更改:', dateString);
+        }
+    });
+}
+
+// 修改 DOMContentLoaded 事件处理函数
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
     
     // 初始化标签页
     initializeTabs();
     
-    // 添加持仓分析按钮的事件监听器
-    const portfolioButton = document.getElementById('runPortfolioAnalysis');
-    if (portfolioButton) {
-        portfolioButton.addEventListener('click', runPortfolioAnalysis);
-    }
-    
     // 初始化日期选择器
-    initializeDatePicker(today);
+    initializeDatePickers();
     
-    // 日期控件初始化
-    const datePicker = document.getElementById('analysisDate');
-    if (datePicker) {
-        // 使用已经定义的 today 变量，而不是重新声明
-        const dateString = today.toISOString().split('T')[0];
-        datePicker.value = dateString;
-        
-        // 添加触摸事件支持
-        datePicker.addEventListener('touchend', function(e) {
-            e.preventDefault();
-            this.focus();
-        });
-        
-        // 处理日期变化
-        datePicker.addEventListener('change', function(e) {
-            const selectedDate = e.target.value;
-            // 这里可以添加日期变化后的处理逻辑
-            updateAnalysis(selectedDate);
-        });
-    }
-    
-    // 设置每日选股日期控件的默认值和最大值
-    const pickDateInput = document.getElementById('pickDate');
-    if (pickDateInput) {
-        const today = new Date();
-        const dateString = today.toISOString().split('T')[0];
-        pickDateInput.value = dateString;
-        pickDateInput.max = dateString;
-    }
+    // 初始化其他组件
+    initializeOtherComponents();
 });
+
+// 添加日期更新处理函数
+function updateDailyPicks(date) {
+    console.log('更新每日选股分析，日期:', date);
+    // 如果需要自动触发分析，可以在这里调用 handleDailyPicks
+    const form = document.getElementById('dailyPicksForm');
+    if (form) {
+        form.dispatchEvent(new Event('submit'));
+    }
+}
+
+function updateAnalysis(date) {
+    console.log('更新分析，日期:', date);
+    // 这里可以添加分析日期变化后的处理逻辑
+}
+
+// 添加其他组件初始化函数
+function initializeOtherComponents() {
+    // 初始化表单提交事件
+    const dailyPicksForm = document.getElementById('dailyPicksForm');
+    if (dailyPicksForm) {
+        dailyPicksForm.addEventListener('submit', handleDailyPicks);
+    }
+    
+    // 初始化模型选择器
+    const modelSelect = document.getElementById('analysisModel');
+    if (modelSelect) {
+        modelSelect.addEventListener('change', function() {
+            console.log('选择的模型:', this.value);
+        });
+    }
+}
+
+// 确保 handleDailyPicks 函数正确处理日期
+async function handleDailyPicks(event) {
+    event.preventDefault();
+    
+    const pickDate = document.getElementById('pickDate').value;
+    if (!pickDate) {
+        showToast('请选择分析日期', 'warning');
+        return;
+    }
+    
+    // 转换日期格式为 YYYYMMDD
+    const formattedDate = pickDate.replace(/-/g, '');
+    const analysisModel = document.getElementById('analysisModel').value;
+    const resultsDiv = document.getElementById('dailyPicksResults');
+    const contentDiv = document.getElementById('dailyPicksContent');
+
+    try {
+        // 显示加载状态
+        resultsDiv.classList.remove('hidden');
+        contentDiv.innerHTML = `
+            <div class="flex justify-center items-center py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                <div class="ml-3 text-gray-600">正在获取分析结果...</div>
+            </div>
+        `;
+
+        const response = await fetch('/api/daily_picks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date: formattedDate,
+                model: analysisModel
+            })
+        });
+
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || '获取分析结果失败');
+        }
+
+        // 直接显示后端返回的 HTML 内容
+        contentDiv.innerHTML = data.content;
+        
+        // 添加样式
+        contentDiv.classList.add('prose', 'max-w-none', 'mx-auto');
+        
+        // 应用自定义样式
+        applyMarkdownStyles(contentDiv);
+
+    } catch (error) {
+        console.error('分析请求失败:', error);
+        showToast(error.message, 'error');
+        contentDiv.innerHTML = `
+            <div class="text-red-500 text-center py-4">
+                ${error.message}
+            </div>
+        `;
+    }
+}
 
 // 修改日期选择器初始化函数
 function initializeDatePicker(today) {
     const pickDateInput = document.getElementById('pickDate');
     if (pickDateInput) {
-        // 设置默认日期为今天
-        const defaultDate = formatDate(today);
-        pickDateInput.value = formatDisplayDate(defaultDate);
-        pickDateInput.dataset.value = defaultDate;
+        // 设置默认值为今天
+        const defaultDate = today.toISOString().split('T')[0];
+        pickDateInput.value = defaultDate;
+        pickDateInput.max = defaultDate; // 限制最大日期为今天
         
-        // 创建隐藏的日期选择器
-        const datePicker = document.createElement('input');
-        datePicker.type = 'date';
-        datePicker.style.position = 'absolute';
-        datePicker.style.width = '100%';
-        datePicker.style.height = '100%';
-        datePicker.style.top = '0';
-        datePicker.style.left = '0';
-        datePicker.style.opacity = '0';
-        datePicker.max = defaultDate; // 限制最大日期为今天
-        
-        // 添加日期变化事件
-        datePicker.addEventListener('change', function(e) {
-            const selectedDate = e.target.value;
-            pickDateInput.dataset.value = selectedDate;
-            pickDateInput.value = formatDisplayDate(selectedDate);
+        // 添加日期变化事件监听器
+        pickDateInput.addEventListener('change', function(e) {
+            console.log('日期已更改:', this.value);
+            // 这里可以添加日期变化后的其他处理逻辑
         });
         
-        // 添加点击事件
-        pickDateInput.addEventListener('click', function() {
-            datePicker.showPicker();
+        // 添加点击事件监听器
+        pickDateInput.addEventListener('click', function(e) {
+            // 确保在移动设备上也能正常工作
+            if (this.type === 'date') {
+                return; // 原生日期选择器会自动打开
+            }
+            // 对于不支持原生日期选择器的设备，可以在这里添加自定义日期选择器
         });
-        
-        // 将日期选择器添加到容器中
-        pickDateInput.parentNode.appendChild(datePicker);
     }
 }
 
@@ -525,7 +730,7 @@ async function handleAnalysis(event) {
     }
 }
 
-// 添加辅助函数
+// 修改 applyMarkdownStyles 函数
 function applyMarkdownStyles(element) {
     // 添加容器类
     element.classList.add('markdown-content', 'prose', 'prose-indigo', 'max-w-none');
@@ -555,13 +760,15 @@ function applyMarkdownStyles(element) {
     });
     
     // 处理交易建议部分
-    const tradingAdvice = element.querySelector('h2:contains("交易建议")');
-    if (tradingAdvice) {
-        const nextElement = tradingAdvice.nextElementSibling;
-        if (nextElement) {
-            nextElement.classList.add('bg-indigo-50', 'p-4', 'rounded-lg', 'border', 'border-indigo-100');
+    const headers = element.getElementsByTagName('h2');
+    Array.from(headers).forEach(header => {
+        if (header.textContent.includes('交易建议')) {
+            const nextElement = header.nextElementSibling;
+            if (nextElement) {
+                nextElement.classList.add('bg-indigo-50', 'p-4', 'rounded-lg', 'border', 'border-indigo-100');
+            }
         }
-    }
+    });
     
     // 高亮重要信息
     const paragraphs = element.getElementsByTagName('p');
@@ -571,6 +778,56 @@ function applyMarkdownStyles(element) {
             p.textContent.includes('风险')) {
             p.classList.add('highlight');
         }
+    });
+
+    // 处理链接
+    const links = element.getElementsByTagName('a');
+    Array.from(links).forEach(link => {
+        link.classList.add('text-indigo-600', 'hover:text-indigo-800', 'hover:underline');
+        // 如果是外部链接，添加新窗口打开
+        if (link.hostname !== window.location.hostname) {
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener noreferrer');
+        }
+    });
+
+    // 处理列表
+    const lists = element.querySelectorAll('ul, ol');
+    lists.forEach(list => {
+        list.classList.add('space-y-1', 'my-4');
+        const items = list.getElementsByTagName('li');
+        Array.from(items).forEach(item => {
+            item.classList.add('text-gray-700');
+        });
+    });
+
+    // 处理引用块
+    const blockquotes = element.getElementsByTagName('blockquote');
+    Array.from(blockquotes).forEach(quote => {
+        quote.classList.add(
+            'border-l-4',
+            'border-indigo-200',
+            'pl-4',
+            'py-2',
+            'my-4',
+            'text-gray-600',
+            'bg-indigo-50',
+            'rounded-r-lg'
+        );
+    });
+
+    // 处理代码
+    const inlineCodes = element.querySelectorAll('code:not(pre code)');
+    inlineCodes.forEach(code => {
+        code.classList.add(
+            'bg-gray-100',
+            'text-indigo-600',
+            'rounded',
+            'px-1.5',
+            'py-0.5',
+            'text-sm',
+            'font-mono'
+        );
     });
 }
 
@@ -1361,105 +1618,110 @@ function displayPortfolioResults(data) {  // 添加data参数
     return html;  // 返回生成的HTML
 }
 
-// 修改处理每日选股表单提交的函数
-function handleDailyPicks(event) {
+// 处理每日选股表单提交
+async function handleDailyPicks(event) {
     event.preventDefault();
     
-    const dateInput = document.getElementById('pickDate');
-    const modelSelect = document.getElementById('analysisModel');
-    
-    if (!dateInput.value) {
-        showToast('请选择分析日期', 'warning');
-        return;
-    }
-    
-    const date = dateInput.value.replace(/-/g, '');
-    const model = modelSelect.value;
-    
+    const pickDate = document.getElementById('pickDate').value;
+    const analysisModel = document.getElementById('analysisModel').value;
     const resultsDiv = document.getElementById('dailyPicksResults');
     const contentDiv = document.getElementById('dailyPicksContent');
-    
-    // 显示加载动画
-    resultsDiv.classList.remove('hidden');
-    contentDiv.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-8 space-y-4">
-            <div class="relative">
+
+    if (!pickDate) {
+        showToast('请选择分析日期', 'error');
+        return;
+    }
+
+    // 转换日期格式�� YYYYMMDD
+    const formattedDate = pickDate.replace(/-/g, '');
+
+    try {
+        // 显示加载状态
+        resultsDiv.classList.remove('hidden');
+        contentDiv.innerHTML = `
+            <div class="flex justify-center items-center py-8">
                 <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
-                <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-purple-200 opacity-20"></div>
+                <div class="ml-3 text-gray-600">正在获取分析结果...</div>
             </div>
-            <div class="text-center">
-                <p class="text-lg font-medium text-gray-600">正在获取${modelSelect.options[modelSelect.selectedIndex].text}分析结果</p>
-                <p class="text-sm text-gray-500 mt-2">请稍候...</p>
-            </div>
-        </div>
-    `;
-    
-    // 发送请求...
-    fetch('/daily_picks', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            date: date,
-            model: model
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            contentDiv.innerHTML = data.content;
-            contentDiv.classList.add('markdown-body');
-        } else {
-            showError(contentDiv, data.error);
+        `;
+
+        const response = await fetch('/api/daily_picks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date: formattedDate,
+                model: analysisModel
+            })
+        });
+
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || '获取分析结果失败');
         }
-    })
-    .catch(error => {
-        showError(contentDiv, `加载失败: ${error.message}`);
-    });
+
+        // 直接显示后端返回的 HTML 内容
+        contentDiv.innerHTML = data.content;
+        
+        // 添加样式
+        contentDiv.classList.add('prose', 'max-w-none', 'mx-auto');
+        
+        // 应用自定义样式
+        applyMarkdownStyles(contentDiv);
+
+    } catch (error) {
+        console.error('分析请求失败:', error);
+        showToast(error.message, 'error');
+        contentDiv.innerHTML = `
+            <div class="text-red-500 text-center py-4">
+                ${error.message}
+            </div>
+        `;
+    }
 }
 
-// 添加错误显示函数
-function showError(container, message) {
-    container.innerHTML = `
-        <div class="bg-red-50 border-l-4 border-red-500 p-4">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm text-red-700">${message}</p>
-                </div>
-            </div>
-        </div>
-    `;
+// 添加日期选择器的事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // 设置日期选择器的默认值为今天
+    const pickDate = document.getElementById('pickDate');
+    if (pickDate) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        pickDate.value = `${year}-${month}-${day}`;
+        
+        // 添加日期变化事件监听
+        pickDate.addEventListener('change', function() {
+            console.log('选择的日期:', this.value);
+        });
+    }
+
+    // 为表单添加提交事件监听
+    const dailyPicksForm = document.getElementById('dailyPicksForm');
+    if (dailyPicksForm) {
+        dailyPicksForm.addEventListener('submit', handleDailyPicks);
+    }
+});
+
+// Toast 提示函数
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 ${
+        type === 'error' ? 'bg-red-500' : 'bg-green-500'
+    } text-white`;
+    toast.style.animation = 'slideIn 0.3s ease-out';
+    toast.textContent = message;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(toast);
+        }, 300);
+    }, 3000);
 }
 
-// 更新分析结果的函数
-function updateAnalysis(date) {
-    // 发送请求获取新的分析结果
-    fetch('/daily_picks', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            date: date.replace(/-/g, '')
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // 更新页面内容
-            document.getElementById('analysisContent').innerHTML = data.content;
-        } else {
-            console.error('获取分析结果失败:', data.error);
-        }
-    })
-    .catch(error => {
-        console.error('请求失败:', error);
-    });
-}

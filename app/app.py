@@ -39,7 +39,8 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    today = datetime.now().strftime('%Y-%m-%d')
+    return render_template('index.html', today=today)
 
 
 @app.route('/optimize', methods=['POST'])
@@ -104,7 +105,7 @@ def optimize():
             stock_data = get_us_stock_data(symbol, start_date, end_date)
         
         if stock_data.empty:
-            logger.warning(f'股票 {symbol} 没有可用的数据进行回测')
+            logger.warning(f'股票 {symbol} 没有可用的数��进行回测')
             return jsonify({'error': f'股票 {symbol} 没有可用的数据进行回测。'})
 
         # 定义数据源类
@@ -241,7 +242,7 @@ def backtest():
                 max_pyramiding=int(opt_params['max_pyramiding'])
             )
         else:
-            # 使用默认参数
+            # 使用默认参
             result = chandelier_zlsma_test.run_backtest(
                 symbol=symbol,
                 start_date=start_date,
@@ -340,13 +341,13 @@ def portfolio_analysis():
         }), 500
 
 
-@app.route('/daily_picks', methods=['POST'])
-def daily_picks():
+@app.route('/api/daily_picks', methods=['POST'])
+def api_daily_picks():
+    data = request.json
+    date = data.get('date')
+    model = data.get('model')
+    
     try:
-        data = request.get_json()
-        model = data.get('model', 'zhipu')  # 默认使用智谱模型
-        date = data.get('date', datetime.now().strftime('%Y%m%d'))
-        
         # 构建文件路径
         file_name = f'stocks_analysis_{model}_{date}.md'
         file_path = Path(__file__).parent / 'AIResult' / file_name
@@ -357,21 +358,25 @@ def daily_picks():
                 'error': f'未找到{date}日的{model}分析结果'
             })
             
-        # 读取markdown文件
+        # 读取 markdown 内容并转换为 HTML
         with open(file_path, 'r', encoding='utf-8') as f:
             md_content = f.read()
             
-        # 将markdown转换为HTML
+        # 使用 markdown 库转换为 HTML
         html_content = markdown.markdown(
             md_content,
-            extensions=['tables', 'fenced_code', 'codehilite']
+            extensions=[
+                'markdown.extensions.tables',
+                'markdown.extensions.fenced_code',
+                'markdown.extensions.codehilite'
+            ]
         )
             
         return jsonify({
             'success': True,
             'date': date,
             'model': model,
-            'content': html_content
+            'content': html_content  # 返回转换后的 HTML 内容
         })
         
     except Exception as e:
