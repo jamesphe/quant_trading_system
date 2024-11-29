@@ -167,49 +167,45 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
     ])
     
     prompt = f"""
-请作为一位专业的股票分析师，综合分析以下股票 {stock_name} 的各项数据，并对下一个交易日的走势进行预判：
-
-1. 基本面信息：
+你是一名经验丰富的股票量化交易员，需要根据以下变量进行全面的股票分析，并对下一个交易日的走势进行预判，提供相应的交易策略建议。分析需涵盖技术指标解读、趋势判断、风险评估、交易策略建议等方面，最终输出简明、直接的操作建议。
+以下是股票{stock_name}的信息
+1. 股票基本信息：
 {basic_info_text}
 
-2. 最近新闻动态：
+2. 行情数据（30个交易日）：
+{data_description} 
+
+3. 最新资讯与链接：
 {news_text}
 
-3. 最近30个交易日的行情数据：
-{data_description}
+分析要求
 
-请从以下几个方面进行分析：
-1. 基本面分析（市值、行业地位等）
-2. 最新消息面分析（重要新闻影响）
-3. 价格趋势分析
-4. 成交量分析
-5. 技术指标分析（基于提供的数据）
-6. 主要支撑位和压力位
+1. 公司概况：
+给出公司的主营业务、行业地位、竞争优势、财务状况、管理层、发展前景等。
 
-请重点关注以下内容：
-1. 下一个交易日可能的走势预判（涨跌空间、波动区间等）
-2. 主要影响因素分析（利好/利空）
-3. 具体的应对策略建议：
-   - 建仓/加仓时机和价位
-   - 减仓/止盈价位
-   - 止损位设置
-   - 仓位控制建议
-4、对下一个交易日开盘走势（高开、低开、平开）进行预判,并针对各种可能的走势给出相应的对策。
+2. 技术分析：
+结合MACD、RSI、BOLL分析趋势是否处于超买、超卖或震荡区间。
+判断当前股票是否处于关键支撑位或压力位。
 
+3. 量化策略应用：
+使用吊顶止损指标，计算当前的止损参考点，并分析风险。
+应用ZSLAM指标，评估当前趋势的强度与方向，判断市场情绪。
 
-请用专业的角度进行分析，给出具体的数据支持，并在分析的最后给出明确的操作建议。
+4. 基本面分析：
+提取并分析最新资讯对股票价格的潜在影响。
+判断行业政策或市场动态是否可能改变投资逻辑。
+
+5. 下一个交易日走势预判：
+基于上述分析，对下一个交易日的价格走势进行预测。
+评估可能的波动范围和方向。
+
+6. 交易建议：
+针对短线、中线投资，分别提供操作建议（如建仓、加仓、减仓、清仓）。
+给出止盈止损点位，预期收益风险比。
+
 """
 
-    if include_backtest:
-        backtest_results = get_backtest_results(symbol)
-        prompt += f"""
-
-4. 回测结果分析：
-{json.dumps(backtest_results, indent=2, ensure_ascii=False)}
-
-请结合回测结果对策略的有效性进行分析。
-"""
-    
+    print(prompt)
     return prompt
 
 def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):
@@ -237,7 +233,7 @@ def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params
     if strategy_params is None:
         optimization_file = f'results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv'
         if os.path.exists(optimization_file):
-            # 读取优化参数
+            # 读取优化参
             opt_params = pd.read_csv(optimization_file).iloc[-1]
             strategy_params = {
                 'period': int(opt_params['period']),
@@ -321,7 +317,14 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
         if symbol.startswith(('51', '159')):
             stock_data = get_etf_data(symbol, start_date, end_date)
         elif symbol.isdigit():
-            stock_data = get_stock_data(symbol, start_date, end_date)
+            stock_data = get_stock_data(
+                symbol,
+                start_date,
+                end_date,
+                include_macd=True,
+                include_rsi=True,
+                include_boll=True
+            )
         else:
             stock_data = get_us_stock_data(symbol, start_date, end_date)
             

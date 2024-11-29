@@ -207,7 +207,7 @@ def test_get_stock_news():
     
     if news_list:
         print(f"成功获取股票 {symbol} 的新闻资讯")
-        print(f"获取到的新闻数量: {len(news_list)}")
+        print(f"获取到的新闻���: {len(news_list)}")
         
         # 显前3条新闻的基本信息
         print("\n前3条新闻:")
@@ -441,7 +441,8 @@ def test_get_industry_stocks():
 
 def test_get_stock_data():
     """
-    测试获取股票历史行情数据功能，包括akshare和baostock两种数据源
+    测试获取股票历史行情数据功能，包括akshare和baostock两种数据源，
+    以及MACD、RSI和BOLL指标计算
     """
     print("\n开始测试获取股票历史行情数据...")
     
@@ -456,6 +457,7 @@ def test_get_stock_data():
     for source in data_sources:
         print(f"\n测试{source}数据源:")
         try:
+            # 测试基础数据获取
             stock_data = get_stock_data(symbol, start_date, end_date, source=source)
             
             if not stock_data.empty:
@@ -499,7 +501,140 @@ def test_get_stock_data():
                 assert all(stock_data['Amount'] >= 0), "存在负的成交额"
                 print("数值有效性检查通过")
                 
-                print(f"\n{source}数据源测试通过！")
+                # 测试包含MACD的数据获取
+                stock_data_with_macd = get_stock_data(
+                    symbol, 
+                    start_date, 
+                    end_date, 
+                    source=source,
+                    include_macd=True
+                )
+                
+                print("\n测试MACD数据:")
+                # 检查MACD相关列是否存在
+                macd_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST']
+                for col in macd_columns:
+                    assert col in stock_data_with_macd.columns, f"缺少MACD相关列 '{col}'"
+                print("MACD列检查通过")
+                
+                # 检查MACD数据类型
+                for col in macd_columns:
+                    assert stock_data_with_macd[col].dtype == 'float64', \
+                        f"{col}列不是浮点数类型"
+                print("MACD数据类型检查通过")
+                
+                # 检查MACD数据有效性
+                assert not stock_data_with_macd['MACD'].isnull().all(), \
+                    "MACD列全为空值"
+                assert not stock_data_with_macd['MACD_SIGNAL'].isnull().all(), \
+                    "MACD_SIGNAL列全为空值"
+                assert not stock_data_with_macd['MACD_HIST'].isnull().all(), \
+                    "MACD_HIST列全为空值"
+                print("MACD数据有效性检查通过")
+                
+                # 验证MACD计算逻辑
+                # MACD_HIST应该等于MACD减去MACD_SIGNAL
+                hist_diff = abs(stock_data_with_macd['MACD_HIST'] - 
+                              (stock_data_with_macd['MACD'] - 
+                               stock_data_with_macd['MACD_SIGNAL']))
+                assert all(hist_diff < 1e-10), "MACD_HIST计算错误"
+                print("MACD计算逻辑验证通过")
+                
+                # 测试包含RSI的数据获取
+                stock_data_with_indicators = get_stock_data(
+                    symbol, 
+                    start_date, 
+                    end_date, 
+                    source=source,
+                    include_macd=True,
+                    include_rsi=True
+                )
+                
+                if not stock_data_with_indicators.empty:
+                    print("\n测试RSI数据:")
+                    # 检查RSI相关列是否存在
+                    rsi_columns = ['RSI_6', 'RSI_12', 'RSI_24']
+                    for col in rsi_columns:
+                        assert col in stock_data_with_indicators.columns, f"缺少RSI相关列 '{col}'"
+                    print("RSI列检查通过")
+                    
+                    # 检查RSI数据类型
+                    for col in rsi_columns:
+                        assert stock_data_with_indicators[col].dtype == 'float64', \
+                            f"{col}列不是浮点数类型"
+                    print("RSI数据类型检查通过")
+                    
+                    # 检查RSI数据有效性
+                    for col in rsi_columns:
+                        assert not stock_data_with_indicators[col].isnull().all(), \
+                            f"{col}列全为空值"
+                        # RSI值应该在0到100之间
+                        valid_values = stock_data_with_indicators[col].dropna()
+                        assert all((valid_values >= 0) & (valid_values <= 100)), \
+                            f"{col}存在超出范围的值"
+                    print("RSI数据有效性检查通过")
+                    
+                    print(f"\n{source}数据源（含MACD和RSI）测试通过！")
+                else:
+                    print(f"未能获取股票 {symbol} 的数据")
+                    
+            # 测试包含BOLL的数据获取
+            stock_data_with_boll = get_stock_data(
+                symbol, 
+                start_date, 
+                end_date, 
+                source=source,
+                include_boll=True
+            )
+            
+            if not stock_data_with_boll.empty:
+                print("\n测试BOLL数据:")
+                # 检查BOLL相关列是否存在
+                boll_columns = ['BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER']
+                for col in boll_columns:
+                    assert col in stock_data_with_boll.columns, f"缺少BOLL相关列 '{col}'"
+                print("BOLL列检查通过")
+                
+                # 检查BOLL数据类型
+                for col in boll_columns:
+                    assert stock_data_with_boll[col].dtype == 'float64', \
+                        f"{col}列不是浮点数类型"
+                print("BOLL数据类型检查通过")
+                
+                # 检查BOLL数据有效性
+                for col in boll_columns:
+                    assert not stock_data_with_boll[col].isnull().all(), \
+                        f"{col}列全为空值"
+                print("BOLL数据空值检查通过")
+                
+                # 验证BOLL计算逻辑
+                # 上轨应该大于中轨，中轨应该大于下轨
+                assert all(stock_data_with_boll['BOLL_UPPER'] >= 
+                         stock_data_with_boll['BOLL_MIDDLE']), "上轨不大于等于中轨"
+                assert all(stock_data_with_boll['BOLL_MIDDLE'] >= 
+                         stock_data_with_boll['BOLL_LOWER']), "中轨不大于等于下轨"
+                print("BOLL数据逻辑关系验证通过")
+                
+                # 测试同时包含所有指标
+                stock_data_with_all = get_stock_data(
+                    symbol, 
+                    start_date, 
+                    end_date, 
+                    source=source,
+                    include_macd=True,
+                    include_rsi=True,
+                    include_boll=True
+                )
+                
+                # 验证所有指标列都存在
+                all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
+                                      'RSI_6', 'RSI_12', 'RSI_24',
+                                      'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER']
+                for col in all_indicator_columns:
+                    assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
+                print("\n所有指标列检查通过")
+                
+                print(f"\n{source}数据源（含所有指标）测试通过！")
             else:
                 print(f"未能获取股票 {symbol} 的数据")
                 

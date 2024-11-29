@@ -4,6 +4,7 @@ import akshare as ak
 import pandas as pd
 import baostock as bs
 from datetime import datetime
+import talib
 
 def get_a_share_list():
     """
@@ -19,7 +20,7 @@ def get_a_share_list():
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()
 
-def get_stock_data(symbol, start_date, end_date, source='akshare'):
+def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False):
     """
     获取A股股票历史行情数据
 
@@ -28,14 +29,62 @@ def get_stock_data(symbol, start_date, end_date, source='akshare'):
     - start_date: 开始日期，格式 'YYYY-MM-DD'
     - end_date: 结束日期，格式 'YYYY-MM-DD'
     - source: 数据源，可选 'akshare' 或 'baostock'，默认为 'akshare'
+    - include_macd: 是否包含MACD指标数据，默认为False
+    - include_rsi: 是否包含RSI指标数据，默认为False
+    - include_boll: 是否包含布林带指标数据，默认为False
 
     返回：
-    - stock_data: 经过预处理的DataFrame
+    - stock_data: 经过预处理的DataFrame，包含以下可选指标：
+                 - MACD、MACD_SIGNAL和MACD_HIST (if include_macd=True)
+                 - RSI_6、RSI_12和RSI_24 (if include_rsi=True)
+                 - BOLL_UPPER、BOLL_MIDDLE、BOLL_LOWER (if include_boll=True)
     """
+    # 获取基础数据
     if source == 'baostock':
-        return _get_stock_data_baostock(symbol, start_date, end_date)
+        stock_data = _get_stock_data_baostock(symbol, start_date, end_date)
     else:
-        return _get_stock_data_akshare(symbol, start_date, end_date)
+        stock_data = _get_stock_data_akshare(symbol, start_date, end_date)
+    
+    if not stock_data.empty and (include_macd or include_rsi or include_boll):
+        # 获取额外90天的数据以确保指标计算的准确性
+        extended_start_date = (pd.to_datetime(start_date) - pd.Timedelta(days=90)).strftime('%Y-%m-%d')
+        temp_df = get_stock_data(symbol, extended_start_date, end_date, source=source, 
+                               include_macd=False, include_rsi=False, include_boll=False)
+        
+        if include_macd:
+            # 计算EMA
+            exp12 = temp_df['Close'].ewm(span=12, adjust=False).mean()
+            exp26 = temp_df['Close'].ewm(span=26, adjust=False).mean()
+            
+            # 计算MACD
+            temp_df['MACD'] = exp12 - exp26
+            temp_df['MACD_SIGNAL'] = temp_df['MACD'].ewm(span=9, adjust=False).mean()
+            temp_df['MACD_HIST'] = temp_df['MACD'] - temp_df['MACD_SIGNAL']
+        
+        if include_rsi:
+            # 计算不同周期的RSI
+            temp_df['RSI_6'] = talib.RSI(temp_df['Close'].values, timeperiod=6)
+            temp_df['RSI_12'] = talib.RSI(temp_df['Close'].values, timeperiod=12)
+            temp_df['RSI_24'] = talib.RSI(temp_df['Close'].values, timeperiod=24)
+        
+        if include_boll:
+            # 计算布林带指标 (20日均线，2倍标准差)
+            upper, middle, lower = talib.BBANDS(
+                temp_df['Close'].values,
+                timeperiod=20,
+                nbdevup=2,
+                nbdevdn=2,
+                matype=0  # 简单移动平均
+            )
+            temp_df['BOLL_UPPER'] = upper
+            temp_df['BOLL_MIDDLE'] = middle
+            temp_df['BOLL_LOWER'] = lower
+        
+        # 只返回请求的日期范围的数据
+        df = temp_df[start_date:end_date].copy()
+        return df
+    
+    return stock_data
 
 def _get_stock_data_baostock(symbol, start_date, end_date):
     """使用baostock获取股票数据"""
@@ -267,11 +316,11 @@ def get_etf_data(symbol, start_date, end_date):
             '涨跌幅': 'Pct_change'
         }, inplace=True)
         
-        # 将'Date'列转换为日期格式并设置为索引
+        # 将'Date'列转换为日期格式并置为索引
         etf_data['Date'] = pd.to_datetime(etf_data['Date'])
         etf_data.set_index('Date', inplace=True)
         
-        # 将数据类型转换为数值类型
+        # 将数据类型换为数值类型
         numeric_cols = ['Open', 'Close', 'High', 'Low', 'Volume', 'Amount', 'Pct_change']
         etf_data[numeric_cols] = etf_data[numeric_cols].apply(pd.to_numeric, errors='coerce')
         
@@ -461,7 +510,7 @@ def get_industry_stocks(industry_name):
         stocks = stocks.rename(columns={
             '代码': 'code',
             '名称': 'name',
-            '最新价': 'price',
+            '最新��': 'price',
             '涨跌幅': 'change_pct',
             '成交量': 'volume',
             '成交额': 'amount',
