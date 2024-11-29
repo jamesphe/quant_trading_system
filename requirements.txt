@@ -11,3 +11,4 @@ openai
 baostock
 markdown
 psutil
+ta-lib
