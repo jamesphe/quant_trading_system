@@ -20,7 +20,7 @@ def get_a_share_list():
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()
 
-def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False):
+def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False):
     """
     获取A股股票历史行情数据
 
@@ -32,12 +32,14 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
     - include_macd: 是否包含MACD指标数据，默认为False
     - include_rsi: 是否包含RSI指标数据，默认为False
     - include_boll: 是否包含布林带指标数据，默认为False
+    - include_zlsma: 是否包含零延迟移动平均线，默认为False
 
     返回：
     - stock_data: 经过预处理的DataFrame，包含以下可选指标：
                  - MACD、MACD_SIGNAL和MACD_HIST (if include_macd=True)
                  - RSI_6、RSI_12和RSI_24 (if include_rsi=True)
                  - BOLL_UPPER、BOLL_MIDDLE、BOLL_LOWER (if include_boll=True)
+                 - ZLSMA_20、ZLSMA_60 (if include_zlsma=True)
     """
     # 获取基础数据
     if source == 'baostock':
@@ -45,11 +47,11 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
     else:
         stock_data = _get_stock_data_akshare(symbol, start_date, end_date)
     
-    if not stock_data.empty and (include_macd or include_rsi or include_boll):
+    if not stock_data.empty and (include_macd or include_rsi or include_boll or include_zlsma):
         # 获取额外90天的数据以确保指标计算的准确性
         extended_start_date = (pd.to_datetime(start_date) - pd.Timedelta(days=90)).strftime('%Y-%m-%d')
         temp_df = get_stock_data(symbol, extended_start_date, end_date, source=source, 
-                               include_macd=False, include_rsi=False, include_boll=False)
+                               include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False)
         
         if include_macd:
             # 计算EMA
@@ -79,6 +81,17 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
             temp_df['BOLL_UPPER'] = upper
             temp_df['BOLL_MIDDLE'] = middle
             temp_df['BOLL_LOWER'] = lower
+        
+        if include_zlsma:
+            # 计算ZLSMA指标
+            # 计算20日和60日的ZLSMA
+            for period in [20, 60]:
+                # 计算EMA
+                ema = temp_df['Close'].ewm(span=period, adjust=False).mean()
+                # 计算EMA的EMA
+                ema_ema = ema.ewm(span=period, adjust=False).mean()
+                # 计算ZLSMA
+                temp_df[f'ZLSMA_{period}'] = 2 * ema - ema_ema
         
         # 只返回请求的日期范围的数据
         df = temp_df[start_date:end_date].copy()
@@ -510,7 +523,7 @@ def get_industry_stocks(industry_name):
         stocks = stocks.rename(columns={
             '代码': 'code',
             '名称': 'name',
-            '最新��': 'price',
+            '最新': 'price',
             '涨跌幅': 'change_pct',
             '成交量': 'volume',
             '成交额': 'amount',

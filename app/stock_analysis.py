@@ -323,7 +323,8 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                 end_date,
                 include_macd=True,
                 include_rsi=True,
-                include_boll=True
+                include_boll=True,
+                include_zlsma=True
             )
         else:
             stock_data = get_us_stock_data(symbol, start_date, end_date)

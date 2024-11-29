@@ -207,7 +207,7 @@ def test_get_stock_news():
     
     if news_list:
         print(f"成功获取股票 {symbol} 的新闻资讯")
-        print(f"获取到的新闻���: {len(news_list)}")
+        print(f"获取到的新闻: {len(news_list)}")
         
         # 显前3条新闻的基本信息
         print("\n前3条新闻:")
@@ -442,7 +442,7 @@ def test_get_industry_stocks():
 def test_get_stock_data():
     """
     测试获取股票历史行情数据功能，包括akshare和baostock两种数据源，
-    以及MACD、RSI和BOLL指标计算
+    以及MACD、RSI、BOLL和ZLSMA指标计算
     """
     print("\n开始测试获取股票历史行情数据...")
     
@@ -615,6 +615,111 @@ def test_get_stock_data():
                          stock_data_with_boll['BOLL_LOWER']), "中轨不大于等于下轨"
                 print("BOLL数据逻辑关系验证通过")
                 
+                # 测试包含ZLSMA的数据获取
+                stock_data_with_zlsma = get_stock_data(
+                    symbol, 
+                    start_date, 
+                    end_date, 
+                    source=source,
+                    include_zlsma=True
+                )
+                
+                if not stock_data_with_zlsma.empty:
+                    print("\n测试ZLSMA数据:")
+                    # 检查ZLSMA相关列是否存在
+                    zlsma_columns = ['ZLSMA_20', 'ZLSMA_60']
+                    for col in zlsma_columns:
+                        assert col in stock_data_with_zlsma.columns, f"缺少ZLSMA相关列 '{col}'"
+                    print("ZLSMA列检查通过")
+                    
+                    # 检查ZLSMA数据类型
+                    for col in zlsma_columns:
+                        assert stock_data_with_zlsma[col].dtype == 'float64', \
+                            f"{col}列不是浮点数类型"
+                    print("ZLSMA数据类型检查通过")
+                    
+                    # 检查ZLSMA数据有效性
+                    for col in zlsma_columns:
+                        assert not stock_data_with_zlsma[col].isnull().all(), \
+                            f"{col}列全为空值"
+                    print("ZLSMA数据空值检查通过")
+                    
+                    # 验证ZLSMA数据范围
+                    # ZLSMA应该在历史价格的最大值和最小值之间
+                    close_min = stock_data_with_zlsma['Close'].min()
+                    close_max = stock_data_with_zlsma['Close'].max()
+                    for col in zlsma_columns:
+                        valid_values = stock_data_with_zlsma[col].dropna()
+                        assert all((valid_values >= close_min * 0.5) & 
+                                 (valid_values <= close_max * 1.5)), \
+                            f"{col}存在异常值"
+                    print("ZLSMA数据范围验证通过")
+                    
+                    # 测试同时包含所有指标
+                    stock_data_with_all = get_stock_data(
+                        symbol, 
+                        start_date, 
+                        end_date, 
+                        source=source,
+                        include_macd=True,
+                        include_rsi=True,
+                        include_boll=True,
+                        include_zlsma=True
+                    )
+                    
+                    # 验证所有指标列都存在
+                    all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
+                                          'RSI_6', 'RSI_12', 'RSI_24',
+                                          'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
+                                          'ZLSMA_20', 'ZLSMA_60']
+                    for col in all_indicator_columns:
+                        assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
+                    print("\n所有指标列检查通过")
+                    
+                    print(f"\n{source}数据源（含所有指标）测试通过！")
+                else:
+                    print(f"未能获取股票 {symbol} 的数据")
+                    
+            # 测试包含ZLSMA的数据获取
+            stock_data_with_zlsma = get_stock_data(
+                symbol, 
+                start_date, 
+                end_date, 
+                source=source,
+                include_zlsma=True
+            )
+            
+            if not stock_data_with_zlsma.empty:
+                print("\n测试ZLSMA数据:")
+                # 检查ZLSMA相关列是否存在
+                zlsma_columns = ['ZLSMA_20', 'ZLSMA_60']
+                for col in zlsma_columns:
+                    assert col in stock_data_with_zlsma.columns, f"缺少ZLSMA相关列 '{col}'"
+                print("ZLSMA列检查通过")
+                
+                # 检查ZLSMA数据类型
+                for col in zlsma_columns:
+                    assert stock_data_with_zlsma[col].dtype == 'float64', \
+                        f"{col}列不是浮点数类型"
+                print("ZLSMA数据类型检查通过")
+                
+                # 检查ZLSMA数据有效性
+                for col in zlsma_columns:
+                    assert not stock_data_with_zlsma[col].isnull().all(), \
+                        f"{col}列全为空值"
+                print("ZLSMA数据空值检查通过")
+                
+                # 验证ZLSMA数据范围
+                # ZLSMA应该在历史价格的最大值和最小值之间
+                close_min = stock_data_with_zlsma['Close'].min()
+                close_max = stock_data_with_zlsma['Close'].max()
+                for col in zlsma_columns:
+                    valid_values = stock_data_with_zlsma[col].dropna()
+                    assert all((valid_values >= close_min * 0.5) & 
+                             (valid_values <= close_max * 1.5)), \
+                        f"{col}存在异常值"
+                print("ZLSMA数据范围验证通过")
+                
                 # 测试同时包含所有指标
                 stock_data_with_all = get_stock_data(
                     symbol, 
@@ -623,13 +728,15 @@ def test_get_stock_data():
                     source=source,
                     include_macd=True,
                     include_rsi=True,
-                    include_boll=True
+                    include_boll=True,
+                    include_zlsma=True
                 )
                 
                 # 验证所有指标列都存在
                 all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
                                       'RSI_6', 'RSI_12', 'RSI_24',
-                                      'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER']
+                                      'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
+                                      'ZLSMA_20', 'ZLSMA_60']
                 for col in all_indicator_columns:
                     assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
                 print("\n所有指标列检查通过")
