@@ -367,12 +367,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (portfolioForm) {
         console.log('找到持仓分析表单，添加提交事件监听器');
         portfolioForm.addEventListener('submit', function(event) {
-            console.log('持仓分析表单提交被触发');
+            console.log('��仓分析表单提交被触发');
             runPortfolioAnalysis(event);
         });
     } else {
         console.warn('未找到持仓分析表单');
     }
+    
+    // 初始化朗读功能
+    SpeechController.init();
 });
 
 // 添加日期更新处理函数
@@ -491,7 +494,7 @@ function initializeDatePicker(today) {
             if (this.type === 'date') {
                 return; // 原生日期选择器会自动打开
             }
-            // 对于不支持原生日期择器的设备，可以在这里添加自定义日期选择器
+            // 对于不支持原生日期���器的设备，可以在这里添加自定义日期选择器
         });
     }
 }
@@ -577,7 +580,7 @@ async function handleBacktest() {
         return;
     }
 
-    // 只显示加载动画，不隐藏结果区域
+    // ��显示加载动画，不隐藏结果区域
     document.getElementById('loading').classList.remove('hidden');
     
     try {
@@ -612,9 +615,13 @@ async function handleBacktest() {
     }
 }
 
-// 修改个股分析处理函数
+// 修改 handleAnalysis 函数
 async function handleAnalysis(event) {
+    // 阻止表单默认提交行为
     event.preventDefault();
+    
+    // 在分析开始前停止朗读
+    SpeechController.stop();
     
     const symbol = document.getElementById('analysisSymbol').value;
     const model = document.getElementById('modelSelect').value;
@@ -775,7 +782,7 @@ function applyMarkdownStyles(element) {
         // 添加代码块样式
         pre.classList.add('relative');
         
-        // 如果包含表格数据，添加水平滚动
+        // 如���包含表格数据，添加水平滚动
         if (pre.textContent.includes('|')) {
             pre.classList.add('overflow-x-auto');
         }
@@ -935,7 +942,7 @@ function showToast(message, type = 'info') {
 }
 
 function displayBacktestResults(data) {
-    console.log('显示回测结果:', data);
+    console.log('显示回测��果:', data);
     
     const backtestResults = document.getElementById('backtestResults');
     backtestResults.innerHTML = `
@@ -1088,7 +1095,7 @@ function displayBacktestResults(data) {
         </div>
     `;
     
-    // 显示回测结果并添加动画效果
+    // 显���回测结果并添加动画效果
     backtestResults.classList.remove('hidden');
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
@@ -1167,7 +1174,7 @@ function startBacktest() {
     document.getElementById('loadingText').innerHTML = `正在回测分析 ${symbol}...`;
     document.getElementById('loadingSection').style.display = 'block';
     
-    // ... 发送回测请求���代码 ...
+    // ... 发送回测请求代码 ...
 }
 
 function handleBacktestResponse(response) {
@@ -1280,7 +1287,7 @@ function runPortfolioAnalysis(event) {
     });
 }
 
-// 添加切换到技术分析页面的函数
+// 添加切换到技术分析��面的函数
 function switchToTechnicalAnalysis(stockCode) {
     // 切换到参数优化标签页
     switchTab('optimization-tab');
@@ -1348,6 +1355,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
     
     // 其他初始化代码...
+    
+    // 初始化朗读功能
+    SpeechController.init();
 });
 
 // 添加动画相关的样式
@@ -1650,7 +1660,7 @@ async function handleDailyPicks(event) {
     const contentDiv = document.getElementById('dailyPicksContent');
 
     if (!pickDate) {
-        showToast('请选择分析日期', 'error');
+        showToast('请选择���析日期', 'error');
         return;
     }
 
@@ -1746,4 +1756,222 @@ function showToast(message, type = 'info') {
         }, 300);
     }, 3000);
 }
+
+// 修改 SpeechController 对象，使用讯飞语音合成
+const SpeechController = {
+    isReading: false,
+    isPaused: false,  // 添加暂停状态
+    audio: null,
+    currentChunkIndex: 0,
+    chunks: [],
+    
+    // 初始化朗读功能
+    init() {
+        console.log('初始化朗读功能...');
+        const readBtn = document.getElementById('readAnalysisBtn');
+        if (readBtn) {
+            console.log('找到朗读按钮');
+            readBtn.addEventListener('click', () => {
+                console.log('朗读按钮被点击');
+                if (this.isReading) {
+                    this.stop();
+                    this.isPaused = true;  // 设置暂停状态
+                } else if (this.isPaused && this.chunks.length > 0) {
+                    // 如果是暂停状态且有未读完的内容，继续朗读
+                    this.isReading = true;
+                    this.updateButtonState();
+                    this.readNextChunk();
+                } else {
+                    // 重新开始朗读
+                    this.isPaused = false;
+                    this.read();
+                }
+            });
+        }
+    },
+    
+    // 开始朗读
+    async read() {
+        console.log('尝试开始朗读...');
+        const content = document.getElementById('analysisContent');
+        if (!content) {
+            console.error('未找到内容元素');
+            return;
+        }
+        
+        // 获取并处理文本内容
+        let textContent = content.innerText;
+        if (!textContent) {
+            console.warn('没有可朗读的内容');
+            return;
+        }
+        
+        // 处理文本内容
+        textContent = textContent
+            .replace(/\n+/g, '。')
+            .replace(/↵/g, '。')
+            .replace(/===+/g, '')
+            .replace(/\s+/g, ' ')
+            .replace(/。+/g, '。')
+            .trim();
+        
+        // 分段处理文本
+        this.chunks = [];
+        while (textContent.length > 0) {
+            let endIndex = 1000;
+            if (textContent.length > 1000) {
+                const lastPeriod = textContent.substring(0, 1000).lastIndexOf('。');
+                endIndex = lastPeriod > 0 ? lastPeriod + 1 : 1000;
+            }
+            this.chunks.push(textContent.substring(0, endIndex));
+            textContent = textContent.substring(endIndex);
+        }
+        
+        // 开始朗读第一段
+        this.currentChunkIndex = 0;
+        this.isReading = true;
+        this.updateButtonState(); // 立即更新按钮状态为"停止朗读"
+        await this.readNextChunk();
+    },
+    
+    // 朗读下一段
+    async readNextChunk() {
+        if (!this.isReading || this.currentChunkIndex >= this.chunks.length) {
+            this.isReading = false;
+            this.updateButtonState();
+            return;
+        }
+        
+        try {
+            const chunk = this.chunks[this.currentChunkIndex];
+            
+            // 请求讯飞语音合成
+            const response = await fetch('/api/xfyun/tts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: chunk })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '语音合成请求失败');
+            }
+            
+            // 获取音频blob
+            const blob = await response.blob();
+            if (blob.size === 0) {
+                throw new Error('获取到的音频数据为空');
+            }
+            
+            // 如果有正在播放的音频，先停止
+            if (this.audio) {
+                this.audio.pause();
+                URL.revokeObjectURL(this.audio.src);
+                this.audio = null;
+            }
+            
+            // 创建新的音频实例
+            const audioUrl = URL.createObjectURL(blob);
+            this.audio = new Audio(audioUrl);
+            
+            // 设置事件处理
+            this.audio.onplay = () => {
+                this.isReading = true;
+                this.updateButtonState(); // 确保播放开始时更新按钮状态
+            };
+            
+            this.audio.onended = async () => {
+                URL.revokeObjectURL(audioUrl);
+                this.audio = null;
+                this.currentChunkIndex++;
+                if (this.currentChunkIndex < this.chunks.length) {
+                    await this.readNextChunk();
+                } else {
+                    this.isReading = false;
+                    this.updateButtonState(); // 所有段落朗读完成后更新按钮状态
+                }
+            };
+            
+            this.audio.onerror = (e) => {
+                console.error('音频播放错误:', e);
+                URL.revokeObjectURL(audioUrl);
+                this.audio = null;
+                this.isReading = false;
+                this.updateButtonState(); // 发生错误时更新按钮状态
+                showToast('播放音频时发生错误', 'error');
+            };
+            
+            // 开始播放
+            await this.audio.play();
+            
+        } catch (error) {
+            console.error('语音合成失败:', error);
+            showToast(error.message || '语音合成失败，请稍后重试', 'error');
+            this.isReading = false;
+            this.updateButtonState(); // 发生错误时更新按钮状态
+        }
+    },
+    
+    // 停止朗读
+    stop() {
+        console.log('停止朗读');
+        this.isReading = false;
+        if (this.audio) {
+            this.audio.pause();
+            this.audio.currentTime = 0;
+            URL.revokeObjectURL(this.audio.src);
+            this.audio = null;
+        }
+        // 不清空 chunks 和 currentChunkIndex，以支持继续朗读
+        this.updateButtonState();
+    },
+    
+    // 更新按钮状态
+    updateButtonState() {
+        const readBtn = document.getElementById('readAnalysisBtn');
+        if (!readBtn) {
+            console.warn('未找到朗读按钮，无法更新状态');
+            return;
+        }
+        
+        if (this.isReading) {
+            readBtn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                </svg>
+                <span class="text-sm font-medium">停止朗读</span>
+            `;
+            readBtn.classList.remove('bg-indigo-50', 'hover:bg-indigo-100', 'text-indigo-600');
+            readBtn.classList.add('bg-red-50', 'hover:bg-red-100', 'text-red-600');
+        } else if (this.isPaused && this.chunks.length > 0) {
+            readBtn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="text-sm font-medium">继续朗读</span>
+            `;
+            readBtn.classList.remove('bg-red-50', 'hover:bg-red-100', 'text-red-600');
+            readBtn.classList.add('bg-green-50', 'hover:bg-green-100', 'text-green-600');
+        } else {
+            readBtn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                </svg>
+                <span class="text-sm font-medium">朗读分析</span>
+            `;
+            readBtn.classList.remove('bg-red-50', 'hover:bg-red-100', 'text-red-600');
+            readBtn.classList.remove('bg-green-50', 'hover:bg-green-100', 'text-green-600');
+            readBtn.classList.add('bg-indigo-50', 'hover:bg-indigo-100', 'text-indigo-600');
+        }
+    }
+};
 

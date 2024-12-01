@@ -599,7 +599,7 @@
                     </div>
                 </div>
 
-                <!-- 在form和loading之间添加显示股票��称的区域 -->
+                <!-- 在form和loading之间添加显示股票称的区域 -->
                 <div id="stockInfo" class="hidden bg-white rounded-xl shadow-lg p-4 mb-6">
                     <div class="flex items-center space-x-3">
                         <div class="bg-blue-100 rounded-lg p-2">
@@ -730,13 +730,25 @@
                 <!-- 对话内容展示区域 -->
                 <div id="analysisResults" class="hidden">
                     <div class="bg-white rounded-xl shadow-lg p-6">
-                        <div class="flex items-center space-x-3 mb-3 pb-2 border-b border-gray-100">
-                            <div class="bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg p-2">
-                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-                                </svg>
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg p-2">
+                                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                                    </svg>
+                                </div>
+                                <h3 class="text-lg font-semibold text-gray-800">分析对话</h3>
                             </div>
-                            <h3 class="text-lg font-semibold text-gray-800">分析对话</h3>
+                            <!-- 添加朗读按钮 -->
+                            <button id="readAnalysisBtn" 
+                                    class="flex items-center space-x-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 
+                                           text-indigo-600 rounded-lg transition-colors duration-200">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                                </svg>
+                                <span class="text-sm font-medium">朗读分析</span>
+                            </button>
                         </div>
                         <div id="analysisContent" class="prose max-w-none space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar"></div>
                     </div>

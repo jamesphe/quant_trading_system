@@ -16,7 +16,7 @@ from data_fetch import (
     get_stock_basic_info
 )
 from strategies import ChandelierZlSmaStrategy
-import logging  # 添加日志模块
+import logging
 import pandas as pd
 import os
 from datetime import datetime, timedelta
@@ -25,7 +25,26 @@ import json
 from stock_analysis import ZhipuAIModel, KimiModel, OpenAIModel, analyze_stock
 import markdown
 from pathlib import Path
+import requests
+import time
+import base64
+import hashlib
+from dotenv import load_dotenv
+from websocket import WebSocketApp
+import hmac
+import ssl
+from wsgiref.handlers import format_date_time
+from time import mktime
+import _thread as thread
+from urllib.parse import urlencode
 
+# 加载 .env 文件
+load_dotenv()
+
+# 获取讯飞配置
+XFYUN_APPID = os.getenv('XFYUN_APPID')
+XFYUN_API_KEY = os.getenv('XFYUN_API_KEY')
+XFYUN_API_SECRET = os.getenv('XFYUN_API_SECRET')
 
 # 配置日志
 logging.basicConfig(
@@ -35,6 +54,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Azure 配置
+AZURE_KEY = os.getenv('AZURE_KEY')
+AZURE_REGION = 'eastasia'
 
 
 @app.route('/')
@@ -204,7 +227,7 @@ def backtest():
         logger.info('收到 /backtest 请求')
         data = request.get_json()
         
-        # 验证输入参数
+        # 验证输入参
         if not data:
             return jsonify({
                 'success': False,
@@ -229,7 +252,7 @@ def backtest():
         # 检查是否存在优化参数文件
         optimization_file = get_optimization_file(symbol)
         if os.path.exists(optimization_file):
-            # 读取化参数
+            # 读化参数
             opt_params = pd.read_csv(optimization_file).iloc[-1]
             result = chandelier_zlsma_test.run_backtest(
                 symbol=symbol,
@@ -434,7 +457,7 @@ def analyze_stock_route():
                     stream=True
                 ):
                     if chunk:
-                        # 确保chunk是JSON格式的字符串
+                        # 确保chunk是JSON格式的字��
                         if isinstance(chunk, str):
                             yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
                         else:
@@ -483,7 +506,7 @@ def get_basic_info(stock_code):
 
 def _convert_signal_to_text(signal):
     """
-    将信号数值转换为文本说明和对应的颜色
+    将信号数值转换为文本说明和对应的颜
     返回格式: {'text': '信号说明', 'color': '颜色代码'}
     """
     signal_map = {
@@ -521,6 +544,176 @@ def _convert_signal_to_text(signal):
 
 def get_optimization_file(symbol, strategy="ChandelierZlSmaStrategy"):
     return f'results/{symbol}_{strategy}_optimization_results.csv'
+
+
+@app.route('/api/get_azure_token', methods=['POST'])
+def get_azure_token():
+    try:
+        url = f'https://{AZURE_REGION}.api.cognitive.microsoft.com/sts/v1.0/issueToken'
+        headers = {
+            'Ocp-Apim-Subscription-Key': AZURE_KEY
+        }
+        response = requests.post(url, headers=headers)
+        response.raise_for_status()
+        
+        return jsonify({
+            'token': response.text,
+            'region': AZURE_REGION
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/xfyun/tts', methods=['POST'])
+def xfyun_tts():
+    try:
+        text = request.json.get('text')
+        speed = request.json.get('speed', 50)  # 获取语速参数，默认50
+        
+        if not text:
+            return jsonify({'error': '缺少文本内容'}), 400
+            
+        # 限制文本长度
+        if len(text) > 8000:
+            text = text[:8000]
+            logger.warning('文本超长已截断到8000字符')
+
+        # 创建音频文件的临时路径
+        audio_file = os.path.join(os.path.dirname(__file__), 'temp', f'tts_{int(time.time())}.mp3')
+        os.makedirs(os.path.dirname(audio_file), exist_ok=True)
+
+        # WebSocket参数类
+        class WsParam:
+            def __init__(self, appid, api_key, api_secret, text):
+                self.APPID = appid
+                self.APIKey = api_key
+                self.APISecret = api_secret
+                self.Text = text
+                
+                self.CommonArgs = {"app_id": self.APPID}
+                self.BusinessArgs = {
+                    "aue": "lame",
+                    "auf": "audio/L16;rate=16000",
+                    "vcn": "xiaoyan",
+                    "tte": "utf8",
+                    "speed": 50,
+                    "volume": 50,
+                    "pitch": 50,
+                }
+                self.Data = {
+                    "status": 2,
+                    "text": str(base64.b64encode(self.Text.encode('utf-8')), "UTF8")
+                }
+
+            def create_url(self):
+                url = 'wss://tts-api.xfyun.cn/v2/tts'
+                # 生成RFC1123格式的时间戳
+                now = datetime.now()
+                date = format_date_time(mktime(now.timetuple()))
+
+                # 拼接字符串
+                signature_origin = "host: " + "ws-api.xfyun.cn" + "\n"
+                signature_origin += "date: " + date + "\n"
+                signature_origin += "GET " + "/v2/tts " + "HTTP/1.1"
+
+                # hmac-sha256加密
+                signature_sha = hmac.new(
+                    self.APISecret.encode('utf-8'),
+                    signature_origin.encode('utf-8'),
+                    digestmod=hashlib.sha256
+                ).digest()
+                signature_sha = base64.b64encode(signature_sha).decode()
+
+                authorization_origin = (
+                    f'api_key="{self.APIKey}", algorithm="hmac-sha256", '
+                    f'headers="host date request-line", signature="{signature_sha}"'
+                )
+                authorization = base64.b64encode(
+                    authorization_origin.encode('utf-8')
+                ).decode()
+
+                # 组织url参数
+                v = {
+                    "authorization": authorization,
+                    "date": date,
+                    "host": "ws-api.xfyun.cn"
+                }
+                return url + '?' + urlencode(v)
+
+        # 处理音频数据
+        audio_data = bytearray()
+
+        def on_message(ws, message):
+            try:
+                message = json.loads(message)
+                code = message["code"]
+                if code != 0:
+                    logger.error(f"讯飞服务返回错误: {message}")
+                    ws.close()
+                    return
+                    
+                audio = message["data"]["audio"]
+                status = message["data"]["status"]
+                
+                # 解码音频数据并保存
+                audio_chunk = base64.b64decode(audio)
+                audio_data.extend(audio_chunk)
+                
+                # 如果是最后一帧，关闭连接
+                if status == 2:
+                    ws.close()
+                
+            except Exception as e:
+                logger.error(f"处理讯飞响应失败: {str(e)}")
+                ws.close()
+
+        def on_error(ws, error):
+            logger.error(f"WebSocket错误: {str(error)}")
+
+        def on_close(ws):
+            logger.info("WebSocket连接已关闭")
+
+        def on_open(ws):
+            def run(*args):
+                data = {
+                    "common": ws_param.CommonArgs,
+                    "business": ws_param.BusinessArgs,
+                    "data": ws_param.Data,
+                }
+                ws.send(json.dumps(data))
+            thread.start_new_thread(run, ())
+
+        # 创建WebSocket连接
+        ws_param = WsParam(XFYUN_APPID, XFYUN_API_KEY, XFYUN_API_SECRET, text)
+        ws_url = ws_param.create_url()
+        
+        ws = WebSocketApp(
+            ws_url,
+            on_message=on_message,
+            on_error=on_error,
+            on_close=on_close
+        )
+        ws.on_open = on_open
+        ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+
+        # 返回音频数据
+        if audio_data:
+            return Response(
+                bytes(audio_data),
+                mimetype='audio/mpeg',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Content-Type': 'audio/mpeg'
+                }
+            )
+        else:
+            return jsonify({'error': '未获取到音频数据'}), 500
+
+    except Exception as e:
+        logger.error(f'语音合成失败: {str(e)}', exc_info=True)
+        return jsonify({'error': f'语音合成失败: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
