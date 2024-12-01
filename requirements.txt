@@ -12,3 +12,5 @@ baostock
 markdown
 psutil
 ta-lib
+python-dotenv
+websocket-client
