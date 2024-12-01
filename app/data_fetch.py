@@ -131,6 +131,7 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
                          timeperiod=chandelier_period)
             
             # 计算最终结果
+            temp_df['ATR'] = atr
             temp_df['CHANDELIER_LONG'] = high - (atr * chandelier_mult)
         # 只返回请求的日期范围的数据
         df = temp_df[start_date:end_date].copy()
