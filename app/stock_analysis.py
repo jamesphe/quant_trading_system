@@ -188,8 +188,8 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 判断当前股票是否处于关键支撑位或压力位。
 
 3. 量化策略应用：
-使用吊顶止损指标，计算当前的止损参考点，并分析风险。
-应用ZSLAM指标，评估当前趋势的强度与方向，判断市场情绪。
+使用吊顶止损指标(在行情数据中包含)，计算当前的止损参考点，并分析风险。
+应用ZSLAM指标(在行情数据中包含)，评估当前趋势的强度与方向，判断市场情绪。
 
 4. 基本面分析：
 提取并分析最新资讯对股票价格的潜在影响。
@@ -198,10 +198,12 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 5. 下一个交易日走势预判：
 基于上述分析，对下一个交易日的价格走势进行预测。
 评估可能的波动范围和方向。
+对各种可能的开盘情况（高开、低开、平开、高开低走、低开高走等）做出对应的交易策略建议。
 
 6. 交易建议：
 针对短线、中线投资，分别提供操作建议（如建仓、加仓、减仓、清仓）。
 给出止盈止损点位，预期收益风险比。
+针对持仓和空仓，分别给出操作建议。
 
 """
 
@@ -324,7 +326,8 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                 include_macd=True,
                 include_rsi=True,
                 include_boll=True,
-                include_zlsma=True
+                include_zlsma=True,
+                include_chandelier=True
             )
         else:
             stock_data = get_us_stock_data(symbol, start_date, end_date)

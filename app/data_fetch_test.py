@@ -441,15 +441,14 @@ def test_get_industry_stocks():
 
 def test_get_stock_data():
     """
-    测试获取股票历史行情数据功能，包括akshare和baostock两种数据源，
-    以及MACD、RSI、BOLL和ZLSMA指标计算
+    测试获取股票历史行情数据功能
     """
     print("\n开始测试获取股票历史行情数据...")
     
-    # 测试参数
+    # 修改测试参数，使用历史数据
     symbol = "300059"  # 东方财富
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    end_date = "2024-01-31"  # 使用固定的历史日期
+    start_date = "2024-01-01"  # 使用固定的历史日期
     
     # 测试两种数据源
     data_sources = ['akshare', 'baostock']
@@ -706,7 +705,7 @@ def test_get_stock_data():
                 # 检查ZLSMA数据有效性
                 for col in zlsma_columns:
                     assert not stock_data_with_zlsma[col].isnull().all(), \
-                        f"{col}列全为空值"
+                        f"{col}列全为空���"
                 print("ZLSMA数据空值检查通过")
                 
                 # 验证ZLSMA数据范围
@@ -734,9 +733,77 @@ def test_get_stock_data():
                 
                 # 验证所有指标列都存在
                 all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
-                                      'RSI_6', 'RSI_12', 'RSI_24',
-                                      'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
-                                      'ZLSMA_20', 'ZLSMA_60']
+                                          'RSI_6', 'RSI_12', 'RSI_24',
+                                          'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
+                                          'ZLSMA_20', 'ZLSMA_60']
+                for col in all_indicator_columns:
+                    assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
+                print("\n所有指标列检查通过")
+                
+                print(f"\n{source}数据源（含所有指标）测试通过！")
+            else:
+                print(f"未能获取股票 {symbol} 的数据")
+                
+            # 测试包含吊灯止损指标的数据获取
+            stock_data_with_chandelier = get_stock_data(
+                symbol, 
+                start_date, 
+                end_date, 
+                source=source,
+                include_chandelier=True
+            )
+            
+            if not stock_data_with_chandelier.empty:
+                print("\n测试吊灯止损指标数据:")
+                # 检查吊灯止损相关列是否存在
+                chandelier_columns = ['CHANDELIER_LONG', 'CHANDELIER_SHORT']
+                for col in chandelier_columns:
+                    assert col in stock_data_with_chandelier.columns, f"缺少吊灯止损相关列 '{col}'"
+                print("吊灯止损列检查通过")
+                
+                # 检查吊灯止损数据类型
+                for col in chandelier_columns:
+                    assert stock_data_with_chandelier[col].dtype == 'float64', \
+                        f"{col}列不是浮点数类型"
+                print("���灯止损数据类型检查通过")
+                
+                # 检查吊灯止损数据有效性
+                for col in chandelier_columns:
+                    assert not stock_data_with_chandelier[col].isnull().all(), \
+                        f"{col}列全为空值"
+                print("吊灯止损数据空值检查通过")
+                
+                # 验证吊灯止损数据逻辑关系
+                # 多头止损位应该低于最高价，空头止损位应该高于最低价
+                assert not stock_data_with_chandelier['CHANDELIER_LONG'].isnull().all(), "多头止损位全为空值"
+                assert not stock_data_with_chandelier['CHANDELIER_SHORT'].isnull().all(), "空头止损位全为空值"
+                
+                # 检查数值是否在合理范围内（不为0或异常大的数值）
+                assert all(stock_data_with_chandelier['CHANDELIER_LONG'] > 0), "多头止损位存在非正数值"
+                assert all(stock_data_with_chandelier['CHANDELIER_SHORT'] > 0), "空头止损位存在非正数值"
+                print("吊灯止损数据有效性验证通过")
+                
+                # 更新所有指标测试部分的指标列表
+                all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
+                                          'RSI_6', 'RSI_12', 'RSI_24',
+                                          'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
+                                          'ZLSMA_20', 'ZLSMA_60',
+                                          'CHANDELIER_LONG', 'CHANDELIER_SHORT']
+                
+                # 测试同时包含所有指标
+                stock_data_with_all = get_stock_data(
+                    symbol, 
+                    start_date, 
+                    end_date, 
+                    source=source,
+                    include_macd=True,
+                    include_rsi=True,
+                    include_boll=True,
+                    include_zlsma=True,
+                    include_chandelier=True
+                )
+                
+                # 验证所有指标列都存在
                 for col in all_indicator_columns:
                     assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
                 print("\n所有指标列检查通过")

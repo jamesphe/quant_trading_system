@@ -5,7 +5,7 @@ import pandas as pd
 import baostock as bs
 from datetime import datetime
 import talib
-
+import os
 def get_a_share_list():
     """
     获取A股所有上市股票的代码和名称。
@@ -20,7 +20,7 @@ def get_a_share_list():
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()
 
-def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False):
+def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False, include_chandelier=False):
     """
     获取A股股票历史行情数据
 
@@ -33,6 +33,7 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
     - include_rsi: 是否包含RSI指标数据，默认为False
     - include_boll: 是否包含布林带指标数据，默认为False
     - include_zlsma: 是否包含零延迟移动平均线，默认为False
+    - include_chandelier: 是否包含吊灯止损指标，默认为False
 
     返回：
     - stock_data: 经过预处理的DataFrame，包含以下可选指标：
@@ -40,18 +41,25 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
                  - RSI_6、RSI_12和RSI_24 (if include_rsi=True)
                  - BOLL_UPPER、BOLL_MIDDLE、BOLL_LOWER (if include_boll=True)
                  - ZLSMA_20、ZLSMA_60 (if include_zlsma=True)
+                 - CHANDELIER_LONG、CHANDELIER_SHORT (if include_chandelier=True)
     """
+    # 验证日期
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    if end_date > current_date:
+        print(f"结束日期 {end_date} 超过当前日期 {current_date}，将使用当前日期作为结束日期")
+        end_date = current_date
+    
     # 获取基础数据
     if source == 'baostock':
         stock_data = _get_stock_data_baostock(symbol, start_date, end_date)
     else:
         stock_data = _get_stock_data_akshare(symbol, start_date, end_date)
     
-    if not stock_data.empty and (include_macd or include_rsi or include_boll or include_zlsma):
+    if not stock_data.empty and (include_macd or include_rsi or include_boll or include_zlsma or include_chandelier):
         # 获取额外90天的数据以确保指标计算的准确性
         extended_start_date = (pd.to_datetime(start_date) - pd.Timedelta(days=90)).strftime('%Y-%m-%d')
         temp_df = get_stock_data(symbol, extended_start_date, end_date, source=source, 
-                               include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False)
+                               include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False, include_chandelier=False)
         
         if include_macd:
             # 计算EMA
@@ -93,6 +101,38 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
                 # 计算ZLSMA
                 temp_df[f'ZLSMA_{period}'] = 2 * ema - ema_ema
         
+        if include_chandelier:
+            # 尝试读取优化参数文件
+            try:
+                result_file = f"results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv"
+                if os.path.exists(result_file):
+                    params_df = pd.read_csv(result_file)
+                    if not params_df.empty:
+                        chandelier_period = int(params_df.iloc[0]['period'])
+                        chandelier_mult = float(params_df.iloc[0]['mult'])
+                    else:
+                        chandelier_period = 14
+                        chandelier_mult = 2.0
+                else:
+                    chandelier_period = 14
+                    chandelier_mult = 2.0
+            except Exception as e:
+                chandelier_period = 14
+                chandelier_mult = 2.0
+            
+            # 计算指标
+            high = temp_df['High'].rolling(window=chandelier_period).max()
+            low = temp_df['Low'].rolling(window=chandelier_period).min()
+            
+            # 计算ATR
+            atr = talib.ATR(temp_df['High'].values,
+                         temp_df['Low'].values,
+                         temp_df['Close'].values,
+                         timeperiod=chandelier_period)
+            
+            # 计算最终结果
+            temp_df['CHANDELIER_LONG'] = high - (atr * chandelier_mult)
+            temp_df['CHANDELIER_SHORT'] = low + (atr * chandelier_mult)
         # 只返回请求的日期范围的数据
         df = temp_df[start_date:end_date].copy()
         return df
@@ -104,7 +144,7 @@ def _get_stock_data_baostock(symbol, start_date, end_date):
     try:
         # 登录baostock
         # baostock不需要账号密码,直接调用login()即可
-        # 返回值为BaoStockLoginResult对象,可以通过error_code和error_msg查看登录状态
+        # 返回值为BaoStockLoginResult对象,可以通过error_code和error_msg查登录状态
         login_result = bs.login()
         if login_result.error_code != '0':
             print(f'baostock登录失败: {login_result.error_msg}')
@@ -201,7 +241,7 @@ def _get_stock_data_akshare(symbol, start_date, end_date):
         stock_data['Date'] = pd.to_datetime(stock_data['Date'])
         stock_data.set_index('Date', inplace=True)
         
-        # 将数据类型转换为数值类型
+        # 将数据类型转换为数类型
         numeric_cols = ['Open', 'Close', 'High', 'Low', 'Volume', 'Amount', 'Pct_change']
         stock_data[numeric_cols] = stock_data[numeric_cols].apply(pd.to_numeric, errors='coerce')
         
@@ -324,7 +364,7 @@ def get_etf_data(symbol, start_date, end_date):
             '收盘': 'Close',
             '最高': 'High',
             '最低': 'Low',
-            '成交量': 'Volume',
+            '成量': 'Volume',
             '成交额': 'Amount',
             '涨跌幅': 'Pct_change'
         }, inplace=True)
@@ -435,7 +475,7 @@ def get_industry_fund_flow_rank(sector_type="行业资金流"):
             # 重命名列
             column_rename = {
                 '名称': 'industry_name',
-                '今日涨跌幅': f'{period}_change_pct',
+                '今日涨幅': f'{period}_change_pct',
                 '主力净流入-净额': f'{period}_main_net_inflow',
                 '主力净流入-净占比': f'{period}_main_net_inflow_pct',
                 '超大单净流入-净额': f'{period}_super_big_net_inflow',
