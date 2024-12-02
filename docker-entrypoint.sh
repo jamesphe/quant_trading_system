@@ -4,4 +4,4 @@
 service cron start
 
 # 启动主应用
-conda run --no-capture-output -n myenv python app.py 
+exec conda run --no-capture-output -n myenv python app.py 

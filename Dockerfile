@@ -43,7 +43,7 @@ ENV PATH /opt/conda/envs/myenv/bin:$PATH
 
 # 修改启动命令以同时运行cron和应用
 WORKDIR /app/app
-COPY docker-entrypoint.sh /
+COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["python", "app.py"]
+CMD []
