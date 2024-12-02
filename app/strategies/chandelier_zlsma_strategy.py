@@ -152,14 +152,10 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         stake = (stake // self.params.min_trade_unit) * self.params.min_trade_unit
 
         # 方向判断
-        if current_close < prev_long_stop or current_close < prev_short_stop:
+        if current_close < prev_long_stop:
             current_direction = -1
             direction_name = '空头'
-            self.reason = f'收盘价 {current_close:.2f} 低于 '
-            if current_close < prev_long_stop:
-                self.reason += f'多头止损价 {prev_long_stop:.2f} '
-            if current_close < prev_short_stop:
-                self.reason += f'空头止损价 {prev_short_stop:.2f}'
+            self.reason = f'收盘价 {current_close:.2f} 低于多头止损价 {prev_long_stop:.2f}'
         elif current_close > prev_short_stop:
             current_direction = 1 if current_close > prev_long_stop else 2
             direction_name = '多头' if current_direction == 1 else '建仓预警'
