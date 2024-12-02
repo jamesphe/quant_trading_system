@@ -152,6 +152,25 @@ class OpenAIModel(AIModelBase):
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
+def get_cost_price(symbol: str) -> float:
+    """获取指定股票的持仓成本价格
+    
+    Args:
+        symbol: 股票代码
+        
+    Returns:
+        float: 持仓成本价格,如果未找到返回0
+    """
+    portfolio_file = os.path.join(os.path.dirname(__file__), 'config/portfolio_stocks.csv')
+    try:
+        df = pd.read_csv(portfolio_file)
+        cost_price = df[df['股票代码'].astype(str) == str(symbol)]['持仓成本'].iloc[0]
+        return float(cost_price)
+    except Exception as e:
+        print(f"获取股票{symbol}持仓成本时出错: {str(e)}")
+        return 0.0
+
+
 
 def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name: str, basic_info: dict, news_list: list, include_backtest: bool = True) -> str:
     """生成用于分析股票的prompt"""
@@ -165,6 +184,10 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
         f"- {news['publish_time']}: {news['title']}\n  {news['content'][:200]}..."
         for news in news_list
     ])
+    
+    # 获取持仓成本
+    cost_price = get_cost_price(symbol)
+    cost_info = f"\n当前持仓成本: {cost_price}" if cost_price > 0 else ""
     
     prompt = f"""
 你是一名经验丰富的股票量化交易员，需要根据以下变量进行全面的股票分析，并对下一个交易日的走势进行预判，提供相应的交易策略建议。分析需涵盖技术指标解读、趋势判断、风险评估、交易策略建议等方面，最终输出简明、直接的操作建议。
@@ -204,6 +227,9 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 针对短线、中线投资，分别提供操作建议（如建仓、加仓、减仓、清仓）。
 给出止盈止损点位，预期收益风险比。
 针对持仓和空仓，分别给出操作建议。
+
+7. 持仓成本分析：
+{cost_info}，请结合当前个股走势，给出更有针对性的建议（如止盈止损、加仓减仓）。
 
 """
 
