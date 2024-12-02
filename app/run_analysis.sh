@@ -35,7 +35,8 @@ main() {
     run_command "python industry_fund_flow_saver.py" "保存行业资金流向"
     
     # 5. 运行 ai_stock_analysis.py
-    run_command "python ai_stock_analysis.py --mode csv --date $date --ai kimi" "AI分析股票"
+    run_command "python ai_stock_analysis.py --mode csv --date $date --ai kimi" "Kimi AI分析股票"
+    run_command "python ai_stock_analysis.py --mode csv --date $date --ai openai" "OpenAI AI分析股票"
     
     echo -e "\n所有任务执行完成!"
 }
