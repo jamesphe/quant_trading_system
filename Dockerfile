@@ -41,9 +41,8 @@ EXPOSE 5100
 # 设置环境变量
 ENV PATH /opt/conda/envs/myenv/bin:$PATH
 
-# 修改启动命令以同时运行cron和应用
+# 设置工作目录
 WORKDIR /app/app
-COPY /app/docker-entrypoint.sh docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD []
+
+# 启动命令：启动cron服务并运行应用
+CMD service cron start && conda run --no-capture-output -n myenv python app.py
