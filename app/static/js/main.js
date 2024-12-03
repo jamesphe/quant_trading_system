@@ -463,7 +463,7 @@ async function handleDailyPicks(event) {
         applyMarkdownStyles(contentDiv);
 
     } catch (error) {
-        console.error('分析请求失败:', error);
+        console.error('分���请求失败:', error);
         showToast(error.message, 'error');
         contentDiv.innerHTML = `
             <div class="text-red-500 text-center py-4">
@@ -482,7 +482,7 @@ function initializeDatePicker(today) {
         pickDateInput.value = defaultDate;
         pickDateInput.max = defaultDate; // 限制最大日期为今天
         
-        // 添加日期变化事件监听器
+        // 添加日期变化事件监听
         pickDateInput.addEventListener('change', function(e) {
             console.log('日期已更改:', this.value);
             // 这里可以添加日期变化后的其他处理逻辑
@@ -1179,7 +1179,7 @@ function startBacktest() {
 
 function handleBacktestResponse(response) {
     if (!response.success) {
-        // ... 错误处理代码 ...
+        // ... 错误处理代��� ...
     } else {
         document.getElementById('loadingText').innerHTML = 
             `${response.stockName}(${symbol}) 回测分析完成`;
@@ -1193,7 +1193,7 @@ document.getElementById('optimizeForm').addEventListener('submit', function(even
     optimize();
 });
 
-// 添加持仓分析相关的函数
+// 添加持仓���析相关的函数
 function runPortfolioAnalysis(event) {
     event.preventDefault();
     
@@ -1226,7 +1226,7 @@ function runPortfolioAnalysis(event) {
         </div>
     `;
     
-    // 显示加载提示
+    // 显示加载���示
     resultsDiv.innerHTML = `
         <div class="animate-pulse flex space-x-4 items-center justify-center py-12">
             <div class="rounded-full bg-purple-200 h-12 w-12"></div>
@@ -1434,7 +1434,7 @@ style.textContent = `
         }
     }
     
-    /* 添加卡片悬停效果 */
+    /* 添���卡片悬停效果 */
     .bg-white.rounded-lg.p-3.shadow-sm {
         transition: all 0.2s ease-in-out;
     }
@@ -1579,7 +1579,7 @@ function displayPortfolioResults(data) {  // 添加data参数
                         </div>
                     </div>
                     
-                    <!-- 详情按钮 -->
+                    <!-- 详情按��� -->
                     <div class="mt-4">
                         <button onclick="toggleDetails(${index})" 
                                 class="details-toggle-btn group w-full py-2 px-4 rounded-md
@@ -1623,7 +1623,7 @@ function displayPortfolioResults(data) {  // 添加data参数
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
                                         <div class="text-sm text-gray-500 mb-1">空头止损</div>
-                                        <div class="font-medium text-gray-900">${tradeData['空头止损'] || '-'}</div>
+                                        <div class="font-medium text-gray-900">${tradeData['��头止损'] || '-'}</div>
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
                                         <div class="text-sm text-gray-500 mb-1">ZLSMA</div>
@@ -1704,7 +1704,7 @@ async function handleDailyPicks(event) {
         applyMarkdownStyles(contentDiv);
 
     } catch (error) {
-        console.error('分析请求失败:', error);
+        console.error('分析请求失��:', error);
         showToast(error.message, 'error');
         contentDiv.innerHTML = `
             <div class="text-red-500 text-center py-4">
@@ -1974,4 +1974,207 @@ const SpeechController = {
         }
     }
 };
+
+// 添加目标股票相关的函数
+let currentSortColumn = '';
+let isAscending = true;
+
+// 处理目标股票表单提交
+async function handleTargetStocks(event) {
+    event.preventDefault();
+    
+    const date = document.getElementById('targetDate').value;
+    if (!date) {
+        showToast('请选择日期', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/target_stocks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date: date  // 直接使用 YYYY-MM-DD 格式
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error);
+        }
+        
+        displayTargetStocks(data.data);
+        
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// 显示目标股票数据
+function displayTargetStocks(stocks) {
+    const tbody = document.getElementById('targetStocksBody');
+    tbody.innerHTML = '';
+    
+    stocks.forEach(stock => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 transition-colors duration-200';
+        
+        // 修改涨跌幅的颜色逻辑：红色表示上涨，绿色表示下跌
+        const changeValue = Number(stock['最新涨跌幅']);
+        const changeColor = changeValue >= 0 ? 'text-red-600' : 'text-green-600';
+        
+        row.innerHTML = `
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                <a href="javascript:void(0)" 
+                   onclick="switchToTechnicalAnalysis('${stock['股票代码']}')"
+                   class="text-blue-600 hover:text-blue-800 hover:underline">
+                    ${stock['股票代码']}
+                </a>
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                <a href="javascript:void(0)" 
+                   onclick="switchToAIAnalysis('${stock['股票代码']}')"
+                   class="text-purple-600 hover:text-purple-800 hover:underline">
+                    ${stock['股票名称']}
+                </a>
+            </td>
+            <td class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                ${stock['industry']}
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                ${Number(stock['最新价格']).toFixed(2)}
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${changeColor}">
+                ${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(2)}%
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                ${Number(stock['换手率']).toFixed(2)}%
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+// 排序函数
+function sortStocks(column) {
+    const tbody = document.getElementById('targetStocksBody');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+    
+    // 如果点击的是当前排序列，则反转排序方向
+    if (column === currentSortColumn) {
+        isAscending = !isAscending;
+    } else {
+        currentSortColumn = column;
+        isAscending = true;
+    }
+    
+    // 更新所有排序图标
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+        icon.textContent = '↕';
+    });
+    
+    // 更新当前列的排序图标
+    const currentHeader = document.querySelector(`th[data-sort="${column}"]`);
+    if (currentHeader) {
+        const icon = currentHeader.querySelector('.sort-icon');
+        icon.textContent = isAscending ? '↑' : '↓';
+    }
+    
+    // 排序
+    rows.sort((a, b) => {
+        let aValue = a.children[getColumnIndex(column)].textContent.trim();
+        let bValue = b.children[getColumnIndex(column)].textContent.trim();
+        
+        // 数字类型的列需要特殊处理
+        if (['最新涨跌幅', '最新价格', '换手率', '夏普比率'].includes(column)) {
+            aValue = parseFloat(aValue.replace('%', ''));
+            bValue = parseFloat(bValue.replace('%', ''));
+        }
+        
+        if (aValue < bValue) return isAscending ? -1 : 1;
+        if (aValue > bValue) return isAscending ? 1 : -1;
+        return 0;
+    });
+    
+    // 重新插入排序后的行
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// 获取列索引
+function getColumnIndex(column) {
+    const headers = document.querySelectorAll('th[data-sort]');
+    for (let i = 0; i < headers.length; i++) {
+        if (headers[i].getAttribute('data-sort') === column) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+// 在文档加载完成后初始化事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化目标股票表单提交事件
+    const targetStocksForm = document.getElementById('targetStocksForm');
+    if (targetStocksForm) {
+        targetStocksForm.addEventListener('submit', handleTargetStocks);
+    }
+    
+    // 初始化表头排序点击事件
+    document.querySelectorAll('th[data-sort]').forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.getAttribute('data-sort');
+            sortStocks(column);
+        });
+    });
+});
+
+// 添加更新价格的处理函数
+async function updatePrices() {
+    const date = document.getElementById('targetDate').value;  // 已经是 YYYY-MM-DD 格式
+    if (!date) {
+        showToast('请选择日期', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/update_prices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date: date  // 直接使用 YYYY-MM-DD 格式
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error);
+        }
+        
+        showToast('价格更新成功', 'success');
+        
+        // 重新加载数据
+        await handleTargetStocks(new Event('submit'));
+        
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// 在文档加载完成后添加事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // ... 现有的初始化代码 ...
+    
+    // 添加更新价格按钮的事件监听
+    const updatePricesBtn = document.getElementById('updatePricesBtn');
+    if (updatePricesBtn) {
+        updatePricesBtn.addEventListener('click', updatePrices);
+    }
+});
 

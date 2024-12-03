@@ -37,11 +37,9 @@ def get_all_stocks_realtime_data():
         print(f"获取实时行情数据时发生错误: {e}")
         return None
 
-def update_target_stocks():
+def update_target_stocks(date_suffix=None):
     # 获取命令行参数中的日期
-    if len(sys.argv) > 1:
-        date_suffix = sys.argv[1]
-    else:
+    if date_suffix is None:
         # 默认为当天日期
         date_suffix = datetime.now().strftime("%Y-%m-%d")
 

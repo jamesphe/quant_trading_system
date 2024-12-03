@@ -457,7 +457,7 @@ def analyze_stock_route():
                     stream=True
                 ):
                     if chunk:
-                        # 确保chunk是JSON格式的字��
+                        # 确保chunk是JSON格式的字
                         if isinstance(chunk, str):
                             yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
                         else:
@@ -512,7 +512,7 @@ def _convert_signal_to_text(signal):
     signal_map = {
         1: {
             'text': "建仓信号",
-            'color': 'green'   # 建仓信号使用绿色
+            'color': 'green'   # 建���号使用绿色
         },
         -1: {
             'text': "清仓信号",
@@ -714,6 +714,117 @@ def xfyun_tts():
     except Exception as e:
         logger.error(f'语音合成失败: {str(e)}', exc_info=True)
         return jsonify({'error': f'语音合成失败: {str(e)}'}), 500
+
+
+@app.route('/api/target_stocks', methods=['POST'])
+def get_target_stocks():
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        if not date:
+            return jsonify({
+                'success': False,
+                'error': '请选择日期'
+            }), 400
+            
+        # 将日期格式统一转换为 YYYY-MM-DD
+        try:
+            # 尝试将日期转换为 YYYY-MM-DD 格式
+            parsed_date = datetime.strptime(date, '%Y-%m-%d').strftime('%Y-%m-%d')
+        except ValueError:
+            # 如果转换失败,返回错误信息
+            return jsonify({
+                'success': False,
+                'error': '日期格式错误,请使用YYYY-MM-DD格式'
+            }), 400
+
+        # 构建文件路径
+        file_path = os.path.join(
+            os.path.dirname(__file__), 
+            'stock_data', 
+            f'updated_target_stocks_{parsed_date}.csv'
+        )
+        
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': False,
+                'error': f'未找到{parsed_date}的目标股票数据'
+            }), 404
+
+        # 读取CSV文件
+        df = pd.read_csv(file_path, dtype={'股票代码': str})
+        
+        # 选择需要的列
+        selected_columns = ['股票代码', '股票名称', 'industry', '最新价格', '最新涨跌幅', '换手率', '夏普比率']
+        df = df[selected_columns]
+        
+        # 转换为字典列表
+        stocks = df.to_dict('records')
+        
+        return jsonify({
+            'success': True,
+            'data': stocks
+        })
+        
+    except Exception as e:
+        logger.error(f'获取目标股票数据失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'获取数据失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/update_prices', methods=['POST'])
+def update_prices():
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        if not date:
+            return jsonify({
+                'success': False,
+                'error': '请选择日期'
+            }), 400
+            
+        # 确保日期格式为 YYYY-MM-DD
+        try:
+            parsed_date = datetime.strptime(date, '%Y-%m-%d').strftime('%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '日期格式错误，请使用YYYY-MM-DD格式'
+            }), 400
+            
+        # 调用更新脚本
+        try:
+            from get_latest_prices import update_target_stocks
+            # 执行更新，传入标准格式的日期
+            update_target_stocks(parsed_date)
+            
+            return jsonify({
+                'success': True,
+                'message': '价格更新成功'
+            })
+            
+        except FileNotFoundError as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 404
+        except Exception as e:
+            logger.error(f'更新价格失败: {str(e)}', exc_info=True)
+            return jsonify({
+                'success': False,
+                'error': f'更新价格失败: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f'处理更新请求失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'处理请求失败: {str(e)}'
+        }), 500
 
 
 if __name__ == '__main__':
