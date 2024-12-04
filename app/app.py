@@ -756,7 +756,7 @@ def get_target_stocks():
         df = pd.read_csv(file_path, dtype={'股票代码': str})
         
         # 选择需要的列
-        selected_columns = ['股票代码', '股票名称', 'industry', '最新价格', '最新涨跌幅', '换手率', '夏普比率']
+        selected_columns = ['股票代码', '股票名称', 'industry', '最新价格', '最新涨跌幅', '换手率', '夏普比率', '最佳回报', '最佳胜率']
         df = df[selected_columns]
         
         # 转换为字典列表

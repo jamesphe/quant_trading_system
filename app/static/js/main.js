@@ -302,15 +302,15 @@ class DatePicker {
 // 初始化所有日期选择器
 function initializeDatePickers() {
     const today = new Date();
-    const lastYear = new Date();
-    lastYear.setFullYear(today.getFullYear() - 1);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
     
     // 初始化所有日期选择器
     const datePickerConfigs = [
         {
             inputId: 'pickDate',
-            defaultDate: today,
-            maxDate: today,
+            defaultDate: yesterday,
+            maxDate: yesterday,
             onChange: (date, dateString) => {
                 console.log('每日选股日期已更改:', dateString);
                 updateDailyPicks(dateString);
@@ -327,7 +327,7 @@ function initializeDatePickers() {
         },
         {
             inputId: 'startDate',
-            defaultDate: lastYear,
+            defaultDate: new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()),
             maxDate: today,
             onChange: (date, dateString) => {
                 console.log('开始日期已更改:', dateString);
@@ -339,6 +339,15 @@ function initializeDatePickers() {
             maxDate: today,
             onChange: (date, dateString) => {
                 console.log('结束日期已更改:', dateString);
+            }
+        },
+        {
+            inputId: 'targetDate',
+            defaultDate: yesterday,
+            maxDate: yesterday,
+            onChange: (date, dateString) => {
+                console.log('目标股票日期已更改:', dateString);
+                updateTargetStocks(dateString);
             }
         }
     ];
@@ -580,7 +589,7 @@ async function handleBacktest() {
         return;
     }
 
-    // ��显示加载动画，不隐藏结果区域
+    // 显示加载动画，不隐藏结果区域
     document.getElementById('loading').classList.remove('hidden');
     
     try {
@@ -1108,7 +1117,7 @@ function displayBacktestResults(data) {
     });
 }
 
-// 修改回测按钮的点击处理函数
+// 修改回���按钮的点击���理函数
 async function runBacktest() {
     try {
         const symbol = document.getElementById('symbol').value;
@@ -1182,7 +1191,7 @@ function handleBacktestResponse(response) {
         // ... 错误处理代��� ...
     } else {
         document.getElementById('loadingText').innerHTML = 
-            `${response.stockName}(${symbol}) 回测分析完成`;
+            `${response.stockName}(${symbol}) 回测分析完��`;
         // ... 显示其他结果的代码 ...
     }
 }
@@ -1295,7 +1304,7 @@ function switchToTechnicalAnalysis(stockCode) {
     // 设置股票代码
     document.getElementById('symbol').value = stockCode;
     
-    // 设置默认的日期范围（比如过去一年）
+    // 设���默认的日期范围（比如过去一年）
     const today = new Date();
     const lastYear = new Date();
     lastYear.setFullYear(today.getFullYear() - 1);
@@ -1579,7 +1588,7 @@ function displayPortfolioResults(data) {  // 添加data参数
                         </div>
                     </div>
                     
-                    <!-- 详情按��� -->
+                    <!-- 详情按 -->
                     <div class="mt-4">
                         <button onclick="toggleDetails(${index})" 
                                 class="details-toggle-btn group w-full py-2 px-4 rounded-md
@@ -1623,7 +1632,7 @@ function displayPortfolioResults(data) {  // 添加data参数
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
                                         <div class="text-sm text-gray-500 mb-1">空头止损</div>
-                                        <div class="font-medium text-gray-900">${tradeData['��头止损'] || '-'}</div>
+                                        <div class="font-medium text-gray-900">${tradeData['空头止损'] || '-'}</div>
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
                                         <div class="text-sm text-gray-500 mb-1">ZLSMA</div>
@@ -1660,12 +1669,9 @@ async function handleDailyPicks(event) {
     const contentDiv = document.getElementById('dailyPicksContent');
 
     if (!pickDate) {
-        showToast('请选择���析日期', 'error');
+        showToast('请选择��析日期', 'error');
         return;
     }
-
-    // 转换日期格式为 YYYYMMDD
-    const formattedDate = pickDate.replace(/-/g, '');
 
     try {
         // 显示加载状态
@@ -1683,7 +1689,7 @@ async function handleDailyPicks(event) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                date: formattedDate,
+                date: pickDate,
                 model: analysisModel
             })
         });
@@ -1704,7 +1710,7 @@ async function handleDailyPicks(event) {
         applyMarkdownStyles(contentDiv);
 
     } catch (error) {
-        console.error('分析请求失��:', error);
+        console.error('分析请求失败:', error);
         showToast(error.message, 'error');
         contentDiv.innerHTML = `
             <div class="text-red-500 text-center py-4">
@@ -2023,8 +2029,27 @@ function displayTargetStocks(stocks) {
         row.className = 'hover:bg-gray-50 transition-colors duration-200';
         
         // 修改涨跌幅的颜色逻辑：红色表示上涨，绿色表示下跌
-        const changeValue = Number(stock['最新涨跌幅']);
+        const changeValue = parseFloat(stock['最新涨跌幅']);
         const changeColor = changeValue >= 0 ? 'text-red-600' : 'text-green-600';
+        
+        // 处理最佳胜率和最佳回报的颜色
+        const winRateValue = parseFloat(stock['最佳胜率']);
+        const returnValue = parseFloat(stock['最佳回报']);
+        // 胜率颜色区间
+        const winRateColor = 
+            winRateValue >= 0.8 ? 'text-red-600' :    // 80%以上红色
+            winRateValue >= 0.7 ? 'text-orange-500' : // 70-80%橙色
+            winRateValue >= 0.6 ? 'text-yellow-600' : // 60-70%黄色
+            winRateValue >= 0.5 ? 'text-blue-600' :   // 50-60%蓝色
+            'text-gray-600';                          // 50%以下灰色
+        
+        // 回报颜色区间
+        const returnColor = 
+            returnValue >= 0.8 ? 'text-red-600' :     // 80%以上红色
+            returnValue >= 0.5 ? 'text-orange-500' :  // 50-80%橙色
+            returnValue >= 0.3 ? 'text-yellow-600' :  // 30-50%黄色
+            returnValue >= 0 ? 'text-blue-600' :      // 0-30%蓝色
+            'text-green-600';                         // 负收益绿色
         
         row.innerHTML = `
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
@@ -2052,6 +2077,15 @@ function displayTargetStocks(stocks) {
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                 ${Number(stock['换手率']).toFixed(2)}%
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${winRateColor} font-medium">
+                ${(winRateValue * 100).toFixed(2)}%
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${returnColor} font-medium">
+                ${(returnValue * 100 >= 0 ? '+' : '')}${(returnValue * 100).toFixed(2)}%
+            </td>
+            <td class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                ${Number(stock['夏普比率']).toFixed(2)}
             </td>
         `;
         
@@ -2090,9 +2124,9 @@ function sortStocks(column) {
         let bValue = b.children[getColumnIndex(column)].textContent.trim();
         
         // 数字类型的列需要特殊处理
-        if (['最新涨跌幅', '最新价格', '换手率', '夏普比率'].includes(column)) {
-            aValue = parseFloat(aValue.replace('%', ''));
-            bValue = parseFloat(bValue.replace('%', ''));
+        if (['最新涨跌幅', '最新价格', '换手率', '夏普比率', '最佳胜率', '最佳回报'].includes(column)) {
+            aValue = aValue === '-' ? 0 : parseFloat(aValue.replace('%', ''));
+            bValue = bValue === '-' ? 0 : parseFloat(bValue.replace('%', ''));
         }
         
         if (aValue < bValue) return isAscending ? -1 : 1;
