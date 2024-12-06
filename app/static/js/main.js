@@ -343,8 +343,8 @@ function initializeDatePickers() {
         },
         {
             inputId: 'targetDate',
-            defaultDate: yesterday,
-            maxDate: yesterday,
+            defaultDate: yesterday,  // 保留默认日期为昨天
+            // 移除 maxDate 限制
             onChange: (date, dateString) => {
                 console.log('目标股票日期已更改:', dateString);
                 updateTargetStocks(dateString);
