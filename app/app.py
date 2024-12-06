@@ -373,15 +373,33 @@ def api_daily_picks():
     model = data.get('model')
     
     try:
-        # 构建文件路径
-        file_name = f'stocks_analysis_{model}_{date}.md'
+        # 将日期格式从 YYYYMMDD 转换为 YYYY-MM-DD
+        formatted_date = f"{date[:4]}{date[4:6]}{date[6:]}" if len(date) == 8 else date
+        
+        # 构建文件路径时使用正确的日期格式
+        file_name = f'stocks_analysis_{model}_{formatted_date}.md'
         file_path = Path(__file__).parent / 'AIResult' / file_name
         
+        # 如果文件不存在，尝试查找其他模型的分析结果
         if not file_path.exists():
-            return jsonify({
-                'success': False,
-                'error': f'未找到{date}日的{model}分析结果'
-            })
+            # 按优先级尝试其他模型
+            fallback_models = ['zhipu', 'kimi', 'openai']
+            for fallback_model in fallback_models:
+                if fallback_model == model:
+                    continue
+                fallback_file = f'stocks_analysis_{fallback_model}_{formatted_date}.md'
+                fallback_path = Path(__file__).parent / 'AIResult' / fallback_file
+                if fallback_path.exists():
+                    file_path = fallback_path
+                    model = fallback_model
+                    break
+            
+            # 如果所有模型都没有找到结果
+            if not file_path.exists():
+                return jsonify({
+                    'success': False,
+                    'error': f'未找到{formatted_date}日的分析结果'
+                })
             
         # 读取 markdown 内容并转换为 HTML
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -399,9 +417,9 @@ def api_daily_picks():
             
         return jsonify({
             'success': True,
-            'date': date,
-            'model': model,
-            'content': html_content  # 返回转换后的 HTML 内容
+            'date': formatted_date,
+            'model': model,  # 返回实际使用的模型
+            'content': html_content
         })
         
     except Exception as e:
@@ -512,7 +530,7 @@ def _convert_signal_to_text(signal):
     signal_map = {
         1: {
             'text': "建仓信号",
-            'color': 'green'   # 建���号使用绿色
+            'color': 'green'   # 建号使用绿色
         },
         -1: {
             'text': "清仓信号",

@@ -425,11 +425,11 @@ async function handleDailyPicks(event) {
     
     const pickDate = document.getElementById('pickDate').value;
     if (!pickDate) {
-        showToast('请选择分析日期', 'warning');
+        showToast('请选择分析��期', 'warning');
         return;
     }
     
-    // 转换日期格式为 YYYYMMDD
+    // 将日期格式从 YYYY-MM-DD 转换为 YYYYMMDD
     const formattedDate = pickDate.replace(/-/g, '');
     const analysisModel = document.getElementById('analysisModel').value;
     const resultsDiv = document.getElementById('dailyPicksResults');
@@ -462,7 +462,7 @@ async function handleDailyPicks(event) {
             throw new Error(data.error || '获取分析结果失败');
         }
 
-        // 直接显示后端返回的 HTML 内容
+        // 显示后端返回的 HTML 内容
         contentDiv.innerHTML = data.content;
         
         // 添加样式
@@ -472,7 +472,7 @@ async function handleDailyPicks(event) {
         applyMarkdownStyles(contentDiv);
 
     } catch (error) {
-        console.error('分���请求失败:', error);
+        console.error('分析请求失败:', error);
         showToast(error.message, 'error');
         contentDiv.innerHTML = `
             <div class="text-red-500 text-center py-4">
@@ -503,7 +503,7 @@ function initializeDatePicker(today) {
             if (this.type === 'date') {
                 return; // 原生日期选择器会自动打开
             }
-            // 对于不支持原生日期���器的设备，可以在这里添加自定义日期选择器
+            // 对于不支持原生日期器的设备，可以在这里添加自定义日期选择器
         });
     }
 }
@@ -791,7 +791,7 @@ function applyMarkdownStyles(element) {
         // 添加代码块样式
         pre.classList.add('relative');
         
-        // 如���包含表格数据，添加水平滚动
+        // 如包含表格数据，添加水平滚动
         if (pre.textContent.includes('|')) {
             pre.classList.add('overflow-x-auto');
         }
@@ -951,7 +951,7 @@ function showToast(message, type = 'info') {
 }
 
 function displayBacktestResults(data) {
-    console.log('显示回测��果:', data);
+    console.log('显示回测果:', data);
     
     const backtestResults = document.getElementById('backtestResults');
     backtestResults.innerHTML = `
@@ -1104,7 +1104,7 @@ function displayBacktestResults(data) {
         </div>
     `;
     
-    // 显���回测结果并添加动画效果
+    // 显回测结果并添加动画效果
     backtestResults.classList.remove('hidden');
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
@@ -1117,7 +1117,7 @@ function displayBacktestResults(data) {
     });
 }
 
-// 修改回���按钮的点击���理函数
+// 修改回按钮的点击理函数
 async function runBacktest() {
     try {
         const symbol = document.getElementById('symbol').value;
@@ -1188,10 +1188,10 @@ function startBacktest() {
 
 function handleBacktestResponse(response) {
     if (!response.success) {
-        // ... 错误处理代��� ...
+        // ... 错误处理代 ...
     } else {
         document.getElementById('loadingText').innerHTML = 
-            `${response.stockName}(${symbol}) 回测分析完��`;
+            `${response.stockName}(${symbol}) 回测分析完`;
         // ... 显示其他结果的代码 ...
     }
 }
@@ -1202,7 +1202,7 @@ document.getElementById('optimizeForm').addEventListener('submit', function(even
     optimize();
 });
 
-// 添加持仓���析相关的函数
+// 添加持仓析相关的函数
 function runPortfolioAnalysis(event) {
     event.preventDefault();
     
@@ -1235,7 +1235,7 @@ function runPortfolioAnalysis(event) {
         </div>
     `;
     
-    // 显示加载���示
+    // 显示加载示
     resultsDiv.innerHTML = `
         <div class="animate-pulse flex space-x-4 items-center justify-center py-12">
             <div class="rounded-full bg-purple-200 h-12 w-12"></div>
@@ -1296,7 +1296,7 @@ function runPortfolioAnalysis(event) {
     });
 }
 
-// 添加切换到技术分析��面的函数
+// 添加切换到技术分析面的函数
 function switchToTechnicalAnalysis(stockCode) {
     // 切换到参数优化标签页
     switchTab('optimization-tab');
@@ -1304,7 +1304,7 @@ function switchToTechnicalAnalysis(stockCode) {
     // 设置股票代码
     document.getElementById('symbol').value = stockCode;
     
-    // 设���默认的日期范围（比如过去一年）
+    // 设默认的日期范围（比如过去一年）
     const today = new Date();
     const lastYear = new Date();
     lastYear.setFullYear(today.getFullYear() - 1);
@@ -1443,7 +1443,7 @@ style.textContent = `
         }
     }
     
-    /* 添���卡片悬停效果 */
+    /* 添卡片悬停效果 */
     .bg-white.rounded-lg.p-3.shadow-sm {
         transition: all 0.2s ease-in-out;
     }
@@ -1664,14 +1664,16 @@ async function handleDailyPicks(event) {
     event.preventDefault();
     
     const pickDate = document.getElementById('pickDate').value;
+    if (!pickDate) {
+        showToast('请选择分析日期', 'warning');
+        return;
+    }
+    
+    // 将日期格式从 YYYY-MM-DD 转换为 YYYYMMDD
+    const formattedDate = pickDate.replace(/-/g, '');
     const analysisModel = document.getElementById('analysisModel').value;
     const resultsDiv = document.getElementById('dailyPicksResults');
     const contentDiv = document.getElementById('dailyPicksContent');
-
-    if (!pickDate) {
-        showToast('请选择��析日期', 'error');
-        return;
-    }
 
     try {
         // 显示加载状态
@@ -1689,7 +1691,7 @@ async function handleDailyPicks(event) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                date: pickDate,
+                date: formattedDate,
                 model: analysisModel
             })
         });
@@ -1700,7 +1702,7 @@ async function handleDailyPicks(event) {
             throw new Error(data.error || '获取分析结果失败');
         }
 
-        // 直接显示后端返回的 HTML 内容
+        // 显示后端返回的 HTML 内容
         contentDiv.innerHTML = data.content;
         
         // 添加样式
@@ -2046,9 +2048,9 @@ function displayTargetStocks(stocks) {
         // 回报颜色区间
         const returnColor = 
             returnValue >= 0.8 ? 'text-red-600' :     // 80%以上红色
-            returnValue >= 0.5 ? 'text-orange-500' :  // 50-80%橙色
-            returnValue >= 0.3 ? 'text-yellow-600' :  // 30-50%黄色
-            returnValue >= 0 ? 'text-blue-600' :      // 0-30%蓝色
+            returnValue >=0.5 ? 'text-orange-500' :  // 50-80%橙色
+            returnValue >=0.3 ? 'text-yellow-600' :  // 30-50%黄色
+            returnValue >=0 ? 'text-blue-600' :      // 0-30%蓝色
             'text-green-600';                         // 负收益绿色
         
         row.innerHTML = `
