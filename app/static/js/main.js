@@ -1522,7 +1522,7 @@ function getSignalStyle(signal) {
     };
 }
 
-// 修改生成HTML的部分，确保data变量的作用域
+// 修���生成HTML的部分，确保data变量的作用域
 function displayPortfolioResults(data) {  // 添加data参数
     let html = '<div class="grid gap-4">';
     
@@ -2211,6 +2211,54 @@ document.addEventListener('DOMContentLoaded', function() {
     const updatePricesBtn = document.getElementById('updatePricesBtn');
     if (updatePricesBtn) {
         updatePricesBtn.addEventListener('click', updatePrices);
+    }
+});
+
+// 在 SpeechController 对象后添加以下代码
+
+// 复制功能处理
+document.addEventListener('DOMContentLoaded', function() {
+    const copyBtn = document.getElementById('copyAnalysisBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', async function() {
+            const content = document.getElementById('analysisContent');
+            if (!content) {
+                showToast('未找到分析内容', 'error');
+                return;
+            }
+
+            try {
+                // 获取纯文本内容
+                const textContent = content.innerText;
+                await navigator.clipboard.writeText(textContent);
+                
+                // 更新按钮状态以提供视觉反馈
+                const originalContent = this.innerHTML;
+                this.innerHTML = `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span class="text-sm font-medium">已复制</span>
+                `;
+                this.classList.remove('bg-green-50', 'hover:bg-green-100', 'text-green-600');
+                this.classList.add('bg-green-100', 'text-green-700');
+                
+                // 显示成功提示
+                showToast('分析内容已复制到剪贴板', 'success');
+                
+                // 2秒后恢复按钮原始状态
+                setTimeout(() => {
+                    this.innerHTML = originalContent;
+                    this.classList.remove('bg-green-100', 'text-green-700');
+                    this.classList.add('bg-green-50', 'hover:bg-green-100', 'text-green-600');
+                }, 2000);
+                
+            } catch (err) {
+                console.error('复制失败:', err);
+                showToast('复制失败，请重试', 'error');
+            }
+        });
     }
 });
 

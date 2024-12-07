@@ -479,7 +479,7 @@
                     </div>
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">量化交易策略优化</h1>
-                        <p class="text-sm text-gray-600 mt-0.5">优化您的交易���略参数，获得最佳回测效果</p>
+                        <p class="text-sm text-gray-600 mt-0.5">优化您的交易策略参数，获得最佳回测效果</p>
                     </div>
                 </div>
             </div>
@@ -749,16 +749,29 @@
                                 </div>
                                 <h3 class="text-lg font-semibold text-gray-800">分析对话</h3>
                             </div>
-                            <!-- 添加朗读按钮 -->
-                            <button id="readAnalysisBtn" 
-                                    class="flex items-center space-x-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 
-                                           text-indigo-600 rounded-lg transition-colors duration-200">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                          d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
-                                </svg>
-                                <span class="text-sm font-medium">朗读分析</span>
-                            </button>
+                            <!-- 按钮组 -->
+                            <div class="flex items-center space-x-2">
+                                <!-- 朗读按钮 -->
+                                <button id="readAnalysisBtn" 
+                                        class="flex items-center space-x-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 
+                                               text-indigo-600 rounded-lg transition-colors duration-200">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">朗读分析</span>
+                                </button>
+                                <!-- 复制按钮 -->
+                                <button id="copyAnalysisBtn"
+                                        class="flex items-center space-x-2 px-3 py-1.5 bg-green-50 hover:bg-green-100 
+                                               text-green-600 rounded-lg transition-colors duration-200">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                    <span class="text-sm font-medium">复制分析</span>
+                                </button>
+                            </div>
                         </div>
                         <div id="analysisContent" class="prose max-w-none space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar"></div>
                     </div>
