@@ -2228,9 +2228,58 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                // 获取纯文本内容
                 const textContent = content.innerText;
-                await navigator.clipboard.writeText(textContent);
+                
+                // 首先尝试使用 navigator.clipboard API
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(textContent);
+                } else {
+                    // 后备方案：创建临时文本区域
+                    const textArea = document.createElement('textarea');
+                    textArea.value = textContent;
+                    
+                    // 防止滚动到底部
+                    textArea.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 2em;
+                        height: 2em;
+                        padding: 0;
+                        border: none;
+                        outline: none;
+                        boxShadow: none;
+                        background: transparent;
+                    `;
+                    
+                    document.body.appendChild(textArea);
+                    
+                    if (navigator.userAgent.match(/ipad|iphone/i)) {
+                        // iOS 设备特殊处理
+                        textArea.contentEditable = true;
+                        textArea.readOnly = false;
+                        
+                        const range = document.createRange();
+                        range.selectNodeContents(textArea);
+                        
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        textArea.setSelectionRange(0, 999999);
+                    } else {
+                        // 其他设备
+                        textArea.select();
+                    }
+                    
+                    try {
+                        document.execCommand('copy');
+                    } catch (err) {
+                        console.error('复制失败:', err);
+                        throw new Error('复制命令执行失败');
+                    } finally {
+                        document.body.removeChild(textArea);
+                    }
+                }
                 
                 // 更新按钮状态以提供视觉反馈
                 const originalContent = this.innerHTML;
