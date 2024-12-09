@@ -1522,8 +1522,8 @@ function getSignalStyle(signal) {
     };
 }
 
-// 修���生成HTML的部分，确保data变量的作用域
-function displayPortfolioResults(data) {  // 添加data参数
+// 修改 displayPortfolioResults 函数
+function displayPortfolioResults(data) {
     let html = '<div class="grid gap-4">';
     
     data.results.forEach((result, index) => {
@@ -1537,7 +1537,7 @@ function displayPortfolioResults(data) {  // 添加data参数
             <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
                 <div class="p-4">
                     <!-- 标题行：股票名称和分析按钮 -->
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:justify-between mb-4">
                         <div class="flex items-center space-x-2">
                             <h3 class="text-lg font-semibold text-gray-800">${result.stock}</h3>
                             <span class="px-2 py-1 rounded-full text-sm ${parseFloat(tradeData['涨跌幅']) >= 0 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'}">
@@ -1545,9 +1545,11 @@ function displayPortfolioResults(data) {  // 添加data参数
                             </span>
                         </div>
                         <!-- 分析按钮组 -->
-                        <div class="flex space-x-2">
+                        <div class="flex space-x-2 w-full sm:w-auto">
                             <button onclick="switchToTechnicalAnalysis('${stockCode}')"
-                                    class="px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
+                                    class="flex-1 sm:flex-none h-10 px-3 sm:px-2.5 py-2 bg-blue-500 hover:bg-blue-600 
+                                           text-white text-sm font-medium rounded-lg transition-colors duration-200 
+                                           flex items-center justify-center space-x-1">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                           d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -1555,7 +1557,9 @@ function displayPortfolioResults(data) {  // 添加data参数
                                 <span>技术分析</span>
                             </button>
                             <button onclick="switchToAIAnalysis('${stockCode}')"
-                                    class="px-2.5 py-1 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center space-x-1">
+                                    class="flex-1 sm:flex-none h-10 px-3 sm:px-2.5 py-2 bg-purple-500 hover:bg-purple-600 
+                                           text-white text-sm font-medium rounded-lg transition-colors duration-200 
+                                           flex items-center justify-center space-x-1">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                           d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -1656,7 +1660,7 @@ function displayPortfolioResults(data) {  // 添加data参数
     });
     
     html += '</div>';
-    return html;  // 返回生成的HTML
+    return html;
 }
 
 // 处理每日选股表单提交
@@ -2072,7 +2076,7 @@ function displayTargetStocks(stocks) {
                 ${stock['industry']}
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
-                ${Number(stock['最新价格']).toFixed(2)}
+                ${Number(stock['最新��格']).toFixed(2)}
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${changeColor}">
                 ${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(2)}%
