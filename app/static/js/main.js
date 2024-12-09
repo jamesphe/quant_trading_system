@@ -309,8 +309,8 @@ function initializeDatePickers() {
     const datePickerConfigs = [
         {
             inputId: 'pickDate',
-            defaultDate: yesterday,
-            maxDate: yesterday,
+            defaultDate: today,  // 改为今天
+            maxDate: today,      // 改为今天
             onChange: (date, dateString) => {
                 console.log('每日选股日期已更改:', dateString);
                 updateDailyPicks(dateString);
@@ -425,7 +425,7 @@ async function handleDailyPicks(event) {
     
     const pickDate = document.getElementById('pickDate').value;
     if (!pickDate) {
-        showToast('请选择分析��期', 'warning');
+        showToast('请选择分析日期', 'warning');
         return;
     }
     
@@ -538,7 +538,7 @@ function initializeTabs() {
     }
 }
 
-// 修改 switchTab 函数
+// 修改 switchTab ���数
 function switchTab(tabId) {
     console.log('Switching to tab:', tabId); // 调试日志
     
@@ -1215,7 +1215,7 @@ function runPortfolioAnalysis(event) {
         return;
     }
     
-    // 获取表单数据
+    // 获取表��数据
     const formData = new FormData(form);
     const sendToWechat = document.getElementById('sendToWechat').checked;
     
