@@ -626,7 +626,6 @@ async function handleBacktest() {
 
 // 修改 handleAnalysis 函数
 async function handleAnalysis(event) {
-    // 阻止表单默认提交行为
     event.preventDefault();
     
     // 在分析开始前停止朗读
@@ -634,6 +633,7 @@ async function handleAnalysis(event) {
     
     const symbol = document.getElementById('analysisSymbol').value;
     const model = document.getElementById('modelSelect').value;
+    const additionalInfo = document.getElementById('additionalInfo').value.trim(); // 获取补充信息
     const resultsDiv = document.getElementById('analysisResults');
     const contentDiv = document.getElementById('analysisContent');
     const submitButton = event.target.querySelector('button[type="submit"]');
@@ -676,7 +676,8 @@ async function handleAnalysis(event) {
             },
             body: JSON.stringify({
                 symbol: symbol,
-                model: model
+                model: model,
+                additionalInfo: additionalInfo // 添加补充信息
             })
         });
 
@@ -1290,7 +1291,7 @@ function runPortfolioAnalysis(event) {
         showToast('分析失败: ' + error.message, 'error');
     })
     .finally(() => {
-        // 恢复按钮状态
+        // 恢复按���状态
         button.disabled = false;
         button.innerHTML = originalButtonContent;
     });
@@ -1907,7 +1908,7 @@ const SpeechController = {
             };
             
             this.audio.onerror = (e) => {
-                console.error('音频播放错误:', e);
+                console.error('音频��放错误:', e);
                 URL.revokeObjectURL(audioUrl);
                 this.audio = null;
                 this.isReading = false;
@@ -2001,28 +2002,7 @@ async function handleTargetStocks(event) {
         return;
     }
     
-    try {
-        const response = await fetch('/api/target_stocks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                date: date  // 直接使用 YYYY-MM-DD 格式
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-            throw new Error(data.error);
-        }
-        
-        displayTargetStocks(data.data);
-        
-    } catch (error) {
-        showToast(error.message, 'error');
-    }
+    await updateTargetStocks(date);
 }
 
 // 显示目标股票数据
@@ -2035,27 +2015,24 @@ function displayTargetStocks(stocks) {
         row.className = 'hover:bg-gray-50 transition-colors duration-200';
         
         // 修改涨跌幅的颜色逻辑：红色表示上涨，绿色表示下跌
-        const changeValue = parseFloat(stock['最新涨跌幅']);
+        const changeValue = parseFloat(stock['最新涨跌幅'] || 0);
         const changeColor = changeValue >= 0 ? 'text-red-600' : 'text-green-600';
         
         // 处理最佳胜率和最佳回报的颜色
-        const winRateValue = parseFloat(stock['最佳胜率']);
-        const returnValue = parseFloat(stock['最佳回报']);
-        // 胜率颜色区间
-        const winRateColor = 
-            winRateValue >= 0.8 ? 'text-red-600' :    // 80%以上红色
-            winRateValue >= 0.7 ? 'text-orange-500' : // 70-80%橙色
-            winRateValue >= 0.6 ? 'text-yellow-600' : // 60-70%黄色
-            winRateValue >= 0.5 ? 'text-blue-600' :   // 50-60%蓝色
-            'text-gray-600';                          // 50%以下灰色
+        const winRateValue = parseFloat(stock['最佳胜率'] || 0);
+        const returnValue = parseFloat(stock['最佳回报'] || 0);
         
-        // 回报颜色区间
-        const returnColor = 
-            returnValue >= 0.8 ? 'text-red-600' :     // 80%以上红色
-            returnValue >=0.5 ? 'text-orange-500' :  // 50-80%橙色
-            returnValue >=0.3 ? 'text-yellow-600' :  // 30-50%黄色
-            returnValue >=0 ? 'text-blue-600' :      // 0-30%蓝色
-            'text-green-600';                         // 负收益绿色
+        // 根据胜率值设置颜色
+        const winRateColor = winRateValue >= 0.6 ? 'text-green-600' : 
+                           winRateValue >= 0.5 ? 'text-blue-600' : 'text-red-600';
+                           
+        // 根据回报值设置颜色
+        const returnColor = returnValue >= 0.2 ? 'text-green-600' : 
+                          returnValue >= 0 ? 'text-blue-600' : 'text-red-600';
+        
+        // 确保价格显示正确
+        const price = parseFloat(stock['最新价格']);
+        const priceDisplay = isNaN(price) ? '-' : price.toFixed(2);
         
         row.innerHTML = `
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
@@ -2076,7 +2053,7 @@ function displayTargetStocks(stocks) {
                 ${stock['industry']}
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
-                ${Number(stock['最新��格']).toFixed(2)}
+                ${priceDisplay}
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${changeColor}">
                 ${changeValue >= 0 ? '+' : ''}${changeValue.toFixed(2)}%
@@ -2314,4 +2291,55 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// 在文件末尾添加 updateTargetStocks 函数
+async function updateTargetStocks(date) {
+    try {
+        // 显示加载状态
+        const tbody = document.getElementById('targetStocksBody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="px-6 py-4 text-center">
+                    <div class="flex justify-center items-center space-x-3">
+                        <div class="animate-spin rounded-full h-5 w-5 border-2 border-purple-500 border-t-transparent"></div>
+                        <span class="text-gray-600">正在获取数据...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        const response = await fetch('/api/target_stocks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: date })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || '获取数据失败');
+        }
+
+        // 显示数据
+        displayTargetStocks(data.data);
+
+    } catch (error) {
+        console.error('获取目标股票数据失败:', error);
+        showToast(error.message, 'error');
+        
+        // 显示错误状态
+        const tbody = document.getElementById('targetStocksBody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="px-6 py-4 text-center">
+                    <div class="text-red-500">
+                        ${error.message}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
 
