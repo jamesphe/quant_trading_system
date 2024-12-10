@@ -628,21 +628,40 @@ async function handleBacktest() {
 async function handleAnalysis(event) {
     event.preventDefault();
     
-    // 在分析开始前停止朗读
-    SpeechController.stop();
-    
-    const symbol = document.getElementById('analysisSymbol').value;
-    const model = document.getElementById('modelSelect').value;
-    const additionalInfo = document.getElementById('additionalInfo').value.trim(); // 获取补充信息
+    // 获取必需的DOM元素
+    const symbolInput = document.getElementById('analysisSymbol');
+    const modelSelect = document.getElementById('modelSelect');
+    const additionalInfoInput = document.getElementById('additionalInfo');
     const resultsDiv = document.getElementById('analysisResults');
     const contentDiv = document.getElementById('analysisContent');
-    const submitButton = event.target.querySelector('button[type="submit"]');
     
+    // 检查必需的元素是否存在
+    if (!symbolInput || !modelSelect || !resultsDiv || !contentDiv) {
+        showToast('页面元素加载失败，请刷新页面重试', 'error');
+        return;
+    }
+
+    const symbol = symbolInput.value;
+    const model = modelSelect.value;
+    const additionalInfo = additionalInfoInput ? additionalInfoInput.value.trim() : '';
+    
+    // 验证输入
     if (!symbol) {
         showToast('请输入股票代码', 'warning');
         return;
     }
     
+    // 在分析开始前停止朗读
+    if (typeof SpeechController !== 'undefined') {
+        SpeechController.stop();
+    }
+
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    if (!submitButton) {
+        showToast('提交按钮未找到，请刷新页面重试', 'error');
+        return;
+    }
+
     // 更新按钮状态
     submitButton.disabled = true;
     const originalButtonContent = submitButton.innerHTML;
@@ -653,22 +672,22 @@ async function handleAnalysis(event) {
         </div>
     `;
     
-    // 显示结果区域和加载提示
-    resultsDiv.classList.remove('hidden');
-    contentDiv.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-8 space-y-4">
-            <div class="relative">
-                <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
-                <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-indigo-200 opacity-20"></div>
-            </div>
-            <div class="text-center">
-                <p class="text-lg font-medium text-gray-600">AI正在分析 ${symbol}</p>
-                <p class="text-sm text-gray-500 mt-2">这可能需要一些时间...</p>
-            </div>
-        </div>
-    `;
-    
     try {
+        // 显示结果区域和加载提示
+        resultsDiv.classList.remove('hidden');
+        contentDiv.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 space-y-4">
+                <div class="relative">
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
+                    <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-indigo-200 opacity-20"></div>
+                </div>
+                <div class="text-center">
+                    <p class="text-lg font-medium text-gray-600">AI正在分析 ${symbol}</p>
+                    <p class="text-sm text-gray-500 mt-2">这可能需要一些时间...</p>
+                </div>
+            </div>
+        `;
+
         const response = await fetch('/analyze_stock', {
             method: 'POST',
             headers: {
@@ -677,7 +696,7 @@ async function handleAnalysis(event) {
             body: JSON.stringify({
                 symbol: symbol,
                 model: model,
-                additionalInfo: additionalInfo // 添加补充信息
+                additionalInfo: additionalInfo
             })
         });
 
@@ -745,16 +764,18 @@ async function handleAnalysis(event) {
                         
                         // 更新显示
                         const markdownContent = contentDiv.querySelector('.markdown-content');
-                        markdownContent.innerHTML = marked.parse(analysisText);
-                        
-                        // 添加样式
-                        applyMarkdownStyles(markdownContent);
-                        
-                        // 平滑滚动到底部
-                        smoothScrollToBottom(contentDiv);
-                        
-                        // 添加打字机效果的CSS类
-                        markdownContent.classList.add('typing-effect');
+                        if (markdownContent) {
+                            markdownContent.innerHTML = marked.parse(analysisText);
+                            
+                            // 添加样式
+                            applyMarkdownStyles(markdownContent);
+                            
+                            // 平滑滚动到底部
+                            smoothScrollToBottom(contentDiv);
+                            
+                            // 添加打字机效果的CSS类
+                            markdownContent.classList.add('typing-effect');
+                        }
                         
                     } catch (e) {
                         console.warn('解析数据块失败:', e);
@@ -776,8 +797,10 @@ async function handleAnalysis(event) {
         `;
     } finally {
         // 恢复按钮状态
-        submitButton.disabled = false;
-        submitButton.innerHTML = originalButtonContent;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonContent;
+        }
     }
 }
 
@@ -1216,7 +1239,7 @@ function runPortfolioAnalysis(event) {
         return;
     }
     
-    // 获取表��数据
+    // 获取表数据
     const formData = new FormData(form);
     const sendToWechat = document.getElementById('sendToWechat').checked;
     
@@ -1291,7 +1314,7 @@ function runPortfolioAnalysis(event) {
         showToast('分析失败: ' + error.message, 'error');
     })
     .finally(() => {
-        // 恢复按���状态
+        // 恢复按状态
         button.disabled = false;
         button.innerHTML = originalButtonContent;
     });
@@ -1908,7 +1931,7 @@ const SpeechController = {
             };
             
             this.audio.onerror = (e) => {
-                console.error('音频��放错误:', e);
+                console.error('音频播放错误:', e);
                 URL.revokeObjectURL(audioUrl);
                 this.audio = null;
                 this.isReading = false;
@@ -2286,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
             } catch (err) {
                 console.error('复制失败:', err);
-                showToast('复制失败，请重试', 'error');
+                showToast('复���失败，请重试', 'error');
             }
         });
     }
