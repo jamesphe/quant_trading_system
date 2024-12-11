@@ -748,10 +748,8 @@ def get_target_stocks():
             
         # 将日期格式统一转换为 YYYY-MM-DD
         try:
-            # 尝试将日期转换为 YYYY-MM-DD 格式
             parsed_date = datetime.strptime(date, '%Y-%m-%d').strftime('%Y-%m-%d')
         except ValueError:
-            # 如果转换失败,返回错误信息
             return jsonify({
                 'success': False,
                 'error': '日期格式错误,请使用YYYY-MM-DD格式'
@@ -770,21 +768,63 @@ def get_target_stocks():
                 'error': f'未找到{parsed_date}的目标股票数据'
             }), 404
 
-        # 读取CSV文件
-        df = pd.read_csv(file_path, dtype={'股票代码': str})
-        
-        # 选择需要的列
-        selected_columns = ['股票代码', '股票名称', 'industry', '最新价格', '最新涨跌幅', '换手率', '夏普比率', '最佳回报', '最佳胜率']
-        df = df[selected_columns]
-        
-        # 转换为字典列表
-        stocks = df.to_dict('records')
-        
-        return jsonify({
-            'success': True,
-            'data': stocks
-        })
-        
+        try:
+            # 读取CSV文件
+            df = pd.read_csv(file_path, 
+                           dtype={'股票代码': str},
+                           encoding='utf-8',
+                           on_bad_lines='skip')
+            
+            # 确保所有必需的列都存在
+            required_columns = [
+                '股票代码', '股票名称', 'industry', '最新价格', 
+                '最新涨跌幅', '换手率', '夏普比率', '最佳回报', '最佳胜率'
+            ]
+            
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                raise ValueError(f'CSV文件缺少以下列: {", ".join(missing_columns)}')
+            
+            # 重命名industry列为所属行业
+            df = df.rename(columns={'industry': '所属行业'})
+            
+            # 选择需要的列并处理空值
+            df = df[['股票代码', '股票名称', '所属行业', '最新价格', '最新涨跌幅', 
+                    '换手率', '夏普比率', '最佳回报', '最佳胜率']].fillna({
+                '最新价格': 0,
+                '最新涨跌幅': 0,
+                '换手率': 0,
+                '夏普比率': 0,
+                '最佳回报': 0,
+                '最佳胜率': 0,
+                '所属行业': ''
+            })
+            
+            # 确保数值列为数值类型
+            numeric_columns = ['最新价格', '最新涨跌幅', '换手率', 
+                             '夏普比率', '最佳回报', '最佳胜率']
+            for col in numeric_columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            # 转换为字典列表
+            stocks = df.to_dict('records')
+            
+            return jsonify({
+                'success': True,
+                'data': stocks
+            })
+            
+        except pd.errors.EmptyDataError:
+            return jsonify({
+                'success': False,
+                'error': 'CSV文件为空'
+            }), 500
+        except ValueError as ve:
+            return jsonify({
+                'success': False,
+                'error': str(ve)
+            }), 500
+            
     except Exception as e:
         logger.error(f'获取目标股票数据失败: {str(e)}', exc_info=True)
         return jsonify({

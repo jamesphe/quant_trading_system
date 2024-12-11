@@ -605,7 +605,7 @@
                             <span class="text-lg font-medium text-gray-600">正在优化策略参数</span>
                             <span class="loading-dots"></span>
                         </div>
-                        <p class="text-sm text-gray-500">���可能需要几分钟时间</p>
+                        <p class="text-sm text-gray-500">��能需要几分钟时间</p>
                     </div>
                 </div>
 
@@ -681,47 +681,14 @@
 
                             <div class="form-group">
                                 <label for="modelSelect" class="form-label block text-sm font-medium text-gray-700 mb-1">
-                                    分析模
+                                    分析模型
                                 </label>
-                                <div class="relative">
-                                    <select id="modelSelect" 
-                                            name="model" 
-                                            class="form-select appearance-none block w-full px-4 py-2 pr-10 rounded-lg border border-gray-300 
-                                                   bg-white shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 
-                                                   hover:border-indigo-400 transition-colors duration-200
-                                                   text-gray-700 cursor-pointer">
-                                        <option value="zhipu" class="py-2 flex items-center">
-                                            <span class="flex items-center">
-                                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                                                </svg>
-                                                智谱AI
-                                            </span>
-                                        </option>
-                                        <option value="kimi" class="py-2 flex items-center">
-                                            <span class="flex items-center">
-                                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
-                                                </svg>
-                                                Kimi
-                                            </span>
-                                        </option>
-                                        <option value="openai" class="py-2 flex items-center">
-                                            <span class="flex items-center">
-                                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M13.5 2c-5.629 0-10.212 4.436-10.475 10h-3.025l4.537 5.917 4.463-5.917h-3.025c.26-3.902 3.508-7 7.525-7 4.178 0 7.573 3.395 7.573 7.573 0 4.178-3.395 7.573-7.573 7.573-1.396 0-2.7-.382-3.818-1.041l-1.939 2.047c1.611 1.187 3.588 1.891 5.727 1.891 5.356 0 9.727-4.371 9.727-9.727s-4.371-9.727-9.727-9.727z"/>
-                                                </svg>
-                                                OpenAI
-                                            </span>
-                                        </option>
-                                    </select>
-                                    <!-- 自定义下拉箭头 -->
-                                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="modelSelect" 
+                                        class="form-select block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="openai" selected>OpenAI</option>
+                                    <option value="zhipu">智谱AI</option>
+                                    <option value="kimi">Kimi</option>
+                                </select>
                             </div>
 
                             <div class="form-group flex items-end">
@@ -1005,10 +972,9 @@
                                                 <span class="sort-icon ml-1">↕</span>
                                             </th>
                                             <th scope="col" 
-                                                class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs 
-                                                       font-medium text-gray-500 uppercase tracking-wider cursor-pointer 
-                                                       hover:bg-gray-100" 
-                                                data-sort="industry">
+                                                class="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 
+                                                       uppercase tracking-wider cursor-pointer hover:bg-gray-100" 
+                                                data-sort="所属行业">
                                                 行业
                                                 <span class="sort-icon ml-1">↕</span>
                                             </th>

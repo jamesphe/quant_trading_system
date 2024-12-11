@@ -1,3 +1,7 @@
+// 在文件开头添加全局变量来跟踪排序状态
+let currentSortColumn = null;
+let sortStates = {};  // 用于跟踪每列的排序状态: null(不排序) -> 'asc' -> 'desc'
+
 function optimize() {
     const symbol = document.getElementById('symbol').value;
     const startDate = document.getElementById('startDate').value;
@@ -206,7 +210,7 @@ class DatePicker {
         this.hiddenInput.id = this.options.inputId;
         this.hiddenInput.className = 'absolute opacity-0 -z-10 pointer-events-none';
         
-        // 设置日期范围
+        // 设置�����范围
         if (this.options.minDate) {
             this.hiddenInput.min = this.formatDate(this.options.minDate);
         }
@@ -365,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化标签页
     initializeTabs();
     
-    // 初始化日期选择器
+    // ���始化日期选择器
     initializeDatePickers();
     
     // 初始化其他组件
@@ -770,7 +774,7 @@ async function handleAnalysis(event) {
                             // 添加样式
                             applyMarkdownStyles(markdownContent);
                             
-                            // 平滑滚动到底部
+                            // 平滑滚�����到底部
                             smoothScrollToBottom(contentDiv);
                             
                             // 添加打字机效果的CSS类
@@ -1259,7 +1263,7 @@ function runPortfolioAnalysis(event) {
         </div>
     `;
     
-    // 显示加载示
+    // 显��加载示
     resultsDiv.innerHTML = `
         <div class="animate-pulse flex space-x-4 items-center justify-center py-12">
             <div class="rounded-full bg-purple-200 h-12 w-12"></div>
@@ -1560,7 +1564,7 @@ function displayPortfolioResults(data) {
         html += `
             <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
                 <div class="p-4">
-                    <!-- 标题行：股票名称和分析按钮 -->
+                    <!-- 标题行：股票名���和分析按钮 -->
                     <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:justify-between mb-4">
                         <div class="flex items-center space-x-2">
                             <h3 class="text-lg font-semibold text-gray-800">${result.stock}</h3>
@@ -2011,9 +2015,6 @@ const SpeechController = {
     }
 };
 
-// 添加目标股票相关的函数
-let currentSortColumn = '';
-let isAscending = true;
 
 // 处理目标股票表单提交
 async function handleTargetStocks(event) {
@@ -2028,14 +2029,19 @@ async function handleTargetStocks(event) {
     await updateTargetStocks(date);
 }
 
-// 显示目标股票数据
+// 修改 displayTargetStocks 函数，添加原始索引
 function displayTargetStocks(stocks) {
     const tbody = document.getElementById('targetStocksBody');
     tbody.innerHTML = '';
     
-    stocks.forEach(stock => {
+    // 重置排序状态（移除重复声明）
+    currentSortColumn = null;
+    sortStates = {};
+    
+    stocks.forEach((stock, index) => {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50 transition-colors duration-200';
+        row.dataset.originalIndex = index;  // 保存原始顺序
         
         // 修改涨跌幅的颜色逻辑：红色表示上涨，绿色表示下跌
         const changeValue = parseFloat(stock['最新涨跌幅'] || 0);
@@ -2072,8 +2078,8 @@ function displayTargetStocks(stocks) {
                     ${stock['股票名称']}
                 </a>
             </td>
-            <td class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                ${stock['industry']}
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                ${stock['所属行业'] || '-'}
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                 ${priceDisplay}
@@ -2097,62 +2103,137 @@ function displayTargetStocks(stocks) {
         
         tbody.appendChild(row);
     });
-}
-
-// 排序函数
-function sortStocks(column) {
-    const tbody = document.getElementById('targetStocksBody');
-    const rows = Array.from(tbody.getElementsByTagName('tr'));
     
-    // 如果点击的是当前排序列，则反转排序方向
-    if (column === currentSortColumn) {
-        isAscending = !isAscending;
-    } else {
-        currentSortColumn = column;
-        isAscending = true;
-    }
-    
-    // 更新所有排序图标
-    document.querySelectorAll('.sort-icon').forEach(icon => {
-        icon.textContent = '↕';
-    });
-    
-    // 更新当前列的排序图标
-    const currentHeader = document.querySelector(`th[data-sort="${column}"]`);
-    if (currentHeader) {
-        const icon = currentHeader.querySelector('.sort-icon');
-        icon.textContent = isAscending ? '↑' : '↓';
-    }
-    
-    // 排序
-    rows.sort((a, b) => {
-        let aValue = a.children[getColumnIndex(column)].textContent.trim();
-        let bValue = b.children[getColumnIndex(column)].textContent.trim();
-        
-        // 数字类型的列需要特殊处理
-        if (['最新涨跌幅', '最新价格', '换手率', '夏普比率', '最佳胜率', '最佳回报'].includes(column)) {
-            aValue = aValue === '-' ? 0 : parseFloat(aValue.replace('%', ''));
-            bValue = bValue === '-' ? 0 : parseFloat(bValue.replace('%', ''));
+    // 更新所有表头的排序图标
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+        const icon = th.querySelector('.sort-icon');
+        const columnName = th.getAttribute('data-sort');
+        if (columnName === '股票代码') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '股票名称') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '所属行业') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '最新价格') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '最新涨跌幅') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '换手率') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '最佳胜率') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '最佳回报') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else if (columnName === '夏普比率') {
+            switch (sortStates[columnName]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
         }
-        
-        if (aValue < bValue) return isAscending ? -1 : 1;
-        if (aValue > bValue) return isAscending ? 1 : -1;
-        return 0;
     });
-    
-    // 重新插入排序后的行
-    rows.forEach(row => tbody.appendChild(row));
 }
 
-// 获取列索引
+// 修改 sortStocks 函数中的列索引获取逻辑
 function getColumnIndex(column) {
-    const headers = document.querySelectorAll('th[data-sort]');
-    for (let i = 0; i < headers.length; i++) {
-        if (headers[i].getAttribute('data-sort') === column) {
-            return i;
-        }
-    }
-    return 0;
+    const columnMap = {
+        '股票代码': 0,
+        '股票名称': 1,
+        '所属行业': 2,
+        '最新价格': 3,
+        '最新涨跌幅': 4,
+        '换手率': 5,
+        '最佳胜率': 6,
+        '最佳回报': 7,
+        '夏普比率': 8
+    };
+    return columnMap[column] || 0;
 }
 
 // 在文档加载完成后初始化事件监听
@@ -2309,7 +2390,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
             } catch (err) {
                 console.error('复制失败:', err);
-                showToast('复���失败，请重试', 'error');
+                showToast('复失败，请重试', 'error');
             }
         });
     }
@@ -2365,4 +2446,128 @@ async function updateTargetStocks(date) {
         `;
     }
 }
+
+// 添加排序函数
+function sortStocks(column) {
+    const tbody = document.getElementById('targetStocksBody');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+    
+    // 初始化该列的排序状态(如果还没有)
+    if (!sortStates[column]) {
+        sortStates[column] = null;
+    }
+    
+    // 更新排序状态
+    if (currentSortColumn !== column) {
+        // 切换到新列时，重置其他列的状态
+        Object.keys(sortStates).forEach(key => {
+            sortStates[key] = null;
+        });
+        // 新列设置为升序
+        sortStates[column] = 'asc';
+        currentSortColumn = column;
+    } else {
+        // 同一列循环: null -> asc -> desc -> null
+        switch (sortStates[column]) {
+            case null:
+                sortStates[column] = 'asc';
+                break;
+            case 'asc':
+                sortStates[column] = 'desc';
+                break;
+            case 'desc':
+                sortStates[column] = null;
+                break;
+        }
+    }
+    
+    // 更新所有表头的排序图标
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+        const icon = th.querySelector('.sort-icon');
+        const columnName = th.getAttribute('data-sort');
+        if (columnName === column) {
+            switch (sortStates[column]) {
+                case 'asc':
+                    icon.textContent = '↑';
+                    break;
+                case 'desc':
+                    icon.textContent = '↓';
+                    break;
+                default:
+                    icon.textContent = '↕';
+                    break;
+            }
+        } else {
+            icon.textContent = '↕';
+        }
+    });
+    
+    // 如果是不排序状态，恢复原始顺序
+    if (sortStates[column] === null) {
+        rows.sort((a, b) => {
+            return parseInt(a.dataset.originalIndex || 0) - parseInt(b.dataset.originalIndex || 0);
+        });
+    } else {
+        // 排序行
+        rows.sort((a, b) => {
+            let aValue = getCellValue(a, column);
+            let bValue = getCellValue(b, column);
+            
+            // 数值比较
+            if (['最新价格', '最新涨跌幅', '换手率', '最佳胜率', '最佳回报', '夏普比率'].includes(column)) {
+                aValue = parseFloat(aValue.replace(/[+%]/g, '')) || 0;
+                bValue = parseFloat(bValue.replace(/[+%]/g, '')) || 0;
+            }
+            
+            // 比较
+            if (aValue === bValue) return 0;
+            const compareResult = aValue > bValue ? 1 : -1;
+            return sortStates[column] === 'asc' ? compareResult : -compareResult;
+        });
+    }
+    
+    // 重新插入排序后的行
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// 获取单元格值的辅助函数
+function getCellValue(row, column) {
+    const columnIndex = getColumnIndex(column);
+    const cell = row.cells[columnIndex];
+    
+    // 如果单元格包含链接，获取链接文本
+    const link = cell.querySelector('a');
+    if (link) {
+        return link.textContent.trim();
+    }
+    
+    return cell.textContent.trim();
+}
+
+// 获取列索引的辅助函数
+function getColumnIndex(column) {
+    const columnMap = {
+        '股票代码': 0,
+        '股票名称': 1,
+        '所属行业': 2,
+        '最新价格': 3,
+        '最新涨跌幅': 4,
+        '换手率': 5,
+        '最佳胜率': 6,
+        '最佳回报': 7,
+        '夏普比率': 8
+    };
+    return columnMap[column] || 0;
+}
+
+// 在文档加载完成后初始化排序事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // 为所有可排序的表头添加点击事件
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.getAttribute('data-sort');
+            sortStocks(column);
+        });
+    });
+});
 
