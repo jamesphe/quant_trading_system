@@ -172,84 +172,126 @@ def get_cost_price(symbol: str) -> float:
 
 
 
-def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name: str, basic_info: dict, news_list: list, include_backtest: bool = True) -> str:
-    """生成用于分析股票的prompt"""
-    data_description = stock_data.to_string()
+def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name: str, 
+                              basic_info: dict, news_list: list, include_backtest: bool = True) -> str:
+    """
+    生成用于分析股票的prompt。
     
-    # 格式化基本信息
+    Args:
+        symbol (str): 股票代码
+        stock_data (pd.DataFrame): 近30交易日行情数据
+        stock_name (str): 股票简称
+        basic_info (dict): 股票基本信息
+        news_list (list): 最新资讯列表，包含时间、标题、内容字段
+        include_backtest (bool): 是否包含回测信息
+    
+    Returns:
+        str: 生成的分析提示词
+    """
+    # 最新价格和涨跌幅
+    latest_row = stock_data.iloc[-1]
+    current_price = round(latest_row['Close'], 2)
+    pct_change = round(latest_row['Pct_change'], 2)
+
+    # Chandelier Exit指标
+    atr = round(latest_row['ATR'], 2)
+    long_stop = round(latest_row['多头止损'], 2)
+    short_stop = round(latest_row['空头止损'], 2)
+
+    # 技术指标
+    macd = round(latest_row['MACD'], 2)
+    macd_signal = round(latest_row['MACD_SIGNAL'], 2)
+    macd_hist = round(latest_row['MACD_HIST'], 2)
+    rsi_6 = round(latest_row['RSI_6'], 2)
+    rsi_12 = round(latest_row['RSI_12'], 2)
+    rsi_24 = round(latest_row['RSI_24'], 2)
+    boll_upper = round(latest_row['BOLL_UPPER'], 2)
+    boll_middle = round(latest_row['BOLL_MIDDLE'], 2)
+    boll_lower = round(latest_row['BOLL_LOWER'], 2)
+    zlsma_20 = round(latest_row['ZLSMA_20'], 2)
+    zlsma_60 = round(latest_row['ZLSMA_60'], 2)
+
+    # 基本信息描述
     basic_info_text = "\n".join([f"{k}: {v}" for k, v in basic_info.items()])
-    
-    # 格式化新闻信息
+
+    # 最新资讯格式化
     news_text = "\n".join([
         f"- {news['publish_time']}: {news['title']}\n  {news['content'][:200]}..."
         for news in news_list
-    ])
-    
-    # 获取持仓成本
+    ]) if news_list else "无最新资讯"
+
+    # 持仓成本信息
     cost_price = get_cost_price(symbol)
-    cost_info = f"当前持仓成本: {cost_price}" if cost_price > 0 else "无持仓成本信息"
+    cost_info = f"当前持仓成本: {round(cost_price, 2)}" if cost_price > 0 else "无持仓成本信息"
 
+    # 持仓建议
+    if cost_price > 0:
+        if current_price > cost_price * 1.05:
+            position_plan = "建议继续持有或部分止盈，保护已有利润。"
+        elif long_stop < current_price <= cost_price:
+            position_plan = "当前价格接近或低于持仓成本，建议严格关注多头止损并制定减仓计划。"
+        elif current_price <= long_stop:
+            position_plan = "价格已低于多头止损，建议止损离场，减少损失。"
+        else:
+            position_plan = "当前价格表现平稳，建议继续观察，等待明确信号。"
+    else:
+        position_plan = "无持仓，无需制定持仓计划。"
+
+    # Prompt模板
     prompt = f"""
-你是一名经验丰富的股票量化交易员。你的任务是对{stock_name}（{symbol}）进行深入分析，以Chandelier Exit（吊灯止损）策略为核心，对下一交易日的走势进行预判并给出可执行的交易建议。策略需贯彻“截止亏损，让利润奔跑”的原则，并参考当前持仓成本信息。
+你是一名经验丰富的股票量化交易员。你的任务是对{stock_name}（{symbol}）进行深入分析，以Chandelier Exit（吊灯止损）策略为核心，结合其他技术指标和市场资讯，帮助制定下一个交易日的建仓或清仓计划。
 
-【股票信息】  
+【股票基本信息】  
 {basic_info_text}
 
-【近30交易日行情数据】  
-{data_description}
+【当前价格信息】  
+- 当前价格: {current_price:.2f}  
+- 涨跌幅: {pct_change:.2f}%  
+- 持仓成本: {cost_info}
+
+【Chandelier Exit指标】  
+- ATR值: {atr:.2f}  
+- 多头止损价格: {long_stop:.2f}  
+- 空头止损价格: {short_stop:.2f}
+
+【技术指标】  
+- MACD: {macd:.2f}, 信号线: {macd_signal:.2f}, 柱状图: {macd_hist:.2f}  
+- RSI(6): {rsi_6:.2f}, RSI(12): {rsi_12:.2f}, RSI(24): {rsi_24:.2f}  
+- BOLL(上轨): {boll_upper:.2f}, BOLL(中轨): {boll_middle:.2f}, BOLL(下轨): {boll_lower:.2f}  
+- ZLSMA(20): {zlsma_20:.2f}, ZLSMA(60): {zlsma_60:.2f}
+
+【持仓建议】  
+{position_plan}
 
 【最新资讯与链接】  
 {news_text}
 
-【持仓成本】  
-{cost_info}
-
-在行情数据中已包含Chandelier Exit策略所需的关键参数和指标（如：周期、倍数、ATR值、多头止损值、空头止损值）。请在分析中使用这些参数与指标，确保策略执行时有明确的参数依据。
-
 【分析要求】  
-1. **Chandelier Exit策略（核心）**：  
-   - 利用已提供的周期与倍数参数，以及ATR数据，确认当前Chandelier Exit的多头与空头止损位。  
-   - 判断价格所处关键止损价格（多头止损或空头止损）附近的状态，并明确当前策略信号（做多、做空或观望）。  
-   - 一旦价格触及对应的止损位（多头或空头），必须严格执行止损，坚决离场。
+1. **建仓时机的多指标验证**：  
+   - 利用Chandelier Exit多头止损位确认当前趋势信号（做多或观望）。  
+   - 使用辅助指标（MACD、RSI、BOLL、ZLSMA等）验证信号是否强劲，并评估趋势的潜在背离和超买超卖状态。  
+   - 结合最新资讯，评估市场情绪与基本面对当前趋势的正负面影响，确认是否适合建仓。  
+   - 提出明确的建仓建议：包括参考价格区间、初始止损位、分批建仓策略等。
 
-2. **根据持仓情况动态调整策略**：  
-   - 若{cost_info}中含有有效持仓成本（即cost_price > 0），说明当前有持仓：  
-     - 若价格显著高于持仓成本并趋势向上，可结合Chandelier Exit多头止损动态上移止损位，让利润奔跑。  
-     - 若价格接近或低于持仓成本且有跌破多头止损位风险，应严格止损离场，以防亏损扩大。  
-   - 若{cost_info}为“无持仓成本信息”（即当前无持仓），则无需对现有持仓进行风险控制：  
-     - 若当前趋势和Chandelier Exit信号支持多头方向（价格站稳多头止损价格上方，趋势向上），则在下一交易日给出建仓策略。例如：  
-       - 根据预期价格区间和ATR设置合理买入区间和初始止损位。  
-       - 提前设定分批建仓计划，在价格向上突破特定水平时小幅加仓，确保风险可控。  
-     - 若趋势并非明确看多，或Chandelier Exit信号不支持多头，则保持观望，不贸然入场。
+2. **提前逃顶信号与清仓计划**：  
+   - 分析股价接近多头止损前的指标表现，寻找可能的逃顶信号（如RSI超买、MACD顶背离等）。  
+   - 结合市场资讯，评估是否存在对股价负面影响的潜在风险（如行业新闻或资金流向变化）。  
+   - 提出清仓策略：包括清仓时机、预期价格区间，以及考虑持仓成本后的损益评估。  
 
-3. **辅助技术指标验证**（MACD、RSI、BOLL、ZLSMA等）：  
-   - 将Chandelier Exit信号与其他指标验证，确认趋势强弱、潜在背离及超买超卖状态。  
-   - 若出现明显背离或极端情况，可相应调低或调高仓位介入标准。
+3. **风险控制与动态调整**：  
+   - 严格遵守Chandelier Exit止损纪律：触及多头或空头止损位时，坚决执行止损。  
+   - 若价格显著高于持仓成本，结合动态上移止损位策略，保护收益，让利润奔跑。  
+   - 在趋势强劲时，适当提升仓位介入标准，扩大收益潜力；在趋势不明朗时，降低风险敞口。
 
-4. **基本面与市场情绪分析**：  
-   - 根据最新资讯、行业动态、龙虎榜信息，评估市场情绪对价格的正负面影响。  
-   - 若基本面与Chandelier Exit信号冲突，说明冲突程度，并在策略中适当调整仓位或快速止盈止损，以应对不确定性。
+4. **综合分析与交易计划制定**：  
+   - 针对当前趋势、技术指标和市场情绪，综合判断下一个交易日的价格波动区间。  
+   - 提出清晰的建仓计划（包括价格区间、分批建仓建议、初始止损位）。  
+   - 若当前趋势不明朗或信号冲突，建议保持观望，并说明原因。  
 
-5. **下一交易日走势预判与策略**：  
-   - 基于Chandelier Exit策略和相关参数，预判下一交易日价格可能的波动区间。  
-   - 针对高开、平开、低开分别给出指令（如加仓、减仓、清仓或观望）。  
-   - 若无持仓且趋势明朗支持多头，在高开或突破关键价位时入场，并设置合理止损位以控制风险。
-
-6. **风险控制与仓位管理**：  
-   - 严格遵守Chandelier Exit止损纪律：触及止损位立即止损。  
-   - 在趋势有利时，动态抬高止损位，让利润奔跑。  
-   - 灵活运用ATR和持仓成本信息，确保仓位配置合理、风险可控。  
-   - 无持仓时的建仓策略必须设定清晰的入场条件和初始止损，谨防盲目进场。
-
-【输出要求】  
-- 分析结论应以Chandelier Exit策略为依据，并清晰指出当前关键止损价格、入场点、出场点和止盈止损价格。  
-- 若有持仓，说明基于持仓成本的策略调整；若无持仓且为看多趋势，给出下一交易日的建仓方案。  
-- 策略应体现“截止亏损，让利润奔跑”的精神，在有持仓时保护收益或减少亏损，在无持仓且趋势看多时抓住合理的介入机会。
-
-请根据上述要求完成分析并给出最终建议。
+请根据上述要求完成分析并提供交易建议。
 """
-    print(prompt)
     return prompt
+
 
 
 
