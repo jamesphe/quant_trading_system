@@ -237,6 +237,15 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
     else:
         position_plan = "无持仓，无需制定持仓计划。"
 
+    # MACD顶背离检测
+    macd_divergence = "未检测到顶背离。"
+    if len(stock_data) > 1:
+        prev_row = stock_data.iloc[-2]
+        prev_macd = round(prev_row['MACD'], 2)
+        prev_price = round(prev_row['Close'], 2)
+        if macd < prev_macd and current_price > prev_price:
+            macd_divergence = "检测到MACD顶背离，建议关注潜在风险，考虑减仓或止盈。"
+
     # Prompt模板
     prompt = f"""
 你是一名经验丰富的股票量化交易员。你的任务是对{stock_name}（{symbol}）进行深入分析，以Chandelier Exit（吊灯止损）策略为核心，结合其他技术指标和市场资讯，帮助制定下一个交易日的建仓或清仓计划。
@@ -262,6 +271,9 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 
 【持仓建议】  
 {position_plan}
+
+【MACD顶背离分析】  
+{macd_divergence}
 
 【最新资讯与链接】  
 {news_text}
@@ -291,9 +303,6 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 请根据上述要求完成分析并提供交易建议。
 """
     return prompt
-
-
-
 
 def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):
     """
