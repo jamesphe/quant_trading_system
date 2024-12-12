@@ -424,32 +424,35 @@
 
         /* 日期选择器输入框 */
         .date-picker-input {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
             width: 100%;
-            padding: 0.5rem 1rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            line-height: 1.25rem;
+            height: 44px; /* 增加移动端点击区域 */
+            padding: 0.75rem 2.5rem 0.75rem 1rem;
+            font-size: 16px; /* 防止iOS缩放 */
+            line-height: 1.25;
             color: #374151;
             background-color: #fff;
-            cursor: pointer;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
             transition: all 0.2s;
+        }
+
+        .date-picker-input:focus {
+            outline: none;
+            border-color: #9333ea;
+            box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
         }
 
         .date-picker-input:hover {
             border-color: #a78bfa;
         }
 
-        .date-picker-input:focus {
-            outline: none;
-            border-color: #7c3aed;
-            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
-        }
-
-        /* 日期选择器图标 */
+        /* 日期图标样式 */
         .date-picker-icon {
             position: absolute;
-            right: 0.75rem;
+            right: 1rem;
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;
@@ -459,9 +462,53 @@
         /* 移动端适配 */
         @media (max-width: 640px) {
             .date-picker-input {
-                font-size: 16px; /* 防止 iOS 缩放 */
-                padding: 0.75rem 1rem;
+                font-size: 16px;
+                height: 48px;
+                padding: 0.875rem 2.5rem 0.875rem 1rem;
             }
+            
+            .date-picker-icon {
+                right: 1.25rem;
+            }
+            
+            /* 增加点击反馈 */
+            .date-picker-input:active {
+                background-color: #f9fafb;
+            }
+        }
+
+        /* 禁用状态样式 */
+        .date-picker-input:disabled {
+            background-color: #f3f4f6;
+            cursor: not-allowed;
+        }
+
+        /* 错误状态样式 */
+        .date-picker-input.error {
+            border-color: #ef4444;
+        }
+
+        .date-picker-input.error:focus {
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+        }
+
+        /* 添加日期范围提示 */
+        .date-picker-input[data-min]:before {
+            content: attr(data-min);
+            position: absolute;
+            bottom: -1.5rem;
+            left: 0;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .date-picker-input[data-max]:after {
+            content: attr(data-max);
+            position: absolute;
+            bottom: -1.5rem;
+            right: 0;
+            font-size: 0.75rem;
+            color: #6b7280;
         }
     </style>
 </head>
@@ -605,7 +652,7 @@
                             <span class="text-lg font-medium text-gray-600">正在优化策略参数</span>
                             <span class="loading-dots"></span>
                         </div>
-                        <p class="text-sm text-gray-500">��能需要几分钟时间</p>
+                        <p class="text-sm text-gray-500">可能需要几分钟时间</p>
                     </div>
                 </div>
 
@@ -628,7 +675,7 @@
                 <!-- 结果展示 -->
                 <div id="results" class="hidden transform transition-all duration-500 ease-in-out">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- 最优参数卡片 -->
+                        <!-- 最��参数卡片 -->
                         <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-[1.02] transition-all duration-300">
                             <div class="flex items-center space-x-3 mb-3 pb-2 border-b border-gray-100">
                                 <div class="bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg p-2">
@@ -1043,7 +1090,7 @@
         
         // 添加选择变化时的视觉反馈
         modelSelect.addEventListener('change', function() {
-            this.blur(); // 移除焦点，触发过渡效果
+            this.blur(); // 移除焦点，触发过��效果
             setTimeout(() => {
                 this.classList.add('ring-2', 'ring-indigo-200');
                 setTimeout(() => {

@@ -198,29 +198,44 @@ class DatePicker {
         // 创建显示输入框
         this.displayInput = document.createElement('input');
         this.displayInput.type = 'text';
-        this.displayInput.className = `date-picker-input w-full px-3 py-2 border rounded-lg 
+        this.displayInput.className = `date-picker-input w-full h-12 px-4 py-2 
+            text-base rounded-lg border border-gray-300 
             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500
-            hover:border-purple-300 transition-colors duration-200`;
+            hover:border-purple-300 transition-colors duration-200
+            bg-white cursor-pointer select-none`;
         this.displayInput.placeholder = this.options.placeholder;
         this.displayInput.readOnly = true;
         
-        // 创建隐藏的原生日期输入框
+        // 创建原生日期输入框 - 修改这里
         this.hiddenInput = document.createElement('input');
         this.hiddenInput.type = 'date';
         this.hiddenInput.id = this.options.inputId;
-        this.hiddenInput.className = 'absolute opacity-0 -z-10 pointer-events-none';
+        // 完全隐藏原生输入框
+        this.hiddenInput.style.cssText = `
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        `;
         
-        // 设置�����范围
+        // 设置日期范围
         if (this.options.minDate) {
             this.hiddenInput.min = this.formatDate(this.options.minDate);
+            this.displayInput.setAttribute('data-min', this.formatDisplayDate(this.options.minDate));
         }
         if (this.options.maxDate) {
             this.hiddenInput.max = this.formatDate(this.options.maxDate);
+            this.displayInput.setAttribute('data-max', this.formatDisplayDate(this.options.maxDate));
         }
         
         // 添加日期图标
         const icon = document.createElement('div');
-        icon.className = 'date-picker-icon absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none';
+        icon.className = 'date-picker-icon absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none';
         icon.innerHTML = `
             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -243,42 +258,75 @@ class DatePicker {
     }
     
     bindEvents() {
-        // 点击显示输入框时打开日期选择器
-        this.displayInput.addEventListener('click', () => {
-            // 在移动端，我们需要确保隐藏输入框可以接收点击事件
-            this.hiddenInput.style.opacity = '0.01';
-            this.hiddenInput.style.pointerEvents = 'auto';
-            this.hiddenInput.style.position = 'absolute';
-            this.hiddenInput.style.top = '0';
-            this.hiddenInput.style.left = '0';
-            this.hiddenInput.style.width = '100%';
-            this.hiddenInput.style.height = '100%';
+        // 处理点击事件
+        const handleClick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 临时调整原生日期选择器的样式以接收点击
+            this.hiddenInput.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                opacity: 0;
+                z-index: 2;
+                -webkit-appearance: none;
+            `;
             
             // 触发原生日期选择器
             this.hiddenInput.focus();
             this.hiddenInput.click();
-        });
+        };
         
-        // 监听日期变化
+        // 同时监听 click 和 touch 事件
+        this.displayInput.addEventListener('click', handleClick);
+        this.displayInput.addEventListener('touchend', handleClick, { passive: false });
+        
+        // 处理日期变化
         this.hiddenInput.addEventListener('change', (e) => {
-            const date = new Date(e.target.value);
-            this.setDate(date);
+            const selectedDate = new Date(e.target.value);
             
-            // 重置隐藏输入框的样式
-            this.hiddenInput.style.opacity = '0';
-            this.hiddenInput.style.pointerEvents = 'none';
-            
-            if (typeof this.options.onChange === 'function') {
-                this.options.onChange(date, e.target.value);
+            if (this.validateDateRange(selectedDate)) {
+                this.setDate(selectedDate);
+                
+                if (typeof this.options.onChange === 'function') {
+                    this.options.onChange(selectedDate, e.target.value);
+                }
+            } else {
+                this.hiddenInput.value = this.formatDate(this.getDate() || this.options.defaultDate);
+                showToast('请选择有效的日期范围', 'warning');
             }
+            
+            // 重置原生日期选择器样式为完全隐藏
+            this.hiddenInput.style.cssText = `
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            `;
         });
         
-        // 处理触摸事件
-        this.displayInput.addEventListener('touchend', (e) => {
+        // 阻止默认的触摸行为
+        this.displayInput.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            this.hiddenInput.focus();
-            this.hiddenInput.click();
-        });
+        }, { passive: false });
+    }
+    
+    validateDateRange(date) {
+        if (this.options.minDate && date < this.options.minDate) {
+            return false;
+        }
+        if (this.options.maxDate && date > this.options.maxDate) {
+            return false;
+        }
+        return true;
     }
     
     setDate(date) {
@@ -393,7 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 添加日期更新处理函数
 function updateDailyPicks(date) {
-    console.log('更新每日选股分析，日期:', date);
+    console.log('更新每日选股分析，���期:', date);
     // 如果需要自动触发分析，可以在这里调用 handleDailyPicks
     const form = document.getElementById('dailyPicksForm');
     if (form) {
@@ -738,7 +786,7 @@ async function handleAnalysis(event) {
                         
                         const content = data.content || '';
                         
-                        // 检查是否是提示信息
+                        // ���查���否是提示信息
                         if (content.includes('正在获取股票数据') || content.includes('正在进行分析')) {
                             if (!hasReceivedAnalysis) {
                                 contentDiv.innerHTML = `
@@ -1340,7 +1388,7 @@ function switchToTechnicalAnalysis(stockCode) {
     document.getElementById('startDate').value = lastYear.toISOString().split('T')[0];
     document.getElementById('endDate').value = today.toISOString().split('T')[0];
     
-    // 自动触发优化
+    // 自动��发优化
     document.getElementById('optimizeForm').dispatchEvent(new Event('submit'));
 }
 
@@ -1647,7 +1695,7 @@ function displayPortfolioResults(data) {
                                         <div class="font-medium text-gray-900">${tradeData['最高价'] || '-'}</div>
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
-                                        <div class="text-sm text-gray-500 mb-1">最低价</div>
+                                        <div class="text-sm text-gray-500 mb-1">最低��</div>
                                         <div class="font-medium text-gray-900">${tradeData['最低价'] || '-'}</div>
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
@@ -1972,7 +2020,7 @@ const SpeechController = {
     updateButtonState() {
         const readBtn = document.getElementById('readAnalysisBtn');
         if (!readBtn) {
-            console.warn('未找到朗读按钮，无法更新状态');
+            console.warn('��找到朗读按钮，无法更新状态');
             return;
         }
         
