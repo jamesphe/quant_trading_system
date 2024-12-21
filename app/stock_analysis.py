@@ -189,14 +189,16 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
         str: 生成的分析提示词
     """
     # 最新价格和涨跌幅
+    print(stock_data)
     latest_row = stock_data.iloc[-1]
     current_price = round(latest_row['Close'], 2)
     pct_change = round(latest_row['Pct_change'], 2)
 
     # Chandelier Exit指标
-    atr = round(latest_row['ATR'], 2)
-    long_stop = round(latest_row['多头止损'], 2)
-    short_stop = round(latest_row['空头止损'], 2)
+    prev_row = stock_data.iloc[-2]
+    atr = round(prev_row['ATR'], 2)
+    long_stop = round(prev_row['多头止损'], 2)
+    short_stop = round(prev_row['空头止损'], 2)
 
     # 技术指标
     macd = round(latest_row['MACD'], 2)
