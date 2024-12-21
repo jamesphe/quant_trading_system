@@ -953,7 +953,7 @@ def get_industry_stocks():
             }), 404
             
         # 读取CSV文件
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, dtype={'stock_code': str})
         stocks = df.to_dict('records')
         
         return jsonify({

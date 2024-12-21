@@ -343,8 +343,13 @@ class IndustryAnalyzer:
                 return pd.DataFrame()
             
             # 获取这些股票的实时行情数据
+            # 确保股票代码为字符串格式
+            stocks_data['代码'] = stocks_data['代码'].astype(str)
             stock_codes = stocks_data['代码'].tolist()
             quotes = ak.stock_zh_a_spot_em()  # 获取所有A股实时行情
+            
+            # 确保行情数据中的股票代码也是字符串格式
+            quotes['代码'] = quotes['代码'].astype(str)
             
             # 筛选出行业内股票的行情数据
             industry_quotes = quotes[quotes['代码'].isin(stock_codes)]
@@ -367,6 +372,9 @@ class IndustryAnalyzer:
             result_df = industry_quotes[list(available_columns.keys())].rename(
                 columns=available_columns
             )
+            
+            # 确保结果中的股票代码仍然是字符串格式
+            result_df['stock_code'] = result_df['stock_code'].astype(str)
             
             # 数据类型转换
             numeric_columns = [col for col in result_df.columns 
@@ -506,6 +514,9 @@ class IndustryAnalyzer:
             if stocks_data.empty:
                 return pd.DataFrame()
             
+            # 过滤掉688开头的科创板股票
+            stocks_data = stocks_data[~stocks_data['stock_code'].astype(str).str.startswith('688')]
+            
             # 按市值排序获取龙头股（如果有市值数据）
             if '市值' in stocks_data.columns:
                 leaders = stocks_data.nlargest(top_n, '市值')
@@ -536,6 +547,9 @@ class IndustryAnalyzer:
             
             if stocks_data.empty:
                 return pd.DataFrame()
+            
+            # 过滤掉688开头的科创板股票
+            stocks_data = stocks_data[~stocks_data['stock_code'].astype(str).str.startswith('688')]
             
             # 计算综合得分
             # 1. 换手率得分（反映市场活跃度）
