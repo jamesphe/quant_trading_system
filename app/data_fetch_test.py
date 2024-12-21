@@ -19,7 +19,9 @@ from data_fetch import (
     get_a_share_list,
     get_industry_stocks,
     get_stock_news,
-    get_stock_data
+    get_stock_data,
+    get_industry_market_data,  # 新增
+    get_industry_detail_data   # 新增
 )
 
 def test_get_vgt_data():
@@ -377,7 +379,7 @@ def test_get_a_share_list():
             print("获取到的A股列表为空")
             
     except Exception as e:
-        print(f"测试过程中发生错误: {str(e)}")
+        print(f"测试过程中发生错��: {str(e)}")
         raise
 
 def test_get_industry_stocks():
@@ -705,7 +707,7 @@ def test_get_stock_data():
                 # 检查ZLSMA数据有效性
                 for col in zlsma_columns:
                     assert not stock_data_with_zlsma[col].isnull().all(), \
-                        f"{col}列全为空���"
+                        f"{col}列全为空值"
                 print("ZLSMA数据空值检查通过")
                 
                 # 验证ZLSMA数据范围
@@ -765,7 +767,7 @@ def test_get_stock_data():
                 for col in chandelier_columns:
                     assert stock_data_with_chandelier[col].dtype == 'float64', \
                         f"{col}列不是浮点数类型"
-                print("���灯止损数据类型检查通过")
+                print("吊灯止损数据类型检查通过")
                 
                 # 检查吊灯止损数据有效性
                 for col in chandelier_columns:
@@ -826,6 +828,130 @@ def test_get_stock_data():
     
     print("\n所有测试完成！")
 
+def test_get_industry_market_data():
+    """
+    测试获取行业市场数据功能
+    """
+    print("\n开始测试获取行业市场数据...")
+    
+    try:
+        industry_data = get_industry_market_data()
+        
+        if not industry_data.empty:
+            print(f"成功获取行业市场数据")
+            print(f"获取到的行业数量: {len(industry_data)}")
+            print("\n数据结构:")
+            print(f"列名: {industry_data.columns.tolist()}")
+            print("\n数据前5行:")
+            print(industry_data.head())
+            
+            # 检查数据列 - 根据实际返回的列名修改
+            expected_columns = [
+                'industry_name',    # 板块名称
+                'price',           # 最新价
+                'change',          # 涨跌额
+                'change_pct',      # 涨跌幅
+                'market_value',    # 总市值
+                'turnover_rate',   # 换手率
+                'up_count',        # 上涨家数
+                'down_count',      # 下跌家数
+                'leading_stock',   # 领涨股票
+                'leading_stock_pct' # 领涨股票涨跌幅
+            ]
+            
+            for col in expected_columns:
+                assert col in industry_data.columns, f"缺少必要的列 '{col}'"
+            print("\n数据列检查通过")
+            
+            # 检查数据类型
+            assert industry_data['industry_name'].dtype == 'object', "industry_name列不是字符串类型"
+            numeric_columns = [
+                'price', 'change', 'change_pct', 'market_value',
+                'turnover_rate', 'up_count', 'down_count', 'leading_stock_pct'
+            ]
+            for col in numeric_columns:
+                assert industry_data[col].dtype in ['float64', 'int64'], \
+                    f"{col}列不是数值类型"
+            print("数据类型检查通过")
+            
+            # 检查数值有效性
+            assert all(industry_data['price'] >= 0), "存在负的价格"
+            assert all(industry_data['market_value'] >= 0), "存在负的市值"
+            assert all(industry_data['turnover_rate'] >= 0), "存在负的换手率"
+            assert all(industry_data['up_count'] >= 0), "存在负的上涨家数"
+            assert all(industry_data['down_count'] >= 0), "存在负的下跌家数"
+            print("数值有效性检查通过")
+            
+            print("\n数据验证全部通过！")
+        else:
+            print("获取到的行业市场数据为空")
+            
+    except Exception as e:
+        print(f"获取行业市场数据时发生错误: {str(e)}")
+
+def test_get_industry_detail_data():
+    """
+    测试获取行业详细数据功能
+    """
+    print("\n开始测试获取行业详细数据...")
+    
+    try:
+        # 测试获取半导体行业的详细数据
+        industry_name = "半导体"
+        industry_detail = get_industry_detail_data(industry_name)
+        
+        if not industry_detail.empty:
+            print(f"成功获取{industry_name}行业的详细数据")
+            print(f"获取到的数据条数: {len(industry_detail)}")
+            print("\n数据前5行:")
+            print(industry_detail.head())
+            
+            # 检查数据列
+            expected_columns = [
+                'date', 'close', 'change_pct', 'volume',
+                'amount', 'turnover_rate'
+            ]
+            for col in expected_columns:
+                assert col in industry_detail.columns, f"缺少必要的列 '{col}'"
+            print("\n数据列检查通过")
+            
+            # 检查数据类型
+            assert pd.api.types.is_datetime64_any_dtype(industry_detail['date']), \
+                "date列不是日期类型"
+            numeric_columns = [
+                'close', 'change_pct', 'volume',
+                'amount', 'turnover_rate'
+            ]
+            for col in numeric_columns:
+                assert industry_detail[col].dtype in ['float64', 'int64'], \
+                    f"{col}列不是数值类型"
+            print("数据类型检查通过")
+            
+            # 检查数值有效性
+            assert all(industry_detail['close'] > 0), "存在无效的收盘点数"
+            assert all(industry_detail['volume'] >= 0), "存在负的成交量"
+            assert all(industry_detail['amount'] >= 0), "存在负的成交额"
+            assert all(industry_detail['turnover_rate'] >= 0), "存在负的换手率"
+            print("数值有效性检查通过")
+            
+            # 检查日期范围 - 修改这部分代码
+            start_date = pd.Timestamp('2024-01-01')
+            end_date = pd.Timestamp.now()
+            min_date = pd.to_datetime(industry_detail['date'].min())
+            max_date = pd.to_datetime(industry_detail['date'].max())
+            
+            assert min_date >= start_date, "数据开始日期早于2024年1月1日"
+            assert max_date <= end_date, "数据结束日期晚于当前日期"
+            print("日期范围检查通过")
+            
+            print("\n数据验证全部通过！")
+        else:
+            print(f"未能获取{industry_name}行业的详细数据")
+            
+    except Exception as e:
+        print(f"测试过程中发生错误: {str(e)}")
+        raise
+
 if __name__ == "__main__":
     #test_get_a_share_list()
     #test_get_vgt_data()
@@ -845,5 +971,9 @@ if __name__ == "__main__":
     #test_get_us_stock_list()
     #print("\n" + "="*50 + "\n")
     #test_get_stock_news()
-    test_get_stock_data()
+    test_get_industry_market_data()  # 新增
     print("\n" + "="*50 + "\n")
+    test_get_industry_detail_data()  # 新增
+    print("\n" + "="*50 + "\n")
+    #test_get_stock_data()
+    #print("\n" + "="*50 + "\n")

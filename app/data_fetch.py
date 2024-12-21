@@ -398,7 +398,7 @@ def get_etf_list():
     try:
         print("开始获取ETF列表...")
         
-        # 使用akshare获取所有ETF基金列表
+        # ��用akshare获取所有ETF基金列表
         etf_df = ak.fund_etf_category_sina(symbol="ETF基金")
         print(f"获取到的原始ETF数量: {len(etf_df)}")
         print("前5条ETF数据:")
@@ -415,7 +415,7 @@ def get_etf_list():
         etf_info = etf_info[['code', 'name']]
         etf_info['code'] = etf_info['code'].str.replace('^(sh|sz)', '', regex=True)
         
-        # 筛选出A股ETF（假设A股ETF的代码以'5'或'1'开头）
+        # 筛选出A股ETF（假设A股ETF的代码以'5'或'1'开头
         etf_info = etf_info[etf_info['code'].str.startswith(('510', '159'))]
         
         print(f"最终A股ETF列表的形状: {etf_info.shape}")
@@ -689,4 +689,206 @@ def get_stock_news(stock_code: str, limit: int = 10) -> list:
         
     except Exception as e:
         print(f"获取股票 {stock_code} 的新闻信息时发生错误: {str(e)}")
+        return []
+
+def get_industry_market_data():
+    """
+    获取行业市场数据
+    
+    返回：
+    - DataFrame，包含以下列：
+        - industry_name: 行业名称（板块名称）
+        - price: 最新价
+        - change: 涨跌额
+        - change_pct: 涨跌幅
+        - market_value: 总市值
+        - turnover_rate: 换手率
+        - up_count: 上涨家数
+        - down_count: 下跌家数
+        - leading_stock: 领涨股票
+        - leading_stock_pct: 领涨股票涨跌幅
+    """
+    try:
+        # 使用 akshare 获取行业行情数据
+        industry_data = ak.stock_board_industry_name_em()
+        
+        if industry_data.empty:
+            print("未获取到行业数据")
+            return pd.DataFrame()
+        
+        # 重命名列以匹配预期的格式
+        column_mapping = {
+            '板块名称': 'industry_name',
+            '最新价': 'price',
+            '涨跌额': 'change',
+            '涨跌幅': 'change_pct',
+            '总市值': 'market_value',
+            '换手率': 'turnover_rate',
+            '上涨家数': 'up_count',
+            '下跌家数': 'down_count',
+            '领涨股票': 'leading_stock',
+            '领涨股票-涨跌幅': 'leading_stock_pct'
+        }
+        
+        # 选择需要的列并重命名
+        industry_data = industry_data[list(column_mapping.keys())].rename(columns=column_mapping)
+        
+        # 转换数值类型列
+        numeric_columns = ['price', 'change', 'change_pct', 'market_value', 
+                         'turnover_rate', 'up_count', 'down_count', 'leading_stock_pct']
+        for col in numeric_columns:
+            industry_data[col] = pd.to_numeric(
+                industry_data[col].astype(str)
+                .str.replace(',', '')
+                .str.replace('%', '')
+                .str.replace('亿', '')
+                .str.replace('万', '')
+                .str.replace('--', 'NaN')
+                .replace('', 'NaN'),
+                errors='coerce'
+            )
+            
+        # 将百分比列除以100
+        percentage_columns = ['change_pct', 'turnover_rate', 'leading_stock_pct']
+        for col in percentage_columns:
+            industry_data[col] = industry_data[col] / 100
+            
+        return industry_data
+        
+    except Exception as e:
+        print(f"获取行业市场数据失败: {e}")
+        return pd.DataFrame()
+
+def get_industry_detail_data(industry_name: str) -> pd.DataFrame:
+    """
+    获取指定行业的详细市场数据，包括该行业的历史走势
+
+    参数:
+        industry_name (str): 行业名称，例如"半导体"
+
+    返回:
+        DataFrame: 包含以下字段:
+            - date: 日期
+            - close: 收盘点数
+            - change_pct: 涨跌幅(%)
+            - volume: 成交量(万手)
+            - amount: 成交额(亿元)
+            - turnover_rate: 换手率(%)
+    """
+    try:
+        print(f"开始获取{industry_name}行业的详细数据...")
+        
+        # 获取行业历史数据
+        industry_detail = ak.stock_board_industry_hist_em(
+            symbol=industry_name,
+            start_date="20240101",
+            end_date=datetime.now().strftime("%Y%m%d")
+        )
+        
+        # 重命名列
+        industry_detail = industry_detail.rename(columns={
+            '日期': 'date',
+            '收盘': 'close',
+            '涨跌幅': 'change_pct',
+            '成交量': 'volume',
+            '成交额': 'amount',
+            '换手率': 'turnover_rate'
+        })
+        
+        # 转换日期格式
+        industry_detail['date'] = pd.to_datetime(industry_detail['date'])
+        
+        # 转换数据类型
+        numeric_columns = ['close', 'change_pct', 'volume', 'amount', 'turnover_rate']
+        for col in numeric_columns:
+            industry_detail[col] = pd.to_numeric(industry_detail[col], errors='coerce')
+            
+        # 单位转换：
+        # 成交量转换为万手
+        industry_detail['volume'] = industry_detail['volume'] / 10000
+        # 成交额转换为亿元
+        industry_detail['amount'] = industry_detail['amount'] / 100000000
+        
+        print(f"成功获取{industry_name}行业的详细数据，共 {len(industry_detail)} 条记录")
+        return industry_detail
+        
+    except Exception as e:
+        print(f"获取{industry_name}行业详细数据时发生错误: {str(e)}")
+        return pd.DataFrame()
+
+def get_hot_industries(min_change_pct=0.015, min_up_count=5):
+    """
+    获取热门行业数据
+    
+    参数:
+        min_change_pct (float): 最小涨跌幅阈值，默认1.5%
+        min_up_count (int): 最小上涨家数阈值，默认5家
+        
+    返回:
+        list: 热门行业列表，每个元素为字典，包含行业名称和主力资金净流入等信息
+    """
+    try:
+        print("正在获取热门行业数据...")
+        
+        # 获取行业行情数据
+        industry_data = ak.stock_board_industry_name_em()
+        
+        if industry_data.empty:
+            print("未获取到行业数据")
+            return []
+            
+        # 打印实际的列名，帮助调试
+        print("实际的列名:", industry_data.columns.tolist())
+        
+        # 根据实际返回的列名进行映射
+        column_mapping = {
+            '板块名称': 'industry_name',
+            '涨跌幅': 'change_pct',
+            '上涨家数': 'up_count',
+            '总市值': 'market_value',
+            '换手率': 'turnover_rate'
+        }
+        
+        # 检查所需的列是否存在
+        missing_columns = [col for col in column_mapping.keys() 
+                         if col not in industry_data.columns]
+        if missing_columns:
+            print(f"缺少以下列: {missing_columns}")
+            print("可用的列:", industry_data.columns.tolist())
+            return []
+        
+        # 重命名列
+        industry_data = industry_data[list(column_mapping.keys())].rename(columns=column_mapping)
+        
+        # 转换数值类型
+        industry_data['change_pct'] = pd.to_numeric(
+            industry_data['change_pct'].str.replace('%', ''), 
+            errors='coerce'
+        ) / 100
+        
+        industry_data['up_count'] = pd.to_numeric(
+            industry_data['up_count'], 
+            errors='coerce'
+        )
+        
+        # 筛选热门行业
+        hot_industries = industry_data[
+            (industry_data['change_pct'] >= min_change_pct) & 
+            (industry_data['up_count'] >= min_up_count)
+        ]
+        
+        if hot_industries.empty:
+            print("未找到符合条件的热门行业")
+            return []
+            
+        # 转换为字典列表
+        result = hot_industries.to_dict('records')
+        
+        print(f"找到 {len(result)} 个热门行业")
+        return result
+        
+    except Exception as e:
+        print(f"获取热门行业数据失败: {str(e)}")
+        if 'industry_data' in locals():
+            print("列名:", industry_data.columns.tolist())
         return []
