@@ -100,7 +100,7 @@ function displayResults(data) {
     const metricItems = [
         { key: 'sharpeRatio', label: '夏普比率', format: v => v.toFixed(2) },
         { key: 'maxDrawdown', label: '最大回撤', format: v => v.toFixed(2) + '%' },
-        { key: 'winRate', label: '胜��', format: v => v.toFixed(2) + '%' },
+        { key: 'winRate', label: '胜率', format: v => v.toFixed(2) + '%' },
         { key: 'totalReturn', label: '总收益率', format: v => v.toFixed(2) + '%' },
         { 
             key: 'lastSignal',
@@ -432,10 +432,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化其他组件
     initializeOtherComponents();
     
-    // 绑定持仓分析按钮事件
+    // 绑定持���分析按钮事件
     const portfolioForm = document.getElementById('portfolioForm');
     if (portfolioForm) {
-        console.log('找到��仓分析表单，添加提交事件监听器');
+        console.log('找到持仓分析表单，添加提交事件监听器');
         portfolioForm.addEventListener('submit', function(event) {
             console.log('持仓分析表单提交被触发');
             runPortfolioAnalysis(event);
@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('未找到持仓分析表单');
     }
     
-    // ... 始化朗读功能
+    // ... ���化朗读功能
     SpeechController.init();
 });
 
@@ -564,7 +564,7 @@ function initializeDatePicker(today) {
             if (this.type === 'date') {
                 return; // 原生日期选择器会自动打开
             }
-            // 对于不支持原生日��器的设备，可以在这里添加自定义日期选择器
+            // 对于不支持原生日期的设备，可以在这里添加自定义日期选择器
         });
     }
 }
@@ -849,7 +849,7 @@ async function handleAnalysis(event) {
                         }
                         
                     } catch (e) {
-                        console.warn('解析数据块失败:', e);
+                        console.warn('解析���据块失败:', e);
                     }
                 }
             }
@@ -880,7 +880,7 @@ function applyMarkdownStyles(element) {
     // 添加容器类
     element.classList.add('markdown-content', 'prose', 'prose-indigo', 'max-w-none');
     
-    // 处理表格
+    // 处理���格
     const tables = element.getElementsByTagName('table');
     Array.from(tables).forEach(table => {
         // 添加基础表格样式
@@ -1261,7 +1261,7 @@ function displayBacktestResults(data) {
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
     
-    // 使用 requestAnimationFrame 保过渡效果正常工作
+    // 使用 requestAnimationFrame 保过渡效果���常工���
     requestAnimationFrame(() => {
         backtestResults.style.transition = 'all 0.5s ease-in-out';
         backtestResults.style.opacity = '1';
@@ -1304,7 +1304,7 @@ function showError(message) {
     document.querySelector('#results-container').prepend(errorDiv);
 }
 
-// 在开始优化时显示股票名称
+// 在��始优化时显示股票名称
 function startOptimization() {
     const symbol = document.getElementById('symbol').value;
     const startDate = document.getElementById('startDate').value;
@@ -1474,10 +1474,16 @@ function switchToAIAnalysis(stockCode) {
     switchTab('analysis-tab');
     
     // 设置股票代码
-    document.getElementById('analysisSymbol').value = stockCode;
-    
-    // 自动触发分析
-    document.getElementById('analysisForm').dispatchEvent(new Event('submit'));
+    const analysisSymbol = document.getElementById('analysisSymbol');
+    if (analysisSymbol) {
+        analysisSymbol.value = stockCode;
+        
+        // 自动触发分析
+        const analysisForm = document.getElementById('analysisForm');
+        if (analysisForm) {
+            analysisForm.dispatchEvent(new Event('submit'));
+        }
+    }
 }
 
 // 优化 toggleDetails 函数
@@ -2208,7 +2214,7 @@ function displayTargetStocks(stocks) {
                 <a href="javascript:void(0)" 
                    onclick="switchToTechnicalAnalysis('${stock['股票代码']}')"
                    class="text-blue-600 hover:text-blue-800 hover:underline">
-                    ${stock['股票代码']}
+                    ${stock['股票���码']}
                 </a>
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
@@ -2616,35 +2622,40 @@ async function updateTargetStocks(date) {
         }
 
         // 渲染数据
-        tbody.innerHTML = data.data.map((stock, index) => `
-            <tr class="hover:bg-gray-50" data-original-index="${index}">
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
-                    <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.股票代码}')">
-                        ${stock.股票代码}
-                    </a>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
-                    <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.股票代码}')">
-                        ${stock.股票名称}
-                    </a>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${stock.所属行业 || '-'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.最新价格 || '-'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.最新涨跌幅) >= 0 ? 'text-red-600' : 'text-green-600'}">
-                    ${parseFloat(stock.最新涨跌幅) >= 0 ? '+' : ''}${stock.最新涨跌幅}%
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.换手率}%</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳胜率)} font-medium">
-                    ${(parseFloat(stock.最佳胜率) * 100).toFixed(2)}%
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳回报)} font-medium">
-                    ${(parseFloat(stock.最佳回报) * 100).toFixed(2)}%
-                </td>
-                <td class="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${parseFloat(stock.夏普比率).toFixed(2)}
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = data.data.map((stock, index) => {
+            const changePercent = parseFloat(stock.最新涨跌幅);
+            const changeClass = changePercent >= 0 ? 'text-red-600' : 'text-green-600';
+            
+            return `
+                <tr class="hover:bg-gray-50" data-original-index="${index}">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                        <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.股票代码}')">
+                            ${stock.股票代码}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
+                        <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.股票代码}')">
+                            ${stock.股票名称}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${stock.所属行业 || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatNumber(stock.最新价格)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${changeClass}">
+                        ${formatChangePercent(stock.最新涨跌幅)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatNumber(stock.换手率)}%</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳胜率)} font-medium">
+                        ${formatNumber(stock.最佳胜率 * 100)}%
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳回报)} font-medium">
+                        ${formatNumber(stock.最佳回报 * 100)}%
+                    </td>
+                    <td class="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${formatNumber(stock.夏普比率)}
+                    </td>
+                </tr>
+            `;
+        }).join('');
 
     } catch (error) {
         console.error('获取目标股票数据失败:', error);
@@ -2673,6 +2684,7 @@ async function updateTargetStocks(date) {
 // 添加辅助函数来设置数值的颜色
 function getValueColor(value) {
     const numValue = parseFloat(value);
+    if (isNaN(numValue)) return 'text-gray-600';
     if (numValue >= 0.6) return 'text-green-600';
     if (numValue >= 0.5) return 'text-blue-600';
     return 'text-red-600';
@@ -2793,7 +2805,7 @@ function getColumnIndex(column) {
 
 // 在文档加载完成后初始化排序事件监听
 document.addEventListener('DOMContentLoaded', function() {
-    // 为所有可排序的表头添加点击事件
+    // 为所有可排序的表头添��点击��件
     document.querySelectorAll('th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
             const column = th.getAttribute('data-sort');
@@ -2848,6 +2860,26 @@ async function handleIndustryAnalysis(event) {
             body: JSON.stringify({ date: formattedDate })
         });
         
+        // 如果报告不存在，显示立即分析按钮
+        if (reportResponse.status === 404) {
+            reportContent.innerHTML = `
+                <div class="text-center py-8">
+                    <p class="text-gray-600 mb-4">未找到${date}的行业分析报告</p>
+                    <button onclick="runIndustryAnalysis('${date}')"
+                            class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg 
+                                   shadow-lg hover:shadow-xl transition-all duration-200 
+                                   flex items-center justify-center space-x-2 mx-auto">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <span>立即分析</span>
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
         const reportData = await reportResponse.json();
         
         if (reportData.success) {
@@ -2876,7 +2908,11 @@ async function handleIndustryAnalysis(event) {
                             ${stock.stock_code}
                         </a>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.stock_name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
+                        <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.stock_code}')">
+                            ${stock.stock_name}
+                        </a>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.price}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.change_pct) >= 0 ? 'text-red-600' : 'text-green-600'}">
                         ${parseFloat(stock.change_pct) >= 0 ? '+' : ''}${stock.change_pct}%
@@ -2907,11 +2943,36 @@ function switchIndustryTab(tabId) {
     document.querySelectorAll('.industry-tab-button').forEach(button => {
         const isActive = button.getAttribute('data-tab') === tabId;
         button.classList.toggle('active', isActive);
-        button.classList.toggle('text-purple-700', isActive);
-        button.classList.toggle('border-purple-600', isActive);
-        button.classList.toggle('bg-purple-50', isActive);
-        button.classList.toggle('text-gray-500', !isActive);
-        button.classList.toggle('border-transparent', !isActive);
+        
+        // 更新按钮样式
+        if (isActive) {
+            // 选中状态
+            button.classList.remove('text-gray-500', 'hover:text-gray-700', 'border-transparent');
+            button.classList.add(
+                'text-purple-700',           // 更深的紫色文字
+                'bg-purple-50',              // 浅紫色背景
+                'border-b-2',                // 底部边框
+                'border-purple-500',         // 紫色边框
+                'font-medium'                // 加粗字体
+            );
+        } else {
+            // 未选中状态
+            button.classList.remove(
+                'text-purple-700',
+                'bg-purple-50',
+                'border-b-2',
+                'border-purple-500',
+                'font-medium'
+            );
+            button.classList.add(
+                'text-gray-600',             // 更深的灰色文字
+                'hover:text-purple-600',     // 悬停时变紫色
+                'hover:bg-purple-50',        // 悬停时添加浅紫色背景
+                'border-transparent',        // 透明边框
+                'transition-colors',         // 颜色过渡动画
+                'duration-200'               // 动画持续时间
+            );
+        }
     });
 
     // 更新内容显示
@@ -3073,4 +3134,81 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// 添加执行行业分析的函数
+async function runIndustryAnalysis(date) {
+    try {
+        const reportContent = document.getElementById('reportContent');
+        
+        // 显示加载状态
+        reportContent.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 space-y-4">
+                <div class="relative">
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                    <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-purple-200 opacity-20"></div>
+                </div>
+                <div class="text-center">
+                    <p class="text-lg font-medium text-gray-600">正在分析行业数据</p>
+                    <p class="text-sm text-gray-500 mt-2">这可能需要几分钟时间...</p>
+                </div>
+            </div>
+        `;
+
+        // 调用后端执行行业分析
+        const response = await fetch('/api/industry/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: date })
+        });
+
+        if (!response.ok) {
+            throw new Error('行业分析请求失败');
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+            // 分析完成后重新加载数据
+            await handleIndustryAnalysis(date);
+            showToast('行业分析完成', 'success');
+        } else {
+            throw new Error(data.error || '行业分析失败');
+        }
+
+    } catch (error) {
+        console.error('执行行业分析失败:', error);
+        reportContent.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-red-500 mb-4">${error.message}</div>
+                <button onclick="runIndustryAnalysis('${date}')"
+                        class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg 
+                               shadow-lg hover:shadow-xl transition-all duration-200 
+                               flex items-center justify-center space-x-2 mx-auto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>重试</span>
+                </button>
+            </div>
+        `;
+        showToast(error.message, 'error');
+    }
+}
+
+// 修改数值格式化函数
+function formatNumber(value, decimals = 2) {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '-';
+    return num.toFixed(decimals);
+}
+
+// 修改涨跌幅格式化函数
+function formatChangePercent(value) {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '-';
+    return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+}
 

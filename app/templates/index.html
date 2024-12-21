@@ -510,6 +510,55 @@
             font-size: 0.75rem;
             color: #6b7280;
         }
+
+        /* 标签页按钮样式 */
+        .industry-tab-button {
+            position: relative;
+            white-space: nowrap;
+            min-width: 100px;
+            transition: all 0.3s ease;
+        }
+
+        .industry-tab-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .industry-tab-button.active {
+            position: relative;
+        }
+
+        .industry-tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #8B5CF6;
+            transform: scaleX(1);
+            transition: transform 0.3s ease;
+        }
+
+        .industry-tab-button:not(.active)::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #8B5CF6;
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .industry-tab-button:hover:not(.active)::after {
+            transform: scaleX(0.5);
+        }
+
+        /* 添加阴影效果 */
+        .industry-tab-button.active {
+            box-shadow: 0 2px 4px rgba(139, 92, 246, 0.1);
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen font-sans">
@@ -1121,10 +1170,12 @@
                     <!-- 内容标签页 -->
                     <div class="border-b border-gray-200 mb-4">
                         <nav class="flex space-x-4" aria-label="Industry Tabs">
-                            <button class="industry-tab-button px-3 py-2 text-sm font-medium" data-tab="report">
+                            <button class="industry-tab-button px-4 py-2 text-sm rounded-t-lg transition-all duration-200 ease-in-out" 
+                                    data-tab="report">
                                 行业报告
                             </button>
-                            <button class="industry-tab-button px-3 py-2 text-sm font-medium" data-tab="stocks">
+                            <button class="industry-tab-button px-4 py-2 text-sm rounded-t-lg transition-all duration-200 ease-in-out" 
+                                    data-tab="stocks">
                                 行业股票
                             </button>
                         </nav>
@@ -1181,7 +1232,7 @@
         
         // 添加选择变化时的视觉反馈
         modelSelect.addEventListener('change', function() {
-            this.blur(); // 移除焦点，触发过��效果
+            this.blur(); // 移除焦点，触发过渡效果
             setTimeout(() => {
                 this.classList.add('ring-2', 'ring-indigo-200');
                 setTimeout(() => {

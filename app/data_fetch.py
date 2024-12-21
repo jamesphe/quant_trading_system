@@ -398,7 +398,7 @@ def get_etf_list():
     try:
         print("开始获取ETF列表...")
         
-        # ��用akshare获取所有ETF基金列表
+        # 使用akshare获取所有ETF基金列表
         etf_df = ak.fund_etf_category_sina(symbol="ETF基金")
         print(f"获取到的原始ETF数量: {len(etf_df)}")
         print("前5条ETF数据:")

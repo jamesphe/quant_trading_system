@@ -453,7 +453,7 @@ def analyze_stock_route():
                 # 发送初始消息
                 yield 'data: {"content": "正在获取股票数据..."}\n\n'
                 
-                # 计算日期围
+                # 计算日期
                 end_date = datetime.now().strftime('%Y-%m-%d')
                 start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
                 
@@ -966,6 +966,45 @@ def get_industry_stocks():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+
+@app.route('/api/industry/analyze', methods=['POST'])
+def analyze_industry():
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        if not date:
+            return jsonify({
+                'success': False,
+                'error': '请选择日期'
+            }), 400
+            
+        # 构建命令行参数
+        cmd = ['python', 'industry_analysis.py']
+        
+        # 运行行业分析脚本
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if result.returncode != 0:
+            raise Exception(f'行业分析脚本执行失败: {result.stderr}')
+            
+        return jsonify({
+            'success': True,
+            'message': '行业分析完成'
+        })
+        
+    except Exception as e:
+        logger.error(f'执行行业分析失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'执行行业分析失败: {str(e)}'
         }), 500
 
 

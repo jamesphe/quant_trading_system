@@ -379,7 +379,7 @@ def test_get_a_share_list():
             print("获取到的A股列表为空")
             
     except Exception as e:
-        print(f"测试过程中发生错��: {str(e)}")
+        print(f"测试过程中发生错误: {str(e)}")
         raise
 
 def test_get_industry_stocks():
