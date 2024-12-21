@@ -532,55 +532,64 @@
             </div>
 
             <!-- 标签页导航 -->
-            <nav class="tab-nav flex overflow-x-auto hide-scrollbar space-x-1 sm:space-x-4 border-b border-gray-200 mb-6 -mx-4 sm:mx-0 px-4 sm:px-0" aria-label="Tabs">
-                <button class="tab-button whitespace-nowrap flex-shrink-0 px-2 sm:px-4 py-2 text-sm sm:text-base" 
+            <nav class="flex overflow-x-auto hide-scrollbar space-x-2 sm:space-x-4 mb-6 bg-gray-50 p-2 rounded-xl">
+                <button class="tab-button flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg transition-all duration-300 border-2" 
                         data-tab="optimization-tab">
-                    <div class="flex items-center space-x-1 sm:space-x-2">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
-                        技术分析
-                    </div>
+                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span class="text-sm font-medium whitespace-nowrap">技术分析</span>
                 </button>
-                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
+
+                <button class="tab-button flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg transition-all duration-300 border-2"
                         data-tab="analysis-tab">
-                    <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                               d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
-                    个股分析
+                    <span class="text-sm font-medium whitespace-nowrap">个股分析</span>
                 </button>
-                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base"
+
+                <button class="tab-button flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg transition-all duration-300 border-2"
                         data-tab="portfolio-tab">
-                    <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    持仓分析
+                    <span class="text-sm font-medium whitespace-nowrap">持仓分析</span>
                 </button>
-                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base" 
+
+                <button class="tab-button flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg transition-all duration-300 border-2" 
                         data-tab="daily-picks-tab">
-                    <div class="flex items-center space-x-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                        </svg>
-                        <span>每日选股</span>
-                        <div class="hidden sm:block px-2 py-0.5 ml-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full">
+                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="text-sm font-medium whitespace-nowrap flex items-center">
+                        每日选股
+                        <span class="ml-1 px-1.5 py-0.5 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full">
                             AI
-                        </div>
-                    </div>
+                        </span>
+                    </span>
                 </button>
-                <button class="tab-button px-3 py-2 sm:px-4 sm:py-2 text-sm sm:text-base" 
+
+                <button class="tab-button flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg transition-all duration-300 border-2" 
                         data-tab="target-stocks-tab">
-                    <div class="flex items-center space-x-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                        <span>目标股票</span>
-                    </div>
+                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                    </svg>
+                    <span class="text-sm font-medium whitespace-nowrap">目标股票</span>
+                </button>
+
+                <button class="tab-button flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg transition-all duration-300 border-2" 
+                        data-tab="industry-tab">
+                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="text-sm font-medium whitespace-nowrap">热门行业</span>
                 </button>
             </nav>
 
@@ -675,7 +684,7 @@
                 <!-- 结果展示 -->
                 <div id="results" class="hidden transform transition-all duration-500 ease-in-out">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- 最��参数卡片 -->
+                        <!-- 最优参数卡片 -->
                         <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-[1.02] transition-all duration-300">
                             <div class="flex items-center space-x-3 mb-3 pb-2 border-b border-gray-100">
                                 <div class="bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg p-2">
@@ -1076,6 +1085,88 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 热门行业页面 -->
+            <div id="industry-tab" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4">
+                    <!-- 日期选择表单 -->
+                    <form id="industryAnalysisForm" class="mb-6">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-end space-y-3 sm:space-y-0 sm:space-x-3">
+                            <div class="flex-1">
+                                <label for="industryDate" class="block text-sm font-medium text-gray-700 mb-1">
+                                    选择日期
+                                </label>
+                                <input type="date" 
+                                       id="industryDate" 
+                                       class="form-input block w-full rounded-lg border-gray-300 shadow-sm 
+                                              focus:border-purple-500 focus:ring-purple-500">
+                            </div>
+                            <button type="submit" 
+                                    class="w-full sm:w-auto px-4 sm:px-6 py-2.5 bg-purple-600 hover:bg-purple-700 
+                                           text-white font-medium rounded-lg shadow-lg hover:shadow-xl 
+                                           transition-all duration-200 flex items-center justify-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                <span>开始分析</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- 内容标签页 -->
+                    <div class="border-b border-gray-200 mb-4">
+                        <nav class="flex space-x-4" aria-label="Industry Tabs">
+                            <button class="industry-tab-button px-3 py-2 text-sm font-medium" data-tab="report">
+                                行业报告
+                            </button>
+                            <button class="industry-tab-button px-3 py-2 text-sm font-medium" data-tab="stocks">
+                                行业股票
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- 行业报告内容 -->
+                    <div id="reportTab" class="industry-tab-content">
+                        <div id="reportContent" class="prose max-w-none">
+                            <!-- 报告内容将通过JavaScript动态插入 -->
+                        </div>
+                    </div>
+
+                    <!-- 行业股票内容 -->
+                    <div id="stocksTab" class="industry-tab-content hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            股票代码
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            股票名称
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            最新价
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            涨跌幅
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            换手率
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            成交额
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="industryStocksTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- 股票数据将通过JavaScript动态插入 -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>

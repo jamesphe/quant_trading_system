@@ -453,7 +453,7 @@ def analyze_stock_route():
                 # 发送初始消息
                 yield 'data: {"content": "正在获取股票数据..."}\n\n'
                 
-                # 计算日期范围
+                # 计算日期围
                 end_date = datetime.now().strftime('%Y-%m-%d')
                 start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
                 
@@ -882,6 +882,90 @@ def update_prices():
         return jsonify({
             'success': False,
             'error': f'处理请求失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/industry/report', methods=['POST'])
+def get_industry_report():
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        if not date:
+            return jsonify({
+                'success': False,
+                'error': '请选择日期'
+            }), 400
+            
+        # 构建文件路径
+        file_path = os.path.join(
+            os.path.dirname(__file__), 
+            'results', 
+            f'industry_analysis_{date}.md'
+        )
+        
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': False,
+                'error': f'未找到{date}的行业分析报告'
+            }), 404
+            
+        # 读取并返回报告内容
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        return jsonify({
+            'success': True,
+            'content': content
+        })
+        
+    except Exception as e:
+        logger.error(f'获取行业分析报告失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/industry/stocks', methods=['POST'])
+def get_industry_stocks():
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        if not date:
+            return jsonify({
+                'success': False,
+                'error': '请选择日期'
+            }), 400
+            
+        # 构建文件路径
+        file_path = os.path.join(
+            os.path.dirname(__file__), 
+            'results', 
+            f'stocks_quotes_{date}.csv'
+        )
+        
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': False,
+                'error': f'未找到{date}的行业股票数据'
+            }), 404
+            
+        # 读取CSV文件
+        df = pd.read_csv(file_path)
+        stocks = df.to_dict('records')
+        
+        return jsonify({
+            'success': True,
+            'stocks': stocks
+        })
+        
+    except Exception as e:
+        logger.error(f'获取行业股票数据失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 

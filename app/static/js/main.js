@@ -100,7 +100,7 @@ function displayResults(data) {
     const metricItems = [
         { key: 'sharpeRatio', label: '夏普比率', format: v => v.toFixed(2) },
         { key: 'maxDrawdown', label: '最大回撤', format: v => v.toFixed(2) + '%' },
-        { key: 'winRate', label: '胜率', format: v => v.toFixed(2) + '%' },
+        { key: 'winRate', label: '胜��', format: v => v.toFixed(2) + '%' },
         { key: 'totalReturn', label: '总收益率', format: v => v.toFixed(2) + '%' },
         { 
             key: 'lastSignal',
@@ -401,6 +401,15 @@ function initializeDatePickers() {
                 console.log('目标股票日期已更改:', dateString);
                 updateTargetStocks(dateString);
             }
+        },
+        {
+            inputId: 'industryDate',
+            defaultDate: today,
+            maxDate: today,
+            onChange: (date, dateString) => {
+                console.log('行业分析日期已更改:', dateString);
+                handleIndustryAnalysis(dateString);
+            }
         }
     ];
     
@@ -417,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化标签页
     initializeTabs();
     
-    // ���始化日期选择器
+    // 初始化日期选择器
     initializeDatePickers();
     
     // 初始化其他组件
@@ -426,22 +435,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // 绑定持仓分析按钮事件
     const portfolioForm = document.getElementById('portfolioForm');
     if (portfolioForm) {
-        console.log('找到持仓分析表单，添加提交事件监听器');
+        console.log('找到��仓分析表单，添加提交事件监听器');
         portfolioForm.addEventListener('submit', function(event) {
-            console.log('��仓分析表单提交被触发');
+            console.log('持仓分析表单提交被触发');
             runPortfolioAnalysis(event);
         });
     } else {
         console.warn('未找到持仓分析表单');
     }
     
-    // 初始化朗读功能
+    // ... 始化朗读功能
     SpeechController.init();
 });
 
 // 添加日期更新处理函数
 function updateDailyPicks(date) {
-    console.log('更新每日选股分析，���期:', date);
+    console.log('更新每日选股分析，日期:', date);
     // 如果需要自动触发分析，可以在这里调用 handleDailyPicks
     const form = document.getElementById('dailyPicksForm');
     if (form) {
@@ -555,7 +564,7 @@ function initializeDatePicker(today) {
             if (this.type === 'date') {
                 return; // 原生日期选择器会自动打开
             }
-            // 对于不支持原生日期器的设备，可以在这里添加自定义日期选择器
+            // 对于不支持原生日��器的设备，可以在这里添加自定义日期选择器
         });
     }
 }
@@ -571,13 +580,15 @@ function formatDisplayDate(dateStr) {
     return `${date.getFullYear()}年${(date.getMonth() + 1).toString().padStart(2, '0')}月${date.getDate().toString().padStart(2, '0')}日`;
 }
 
-// 修改初始化标签页的函数
+// 修改 initializeTabs 函数
 function initializeTabs() {
+    console.log('Initializing tabs...');
+    
     // 为所有标签按钮添加点击事件
     document.querySelectorAll('.tab-button').forEach(button => {
         button.addEventListener('click', () => {
             const tabId = button.getAttribute('data-tab');
-            console.log('Tab button clicked:', tabId); // 调试日志
+            console.log('Tab button clicked:', tabId);
             switchTab(tabId);
         });
     });
@@ -590,39 +601,47 @@ function initializeTabs() {
     }
 }
 
-// 修改 switchTab ���数
+// 修改 switchTab 函数
 function switchTab(tabId) {
-    console.log('Switching to tab:', tabId); // 调试日志
+    console.log('Switching to tab:', tabId);
     
-    // 隐藏所有标签页内容
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.add('hidden');
-    });
-    
-    // 移除所有标签按钮的激活状态
+    // 更新标签按钮状态
     document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('active');
-        button.classList.remove('text-purple-600');
-        button.classList.remove('border-b-2');
-        button.classList.remove('border-purple-600');
-        button.classList.add('text-gray-500');
+        const isActive = button.getAttribute('data-tab') === tabId;
+        button.classList.toggle('active', isActive);
+        button.classList.toggle('bg-white', isActive);
+        button.classList.toggle('shadow-lg', isActive);
+        button.classList.toggle('text-purple-600', isActive);
+        button.classList.toggle('border-purple-500', isActive);
+        button.classList.toggle('hover:bg-purple-50', !isActive);
+        button.classList.toggle('text-gray-600', !isActive);
+        button.classList.toggle('border-transparent', !isActive);
+        
+        // 更新图标颜色
+        const icon = button.querySelector('svg');
+        if (icon) {
+            icon.classList.toggle('text-purple-500', isActive);
+            icon.classList.toggle('text-gray-400', !isActive);
+        }
     });
-    
-    // 显示选中的标签页内容
-    const selectedTab = document.getElementById(tabId);
-    if (selectedTab) {
-        selectedTab.classList.remove('hidden');
-    }
-    
-    // 激活对应的标签按钮
-    const activeButton = document.querySelector(`button[data-tab="${tabId}"]`);
-    if (activeButton) {
-        activeButton.classList.add('active');
-        activeButton.classList.add('text-purple-600');
-        activeButton.classList.add('border-b-2');
-        activeButton.classList.add('border-purple-600');
-        activeButton.classList.remove('text-gray-500');
-    }
+
+    // 更新内容显示
+    document.querySelectorAll('.tab-content').forEach(content => {
+        const isSelected = content.id === tabId;
+        if (isSelected) {
+            content.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                content.style.opacity = '1';
+                content.style.transform = 'translateY(0)';
+            });
+        } else {
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                content.classList.add('hidden');
+            }, 300);
+        }
+    });
 }
 
 // 添加表单提交处理函数
@@ -786,7 +805,7 @@ async function handleAnalysis(event) {
                         
                         const content = data.content || '';
                         
-                        // ���查���否是提示信息
+                        // 检查是否是提示信息
                         if (content.includes('正在获取股票数据') || content.includes('正在进行分析')) {
                             if (!hasReceivedAnalysis) {
                                 contentDiv.innerHTML = `
@@ -822,7 +841,7 @@ async function handleAnalysis(event) {
                             // 添加样式
                             applyMarkdownStyles(markdownContent);
                             
-                            // 平滑滚�����到底部
+                            // 平滑滚到底部
                             smoothScrollToBottom(contentDiv);
                             
                             // 添加打字机效果的CSS类
@@ -856,77 +875,118 @@ async function handleAnalysis(event) {
     }
 }
 
-// 修改 applyMarkdownStyles 函数
+// 修改 applyMarkdownStyles 函
 function applyMarkdownStyles(element) {
     // 添加容器类
     element.classList.add('markdown-content', 'prose', 'prose-indigo', 'max-w-none');
     
-    // 处理代码块
-    const preTags = element.getElementsByTagName('pre');
-    Array.from(preTags).forEach(pre => {
-        // 添加代码块样式
-        pre.classList.add('relative');
-        
-        // 如包含表格数据，添加水平滚动
-        if (pre.textContent.includes('|')) {
-            pre.classList.add('overflow-x-auto');
-        }
-    });
-    
     // 处理表格
     const tables = element.getElementsByTagName('table');
     Array.from(tables).forEach(table => {
-        table.classList.add('table-auto', 'border-collapse', 'w-full');
+        // 添加基础表格样式
+        table.classList.add(
+            'min-w-full',
+            'divide-y',
+            'divide-gray-200',
+            'my-4'
+        );
+        
+        // 处理表头
+        const thead = table.querySelector('thead');
+        if (thead) {
+            thead.classList.add('bg-gray-50');
+            const headerCells = thead.getElementsByTagName('th');
+            Array.from(headerCells).forEach(cell => {
+                cell.classList.add(
+                    'px-6',
+                    'py-3',
+                    'text-left',
+                    'text-xs',
+                    'font-medium',
+                    'text-gray-500',
+                    'uppercase',
+                    'tracking-wider'
+                );
+            });
+        }
+        
+        // 处理表体
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+            tbody.classList.add('bg-white', 'divide-y', 'divide-gray-200');
+            const rows = tbody.getElementsByTagName('tr');
+            Array.from(rows).forEach(row => {
+                row.classList.add('hover:bg-gray-50', 'transition-colors');
+                const cells = row.getElementsByTagName('td');
+                Array.from(cells).forEach(cell => {
+                    cell.classList.add(
+                        'px-6',
+                        'py-4',
+                        'whitespace-nowrap',
+                        'text-sm',
+                        'text-gray-900'
+                    );
+                    
+                    // 处理数值类型的单元格
+                    const content = cell.textContent.trim();
+                    if (!isNaN(parseFloat(content))) {
+                        // 如果是百分比
+                        if (content.includes('%')) {
+                            const value = parseFloat(content);
+                            cell.classList.add(value >= 0 ? 'text-red-600' : 'text-green-600');
+                        }
+                        // 如果是大数值（市值等）
+                        else if (parseFloat(content) > 10000) {
+                            cell.classList.add('font-medium');
+                        }
+                    }
+                });
+            });
+        }
         
         // 添加表格容器以支持水平滚动
         const wrapper = document.createElement('div');
-        wrapper.classList.add('overflow-x-auto');
+        wrapper.classList.add('overflow-x-auto', 'shadow', 'rounded-lg', 'border', 'border-gray-200');
         table.parentNode.insertBefore(wrapper, table);
         wrapper.appendChild(table);
     });
     
-    // 处理交易建议部分
-    const headers = element.getElementsByTagName('h2');
-    Array.from(headers).forEach(header => {
-        if (header.textContent.includes('交易建议')) {
-            const nextElement = header.nextElementSibling;
-            if (nextElement) {
-                nextElement.classList.add('bg-indigo-50', 'p-4', 'rounded-lg', 'border', 'border-indigo-100');
-            }
+    // 处理标题
+    const headers = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    headers.forEach(header => {
+        header.classList.add('font-bold', 'text-gray-900', 'my-4');
+        if (header.tagName === 'H1') {
+            header.classList.add('text-2xl', 'mt-8', 'mb-6');
+        } else if (header.tagName === 'H2') {
+            header.classList.add('text-xl', 'mt-6', 'mb-4');
+        } else {
+            header.classList.add('text-lg', 'mt-4', 'mb-2');
         }
     });
     
-    // 高亮重要信息
+    // 处理段落
     const paragraphs = element.getElementsByTagName('p');
     Array.from(paragraphs).forEach(p => {
-        if (p.textContent.includes('建议') || 
-            p.textContent.includes('注意') || 
-            p.textContent.includes('风险')) {
-            p.classList.add('highlight');
-        }
+        p.classList.add('text-gray-600', 'my-4', 'leading-relaxed');
     });
-
-    // 处理链接
-    const links = element.getElementsByTagName('a');
-    Array.from(links).forEach(link => {
-        link.classList.add('text-indigo-600', 'hover:text-indigo-800', 'hover:underline');
-        // 如果是外部链接，添加新窗口打开
-        if (link.hostname !== window.location.hostname) {
-            link.setAttribute('target', '_blank');
-            link.setAttribute('rel', 'noopener noreferrer');
-        }
-    });
-
+    
     // 处理列表
     const lists = element.querySelectorAll('ul, ol');
     lists.forEach(list => {
-        list.classList.add('space-y-1', 'my-4');
+        list.classList.add('my-4', 'space-y-2', 'list-inside');
+        if (list.tagName === 'UL') {
+            list.classList.add('list-disc');
+        } else {
+            list.classList.add('list-decimal');
+        }
+        
+        // 处理列表项
         const items = list.getElementsByTagName('li');
         Array.from(items).forEach(item => {
-            item.classList.add('text-gray-700');
+            item.classList.add('text-gray-600', 'ml-4');
         });
     });
-
+    
     // 处理引用块
     const blockquotes = element.getElementsByTagName('blockquote');
     Array.from(blockquotes).forEach(quote => {
@@ -941,8 +1001,24 @@ function applyMarkdownStyles(element) {
             'rounded-r-lg'
         );
     });
-
-    // 处理代码
+    
+    // 处理代码块
+    const codeBlocks = element.querySelectorAll('pre code');
+    codeBlocks.forEach(code => {
+        const pre = code.parentElement;
+        pre.classList.add(
+            'bg-gray-50',
+            'rounded-lg',
+            'p-4',
+            'my-4',
+            'overflow-x-auto',
+            'text-sm',
+            'font-mono',
+            'text-gray-700'
+        );
+    });
+    
+    // 处理行内代码
     const inlineCodes = element.querySelectorAll('code:not(pre code)');
     inlineCodes.forEach(code => {
         code.classList.add(
@@ -1311,7 +1387,7 @@ function runPortfolioAnalysis(event) {
         </div>
     `;
     
-    // 显��加载示
+    // 显示加载示
     resultsDiv.innerHTML = `
         <div class="animate-pulse flex space-x-4 items-center justify-center py-12">
             <div class="rounded-full bg-purple-200 h-12 w-12"></div>
@@ -1388,7 +1464,7 @@ function switchToTechnicalAnalysis(stockCode) {
     document.getElementById('startDate').value = lastYear.toISOString().split('T')[0];
     document.getElementById('endDate').value = today.toISOString().split('T')[0];
     
-    // 自动��发优化
+    // 自动触发优化
     document.getElementById('optimizeForm').dispatchEvent(new Event('submit'));
 }
 
@@ -1445,91 +1521,107 @@ document.addEventListener('DOMContentLoaded', function() {
     SpeechController.init();
 });
 
-// 添加动画相关的样式
-const style = document.createElement('style');
-style.textContent = `
-    /* 原有的样式持不变 */
-    .tab-button.active {
-        color: #7C3AED;
-        border-bottom: 2px solid #7C3AED;
+// 合并所有样式到一个统一的样式表
+const combinedStyles = document.createElement('style');
+combinedStyles.textContent = `
+    /* 通用标签页按钮样式 */
+    .tab-button {
+        position: relative;
+        white-space: nowrap;
+        min-width: 100px;
+        transition: all 0.3s ease;
     }
-    
-    .tab-content {
-        transition: all 0.3s ease-in-out;
-    }
-    
-    .tab-content.hidden {
-        display: none;
-    }
-    
-    /* 添加新的动画样式 */
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-8px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    @keyframes slideUp {
-        from {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        to {
-            opacity: 0;
-            transform: translateY(-8px);
-        }
-    }
-    
-    .details-icon {
-        transition: transform 0.3s ease;
-    }
-    
-    .details-toggle-btn:focus {
-        outline: none;
-        ring: 2px;
-        ring-offset: 2px;
-        ring-blue-500;
-    }
-    
-    /* 优化动画效果 */
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-8px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    @keyframes slideUp {
-        from {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        to {
-            opacity: 0;
-            transform: translateY(-8px);
-        }
-    }
-    
-    /* 添卡片悬停效果 */
-    .bg-white.rounded-lg.p-3.shadow-sm {
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .bg-white.rounded-lg.p-3.shadow-sm:hover {
+
+    .tab-button:hover {
+        background-color: #F5F3FF;
+        color: #6D28D9;
         transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .tab-button.active {
+        background-color: #EDE9FE;
+        color: #6D28D9;
+    }
+
+    /* 只保留一个底部指示器 */
+    .tab-button.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 30%;
+        height: 3px;
+        background-color: #6D28D9;
+        border-radius: 3px;
+        transition: all 0.3s ease;
+    }
+
+    /* 图标和文字动画 */
+    .tab-button svg {
+        transition: all 0.3s ease;
+    }
+
+    .tab-button:hover svg {
+        transform: scale(1.1);
+        color: #6D28D9;
+    }
+
+    .tab-button.active svg {
+        color: #6D28D9;
+    }
+
+    .tab-button span {
+        transition: all 0.3s ease;
+    }
+
+    .tab-button:hover span {
+        transform: scale(1.05);
+    }
+
+    /* 内容区域动画 */
+    .tab-content,
+    .industry-tab-content {
+        transition: all 0.3s ease;
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    .tab-content:not(.hidden),
+    .industry-tab-content:not(.hidden) {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 640px) {
+        .tab-button {
+            min-width: 80px;
+            padding: 0.75rem;
+        }
+        
+        .tab-button svg {
+            width: 1.75rem;
+            height: 1.75rem;
+        }
+        
+        .tab-button span {
+            font-size: 0.75rem;
+        }
     }
 `;
-document.head.appendChild(style);
+
+// 移除旧的样式表（如果存在）
+const oldStyles = document.querySelectorAll('style');
+oldStyles.forEach(style => {
+    if (style.textContent.includes('.tab-button') || 
+        style.textContent.includes('.industry-tab-button')) {
+        style.remove();
+    }
+});
+
+// 添加新的统一样式表
+document.head.appendChild(combinedStyles);
 
 // 修改数据解析函数
 function parseTradeData(content) {
@@ -1580,7 +1672,7 @@ function getSignalStyle(signal) {
             border: 'border-orange-200',
             icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
         };
-    } else if (signal.includes('观察') || signal.includes('等待')) {
+    } else if (signal.includes('观察') || signal.includes('待')) {
         return {
             color: 'text-blue-600',
             bg: 'bg-blue-50',
@@ -1612,7 +1704,7 @@ function displayPortfolioResults(data) {
         html += `
             <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
                 <div class="p-4">
-                    <!-- 标题行：股票名���和分析按钮 -->
+                    <!-- 标题行：股票名和分析按钮 -->
                     <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:justify-between mb-4">
                         <div class="flex items-center space-x-2">
                             <h3 class="text-lg font-semibold text-gray-800">${result.stock}</h3>
@@ -1695,7 +1787,7 @@ function displayPortfolioResults(data) {
                                         <div class="font-medium text-gray-900">${tradeData['最高价'] || '-'}</div>
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
-                                        <div class="text-sm text-gray-500 mb-1">最低��</div>
+                                        <div class="text-sm text-gray-500 mb-1">最低</div>
                                         <div class="font-medium text-gray-900">${tradeData['最低价'] || '-'}</div>
                                     </div>
                                     <div class="bg-white rounded-lg p-3 shadow-sm">
@@ -2020,7 +2112,7 @@ const SpeechController = {
     updateButtonState() {
         const readBtn = document.getElementById('readAnalysisBtn');
         if (!readBtn) {
-            console.warn('��找到朗读按钮，无法更新状态');
+            console.warn('找到朗读按钮，无法更新状态');
             return;
         }
         
@@ -2183,7 +2275,7 @@ function displayTargetStocks(stocks) {
         } else if (columnName === '所属行业') {
             switch (sortStates[columnName]) {
                 case 'asc':
-                    icon.textContent = '↑';
+                    icon.textContent = '';
                     break;
                 case 'desc':
                     icon.textContent = '↓';
@@ -2284,8 +2376,11 @@ function getColumnIndex(column) {
     return columnMap[column] || 0;
 }
 
-// 在文档加载完成后初始化事件监听
+// 在文档加载完成后初始化标签页
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...'); // 调试日志
+    initializeTabs();
+    
     // 初始化目标股票表单提交事件
     const targetStocksForm = document.getElementById('targetStocksForm');
     if (targetStocksForm) {
@@ -2338,7 +2433,7 @@ async function updatePrices() {
 
 // 在文档加载完成后添加事件监听
 document.addEventListener('DOMContentLoaded', function() {
-    // ... 现有的初始化代码 ...
+    // ... 有的始化代码 ...
     
     // 添加更新价格按钮的事件监听
     const updatePricesBtn = document.getElementById('updatePricesBtn');
@@ -2447,19 +2542,30 @@ document.addEventListener('DOMContentLoaded', function() {
 // 在文件末尾添加 updateTargetStocks 函数
 async function updateTargetStocks(date) {
     try {
-        // 显示加载状态
+        if (!date) {
+            showToast('请选择日期', 'warning');
+            return;
+        }
+
         const tbody = document.getElementById('targetStocksBody');
+        if (!tbody) {
+            console.error('未找到目标股票表格主体元素');
+            return;
+        }
+
+        // 显示加载状态
         tbody.innerHTML = `
             <tr>
                 <td colspan="9" class="px-6 py-4 text-center">
-                    <div class="flex justify-center items-center space-x-3">
-                        <div class="animate-spin rounded-full h-5 w-5 border-2 border-purple-500 border-t-transparent"></div>
-                        <span class="text-gray-600">正在获取数据...</span>
+                    <div class="flex justify-center items-center space-x-2">
+                        <div class="animate-spin rounded-full h-4 w-4 border-2 border-purple-500 border-t-transparent"></div>
+                        <span class="text-gray-600">正在加载数据...</span>
                     </div>
                 </td>
             </tr>
         `;
 
+        // 发送请求获取数据
         const response = await fetch('/api/target_stocks', {
             method: 'POST',
             headers: {
@@ -2467,32 +2573,109 @@ async function updateTargetStocks(date) {
             },
             body: JSON.stringify({ date: date })
         });
-
+        
         const data = await response.json();
+        
+        if (response.status === 404) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="px-6 py-4">
+                        <div class="text-center space-y-3">
+                            <p class="text-gray-500">未找到 ${date} 的目标股票数据</p>
+                            <button onclick="updatePrices()" 
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200">
+                                点击更新数据
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
 
         if (!data.success) {
             throw new Error(data.error || '获取数据失败');
         }
 
-        // 显示数据
-        displayTargetStocks(data.data);
+        // 检查是否有数据
+        if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="px-6 py-4 text-center">
+                        <div class="text-gray-500 space-y-2">
+                            <p>暂无数据</p>
+                            <button onclick="updatePrices()" 
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200">
+                                更新数据
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // 渲染数据
+        tbody.innerHTML = data.data.map((stock, index) => `
+            <tr class="hover:bg-gray-50" data-original-index="${index}">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                    <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.股票代码}')">
+                        ${stock.股票代码}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
+                    <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.股票代码}')">
+                        ${stock.股票名称}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${stock.所属行业 || '-'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.最新价格 || '-'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.最新涨跌幅) >= 0 ? 'text-red-600' : 'text-green-600'}">
+                    ${parseFloat(stock.最新涨跌幅) >= 0 ? '+' : ''}${stock.最新涨跌幅}%
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.换手率}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳胜率)} font-medium">
+                    ${(parseFloat(stock.最佳胜率) * 100).toFixed(2)}%
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳回报)} font-medium">
+                    ${(parseFloat(stock.最佳回报) * 100).toFixed(2)}%
+                </td>
+                <td class="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${parseFloat(stock.夏普比率).toFixed(2)}
+                </td>
+            </tr>
+        `).join('');
 
     } catch (error) {
         console.error('获取目标股票数据失败:', error);
-        showToast(error.message, 'error');
         
-        // 显示错误状态
         const tbody = document.getElementById('targetStocksBody');
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="9" class="px-6 py-4 text-center">
-                    <div class="text-red-500">
-                        ${error.message}
-                    </div>
-                </td>
-            </tr>
-        `;
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="px-6 py-4">
+                        <div class="text-center space-y-3">
+                            <p class="text-red-500">${error.message}</p>
+                            <button onclick="updatePrices()" 
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200">
+                                重试更新数据
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        showToast(error.message, 'error');
     }
+}
+
+// 添加辅助函数来设置数值的颜色
+function getValueColor(value) {
+    const numValue = parseFloat(value);
+    if (numValue >= 0.6) return 'text-green-600';
+    if (numValue >= 0.5) return 'text-blue-600';
+    return 'text-red-600';
 }
 
 // 添加排序函数
@@ -2561,8 +2744,8 @@ function sortStocks(column) {
             let aValue = getCellValue(a, column);
             let bValue = getCellValue(b, column);
             
-            // 数值比较
-            if (['最新价格', '最新涨跌幅', '换手率', '最佳胜率', '最佳回报', '夏普比率'].includes(column)) {
+            // 数比较
+            if (['最新价格', '最新涨跌幅', '换手率', '最佳率', '最佳回报', '夏普比率'].includes(column)) {
                 aValue = parseFloat(aValue.replace(/[+%]/g, '')) || 0;
                 bValue = parseFloat(bValue.replace(/[+%]/g, '')) || 0;
             }
@@ -2617,5 +2800,277 @@ document.addEventListener('DOMContentLoaded', function() {
             sortStocks(column);
         });
     });
+});
+
+// 添加行业分析相关函数
+async function handleIndustryAnalysis(event) {
+    // 如果是事件对象，则阻止默认行为
+    if (event && event.preventDefault) {
+        event.preventDefault();
+    }
+    
+    // 获取日期值
+    let date;
+    if (typeof event === 'string') {
+        date = event;
+    } else {
+        date = document.getElementById('industryDate').value;
+    }
+    
+    if (!date) {
+        showToast('请选择日期', 'warning');
+        return;
+    }
+    
+    const formattedDate = date.replace(/-/g, '');
+    
+    try {
+        // 初始化标签页状态
+        switchIndustryTab('report');
+        
+        // 显示加载状态
+        const reportContent = document.getElementById('reportContent');
+        const industryStocksTableBody = document.getElementById('industryStocksTableBody');
+        
+        reportContent.innerHTML = `
+            <div class="flex justify-center items-center py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                <div class="ml-3 text-gray-600">正在加载分析报告...</div>
+            </div>
+        `;
+        
+        // 获取行业分析报告
+        const reportResponse = await fetch('/api/industry/report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: formattedDate })
+        });
+        
+        const reportData = await reportResponse.json();
+        
+        if (reportData.success) {
+            reportContent.innerHTML = marked.parse(reportData.content);
+            applyMarkdownStyles(reportContent);
+        } else {
+            reportContent.innerHTML = `<div class="text-red-500">${reportData.error}</div>`;
+        }
+        
+        // 获取行业股票清单
+        const stocksResponse = await fetch('/api/industry/stocks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: formattedDate })
+        });
+        
+        const stocksData = await stocksResponse.json();
+        
+        if (stocksData.success) {
+            industryStocksTableBody.innerHTML = stocksData.stocks.map(stock => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                        <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.stock_code}')">
+                            ${stock.stock_code}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.stock_name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.price}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.change_pct) >= 0 ? 'text-red-600' : 'text-green-600'}">
+                        ${parseFloat(stock.change_pct) >= 0 ? '+' : ''}${stock.change_pct}%
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.turnover_rate}%</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatAmount(stock.turnover)}</td>
+                </tr>
+            `).join('');
+        } else {
+            industryStocksTableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-4 text-center text-red-500">
+                        ${stocksData.error}
+                    </td>
+                </tr>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('获取行业分析数据失败:', error);
+        showToast(error.message, 'error');
+    }
+}
+
+// 修改 switchIndustryTab 函数
+function switchIndustryTab(tabId) {
+    // 更新标签按钮状态
+    document.querySelectorAll('.industry-tab-button').forEach(button => {
+        const isActive = button.getAttribute('data-tab') === tabId;
+        button.classList.toggle('active', isActive);
+        button.classList.toggle('text-purple-700', isActive);
+        button.classList.toggle('border-purple-600', isActive);
+        button.classList.toggle('bg-purple-50', isActive);
+        button.classList.toggle('text-gray-500', !isActive);
+        button.classList.toggle('border-transparent', !isActive);
+    });
+
+    // 更新内容显示
+    document.querySelectorAll('.industry-tab-content').forEach(content => {
+        const isSelected = content.id === `${tabId}Tab`;
+        if (isSelected) {
+            content.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                content.style.opacity = '1';
+                content.style.transform = 'translateY(0)';
+            });
+        } else {
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                content.classList.add('hidden');
+            }, 300);
+        }
+    });
+}
+
+// 金额格式化函数
+function formatAmount(amount) {
+    const num = parseFloat(amount);
+    if (num >= 100000000) {
+        return (num / 100000000).toFixed(2) + '亿';
+    } else if (num >= 10000) {
+        return (num / 10000).toFixed(2) + '万';
+    }
+    return num.toFixed(2);
+}
+
+// 在文档加载完成后添加事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // ... 现有的初始化代码 ...
+    
+    // 添加行业分析表单提交事件监听
+    const industryAnalysisForm = document.getElementById('industryAnalysisForm');
+    if (industryAnalysisForm) {
+        industryAnalysisForm.addEventListener('submit', handleIndustryAnalysis);
+    }
+    
+    // 添加标签页切换事件监听
+    document.querySelectorAll('.industry-tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            switchIndustryTab(tabId);
+        });
+    });
+    
+    // 初始化显示第一个标签页
+    const firstIndustryTab = document.querySelector('.industry-tab-button');
+    if (firstIndustryTab) {
+        const defaultTabId = firstIndustryTab.getAttribute('data-tab');
+        switchIndustryTab(defaultTabId);
+    }
+});
+
+// 添加个股分析处理函数
+async function handleStockAnalysis(event) {
+    event.preventDefault();
+    
+    const symbol = document.getElementById('analysisSymbol').value;
+    const date = document.getElementById('analysisDate').value;
+    
+    if (!symbol || !date) {
+        showToast('请输入股票代码和选择日期', 'warning');
+        return;
+    }
+    
+    try {
+        // 显示加载状态
+        const resultsDiv = document.getElementById('stockAnalysisResults');
+        const analysisContent = document.getElementById('analysisContent');
+        
+        if (!resultsDiv || !analysisContent) {
+            showToast('页面元素不存在', 'error');
+            return;
+        }
+        
+        analysisContent.innerHTML = `
+            <div class="flex justify-center items-center py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                <div class="ml-3 text-gray-600">正在分析数据...</div>
+            </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+        
+        // 发送分析请求
+        const response = await fetch('/api/stock/analysis', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                date: date
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `请求失败: ${response.status}`);
+        }
+        
+        if (!data.success) {
+            throw new Error(data.error || '分析失败，请重试');
+        }
+        
+        // 更新股票信息
+        document.getElementById('analysisStockName').textContent = data.stockName;
+        document.getElementById('analysisStockCode').textContent = `股票代码：${symbol}`;
+        
+        // 显示分析报告
+        analysisContent.innerHTML = marked.parse(data.content);
+        applyMarkdownStyles(analysisContent);
+        
+    } catch (error) {
+        console.error('个股分析失败:', error);
+        const analysisContent = document.getElementById('analysisContent');
+        if (analysisContent) {
+            analysisContent.innerHTML = `
+                <div class="text-red-500 text-center p-4">
+                    ${error.message || '分析失败，请重试'}
+                </div>
+            `;
+        }
+        showToast(error.message, 'error');
+    }
+}
+
+// 在文档加载完成后添加事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // ... 现有的初始化代码 ...
+    
+    // 添加个股分析表单提交事件监听
+    const stockAnalysisForm = document.getElementById('stockAnalysisForm');
+    if (stockAnalysisForm) {
+        stockAnalysisForm.addEventListener('submit', handleStockAnalysis);
+    }
+    
+    // 添加复制分析报告按钮事件监听
+    const copyAnalysisBtn = document.getElementById('copyAnalysisBtn');
+    if (copyAnalysisBtn) {
+        copyAnalysisBtn.addEventListener('click', async function() {
+            const analysisContent = document.getElementById('analysisContent');
+            if (!analysisContent) {
+                showToast('未找到分析内容', 'error');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(analysisContent.innerText);
+                showToast('分析报告已复制到剪贴板', 'success');
+            } catch (error) {
+                showToast('复制失败，请重试', 'error');
+            }
+        });
+    }
 });
 
