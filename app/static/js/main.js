@@ -3212,3 +3212,111 @@ function formatChangePercent(value) {
     return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
 }
 
+// 修改复制功能的处理代码
+async function copyAnalysisContent() {
+    const content = document.getElementById('analysisContent');
+    if (!content) {
+        showToast('未找到分析内容', 'error');
+        return;
+    }
+
+    try {
+        const textContent = content.innerText;
+        await copyToClipboard(textContent);
+        
+        // 更新复制按钮状态
+        const copyBtn = document.getElementById('copyAnalysisBtn');
+        if (copyBtn) {
+            const originalContent = copyBtn.innerHTML;
+            copyBtn.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M5 13l4 4L19 7"/>
+                </svg>
+                <span class="text-sm font-medium">已复制</span>
+            `;
+            copyBtn.classList.remove('bg-green-50', 'hover:bg-green-100', 'text-green-600');
+            copyBtn.classList.add('bg-green-100', 'text-green-700');
+            
+            // 显示成功提示
+            showToast('分析内容已复制到剪贴板', 'success');
+            
+            // 2秒后恢复按钮原始状态
+            setTimeout(() => {
+                copyBtn.innerHTML = originalContent;
+                copyBtn.classList.remove('bg-green-100', 'text-green-700');
+                copyBtn.classList.add('bg-green-50', 'hover:bg-green-100', 'text-green-600');
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('复制失败:', err);
+        showToast('复制失败，请重试', 'error');
+    }
+}
+
+// 添加通用的复制到剪贴板函数
+async function copyToClipboard(text) {
+    try {
+        // 优先使用现代 Clipboard API
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+        
+        // 后备方案：使用传统方法
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        
+        // 设置样式使其不可见
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+        
+        document.body.appendChild(textArea);
+        
+        // 特殊处理 iOS 设备
+        if (navigator.userAgent.match(/ipad|iphone/i)) {
+            textArea.contentEditable = true;
+            textArea.readOnly = false;
+            
+            const range = document.createRange();
+            range.selectNodeContents(textArea);
+            
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            textArea.setSelectionRange(0, 999999);
+        } else {
+            textArea.select();
+        }
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (!successful) {
+            throw new Error('复制命令执行失败');
+        }
+    } catch (err) {
+        console.error('复制失败:', err);
+        throw err;
+    }
+}
+
+// 修改事件监听器的绑定
+document.addEventListener('DOMContentLoaded', function() {
+    // ... 其他初始化代码 ...
+    
+    // 为复制按钮添加事件监听
+    const copyBtn = document.getElementById('copyAnalysisBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyAnalysisContent);
+    }
+});
+
