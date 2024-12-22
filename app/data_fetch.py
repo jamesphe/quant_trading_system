@@ -120,22 +120,49 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
                 chandelier_period = 14
                 chandelier_mult = 2.0
             
-            # 计算指标
-            high = temp_df['High'].rolling(window=chandelier_period).max()
-            low = temp_df['Low'].rolling(window=chandelier_period).min()
-            
             # 计算ATR
             atr = talib.ATR(temp_df['High'].values,
-                         temp_df['Low'].values,
-                         temp_df['Close'].values,
-                         timeperiod=chandelier_period)
+                          temp_df['Low'].values,
+                          temp_df['Close'].values,
+                          timeperiod=chandelier_period)
             
-            # 计算最终结果
+            # 计算最高价和最低价
+            high = temp_df['Close'].rolling(window=chandelier_period).max()
+            low = temp_df['Close'].rolling(window=chandelier_period).min()
+            
+            # 初始化多头止损和空头止损
+            long_stop = pd.Series(index=temp_df.index)
+            short_stop = pd.Series(index=temp_df.index)
+            
+            # 第一个有效值的计算
+            first_valid = chandelier_period - 1
+            long_stop.iloc[first_valid] = high.iloc[first_valid] - (atr[first_valid] * chandelier_mult)
+            short_stop.iloc[first_valid] = low.iloc[first_valid] + (atr[first_valid] * chandelier_mult)
+            
+            # 动态调整止损点
+            for i in range(first_valid + 1, len(temp_df)):
+                # 计算当前的基础止损点
+                current_long_stop = high.iloc[i] - (atr[i] * chandelier_mult)
+                current_short_stop = low.iloc[i] + (atr[i] * chandelier_mult)
+                
+                # 动态调整多头止损点
+                if temp_df['Close'].iloc[i] > long_stop.iloc[i-1]:
+                    long_stop.iloc[i] = max(current_long_stop, long_stop.iloc[i-1])
+                else:
+                    long_stop.iloc[i] = current_long_stop
+                
+                # 动态调整空头止损点
+                if temp_df['Close'].iloc[i] < short_stop.iloc[i-1]:
+                    short_stop.iloc[i] = min(current_short_stop, short_stop.iloc[i-1])
+                else:
+                    short_stop.iloc[i] = current_short_stop
+            
+            # 保存计算结果
             temp_df['ATR'] = atr
             temp_df['周期'] = chandelier_period
             temp_df['倍数'] = chandelier_mult
-            temp_df['多头止损'] = high - (atr * chandelier_mult)
-            temp_df['空头止损'] = low + (atr * chandelier_mult)
+            temp_df['多头止损'] = long_stop  # 现在使用的是动态调整后的止损点
+            temp_df['空头止损'] = short_stop  # 现在使用的是动态调整后的止损点
         # 只返回请求的日期范围的数据
         df = temp_df[start_date:end_date].copy()
         return df
