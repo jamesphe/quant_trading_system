@@ -172,38 +172,61 @@ def get_cost_price(symbol: str) -> float:
 
 
 
-def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name: str, 
-                              basic_info: dict, news_list: list, include_backtest: bool = True) -> str:
+def get_stock_analysis_prompt(
+    symbol: str,
+    stock_data: pd.DataFrame,
+    stock_name: str, 
+    basic_info: dict, 
+    news_list: list, 
+    include_backtest: bool = True
+) -> str:
     """
-    生成用于分析股票的prompt。
+    优化后的函数，用于生成针对股票的分析提示词（Prompt）。
+    结合Chandelier Exit策略、其他技术指标和资讯，帮助LLM生成更深入的交易决策分析。
     
     Args:
         symbol (str): 股票代码
-        stock_data (pd.DataFrame): 近30交易日行情数据
+        stock_data (pd.DataFrame): 近30交易日行情数据，需包含以下列：
+            ['Close', 'Pct_change', 'ATR', '多头止损', '空头止损',
+             'MACD', 'MACD_SIGNAL', 'MACD_HIST',
+             'RSI_6','RSI_12','RSI_24',
+             'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
+             'ZLSMA_20', 'ZLSMA_60',
+             '夏普比率', '最大回撤', '胜率', '总收益', '最新信号']
         stock_name (str): 股票简称
-        basic_info (dict): 股票基本信息
-        news_list (list): 最新资讯列表，包含时间、标题、内容字段
-        include_backtest (bool): 是否包含回测信息
+        basic_info (dict): 股票基本信息，如{'总市值': 'xxx', '行业': 'xxx', ...}
+        news_list (list): 最新资讯列表，元素包含{'publish_time', 'title', 'content'}
+        include_backtest (bool): 是否需要在提示中包含回测指标（默认True）
     
     Returns:
-        str: 生成的分析提示词
+        str: 优化后的分析提示词（Prompt）。
     """
-    # 最新价格和涨跌幅
-    print(stock_data)
+
+    # 简单的容错：若stock_data行数不足2行，直接给出提示
+    if len(stock_data) < 2:
+        return (
+            f"数据不足：仅有 {len(stock_data)} 条记录，无法生成有效分析。"
+            "请提供至少2个交易日的行情数据。"
+        )
+
+    # ========== 1. 提取最新行情、技术指标等 ========== #
     latest_row = stock_data.iloc[-1]
+    prev_row = stock_data.iloc[-2]
+
+    # 最新价格和涨跌幅
     current_price = round(latest_row['Close'], 2)
     pct_change = round(latest_row['Pct_change'], 2)
 
-    # Chandelier Exit指标
-    prev_row = stock_data.iloc[-2]
+    # Chandelier Exit (吊灯止损) 相关
     atr = round(prev_row['ATR'], 2)
     long_stop = round(prev_row['多头止损'], 2)
     short_stop = round(prev_row['空头止损'], 2)
-    # 检查是否存在回测相关列
+
+    # 回测指标
     sharpe_ratio = round(prev_row['夏普比率'], 2) if '夏普比率' in prev_row else None
-    max_drawdown = round(prev_row['最大回撤'], 2) if '最大回撤' in prev_row else None 
-    win_rate = round(prev_row['胜率'] * 100, 2) if '胜率' in prev_row else None
-    total_return = round(prev_row['总收益'] * 100, 2) if '总收益' in prev_row else None
+    max_drawdown = round(prev_row['最大回撤'], 2) if '最大回撤' in prev_row else None
+    win_rate = round(prev_row['胜率']*100, 2) if '胜率' in prev_row else None
+    total_return = round(prev_row['总收益']*100, 2) if '总收益' in prev_row else None
     latest_signal = prev_row['最新信号'] if '最新信号' in prev_row else None
 
     # 技术指标
@@ -219,25 +242,34 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
     zlsma_20 = round(latest_row['ZLSMA_20'], 2)
     zlsma_60 = round(latest_row['ZLSMA_60'], 2)
 
-    # 基本信息描述
+    # 基本信息
     basic_info_text = "\n".join([f"{k}: {v}" for k, v in basic_info.items()])
 
     # 最新资讯格式化
-    news_text = "\n".join([
-        f"- {news['publish_time']}: {news['title']}\n  {news['content'][:200]}..."
-        for news in news_list
-    ]) if news_list else "无最新资讯"
+    if news_list:
+        # 截取content前200字
+        news_text = "\n".join([
+            f"- {news['publish_time']}: {news['title']}\n  {news['content'][:200]}..."
+            for news in news_list
+        ])
+    else:
+        news_text = "无最新资讯"
 
     # 持仓成本信息
     cost_price = get_cost_price(symbol)
-    cost_info = f"当前持仓成本: {round(cost_price, 2)}" if cost_price > 0 else "无持仓成本信息"
+    if cost_price > 0:
+        cost_info = f"当前持仓成本: {round(cost_price, 2)}"
+    else:
+        cost_info = "无持仓成本信息"
 
-    # 持仓建议
+    # ========== 2. 持仓建议逻辑 ========== #
     if cost_price > 0:
         if current_price > cost_price * 1.05:
             position_plan = "建议继续持有或部分止盈，保护已有利润。"
         elif long_stop < current_price <= cost_price:
-            position_plan = "当前价格接近或低于持仓成本，建议严格关注多头止损并制定减仓计划。"
+            position_plan = (
+                "当前价格接近或低于持仓成本，建议严格关注多头止损并制定减仓计划。"
+            )
         elif current_price <= long_stop:
             position_plan = "价格已低于多头止损，建议止损离场，减少损失。"
         else:
@@ -245,18 +277,57 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
     else:
         position_plan = "无持仓，无需制定持仓计划。"
 
-    # MACD顶背离检测
+    # ========== 3. MACD顶背离检测 ========== #
     macd_divergence = "未检测到顶背离。"
-    if len(stock_data) > 1:
-        prev_row = stock_data.iloc[-2]
-        prev_macd = round(prev_row['MACD'], 2)
-        prev_price = round(prev_row['Close'], 2)
-        if macd < prev_macd and current_price > prev_price:
-            macd_divergence = "检测到MACD顶背离，建议关注潜在风险，考虑减仓或止盈。"
+    if macd < round(prev_row['MACD'], 2) and current_price > round(prev_row['Close'], 2):
+        macd_divergence = "检测到MACD顶背离，建议关注潜在风险，考虑减仓或止盈。"
 
-    # Prompt模板
+    # ========== 4. 角色设定与深度分析需求 ========== #
+    # 通过在提示中增加更明确的角色和分析指引，让模型输出更深入的内容
+    role_intro = f"""
+你是一名在金融行业拥有超过十年经验的资深量化交易员，熟悉多种交易策略和风控体系。
+请基于所提供的 {stock_name}（{symbol}）的最新行情、基本面数据以及资讯，结合 Chandelier Exit（吊灯止损）策略，
+深入分析并输出专业报告。你可以充分运用技术分析、数据建模以及宏观行业洞察，帮助我们制定更全面的交易计划。
+"""
+
+    # ========== 5. 详细分析要求，引导输出结构 ========== #
+    # 在analysis_requirements中明确列出希望模型逐条回应的分析重点
+    analysis_requirements = f"""
+【分析要求】  
+
+1. **行情回顾与多空格局**  
+   - 总结 {symbol} 近30个交易日的价格走势与成交量变化，说明近期涨跌幅是否反映了多空情绪的转变。
+   - 结合 ATR（{atr}）等波动性指标，判断当前市场情绪是偏乐观还是谨慎。
+
+2. **Chandelier Exit策略深入分析**  
+   - 回顾该策略的核心逻辑和历史表现（夏普比率: {sharpe_ratio}, 最大回撤: {max_drawdown}%, 胜率: {win_rate}%, 总收益: {total_return}%）。
+   - 分析多头止损价格 {long_stop}、空头止损价格 {short_stop} 与当前股价({current_price})之间的关系，探讨其有效性。
+   - 若有背离信号或风险提示（如MACD顶背离、RSI临界值等），请深入阐述。
+
+3. **技术指标交叉验证**  
+   - 从MACD、RSI、BOLL、ZLSMA等角度，逐一解释其意义并判断当前是强势还是谨慎信号。
+   - 判断这些指标是否需要进一步确认，如等待量能配合、或参考其他周期的K线形态。
+
+4. **资讯与基本面解读**  
+   - 将最新资讯中的重大信息提炼出来，分析其对公司或行业的正负面影响。
+   - 若消息面存在矛盾（如同一时间出现多空分歧），请给出如何辨别和甄别的建议。
+
+5. **深入的建仓与清仓策略**  
+   - 针对“多头止损价 {long_stop} 上方的区域是否适合建仓”，给出更细化的价格区间及分批建仓思路。
+   - 若出现指标矛盾或信号减弱，如何执行止盈止损，包括参考价格区间、分批卖出的计划等。
+
+6. **风险控制与情景推演**  
+   - 结合胜率偏低（{win_rate if win_rate else '未知'}%）和夏普比率不佳（{sharpe_ratio if sharpe_ratio else '未知'}），如何调整仓位与资金管理。
+   - 模拟极端行情或公司突发公告时的应对方案（快速止损、减仓或观望）。
+
+7. **最终交易计划与执行细则**  
+   - 请综合以上分析，提出在下一个交易日/短期内可行的交易方案，包括：初始买入价、加仓时机、止损和止盈目标。
+   - 特别说明潜在不确定因素与风险提示，帮助投资者做好资金管理。
+"""
+
+    # ========== 6. 组织最终 Prompt 文本 ========== #
     prompt = f"""
-你是一名经验丰富的股票量化交易员。你的任务是对{stock_name}（{symbol}）进行深入分析，以Chandelier Exit（吊灯止损）策略为核心，结合其他技术指标和市场资讯，帮助制定下一个交易日的建仓或清仓计划。
+{role_intro}
 
 【股票基本信息】  
 {basic_info_text}
@@ -291,36 +362,12 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 【最新资讯与链接】  
 {news_text}
 
-【分析要求】  
-1. **建仓时机的多指标验证**：
-   - 分析Chandelier Exit策略的历史表现：
-     * 夏普比率{sharpe_ratio}反映风险调整后收益,大于1为佳
-     * 最大回撤{max_drawdown}%显示历史最大亏损幅度,控制在25%以内较好
-     * 胜率{win_rate}%反映策略的稳定性,建议>50%
-     * 总收益{total_return}%衡量策略盈利能力,结合夏普比率评估
-     * 最新信号{latest_signal}作为当前建仓时机的重要参考
-   - 利用Chandelier Exit多头止损位确认当前趋势信号（做多或观望）。
-   - 使用辅助指标（MACD、RSI、BOLL、ZLSMA等）验证信号是否强劲，并评估趋势的潜在背离和超买超卖状态。
-   - 结合最新资讯，评估市场情绪与基本面对当前趋势的正负面影响，确认是否适合建仓。
-   - 提出明确的建仓建议：包括参考价格区间、初始止损位、分批建仓策略等。
+{analysis_requirements}
 
-2. **提前逃顶信号与清仓计划**：  
-   - 分析股价接近多头止损前的指标表现，寻找可能的逃顶信号（如RSI超买、MACD顶背离等）。  
-   - 结合市场资讯，评估是否存在对股价负面影响的潜在风险（如行业新闻或资金流向变化）。  
-   - 提出清仓策略：包括清仓时机、预期价格区间，以及考虑持仓成本后的损益评估。  
-
-3. **风险控制与动态调整**：  
-   - 严格遵守Chandelier Exit止损纪律：触及多头或空头止损位时，坚决执行止损。  
-   - 若价格显著高于持仓成本，结合动态上移止损位策略，保护收益，让利润奔跑。  
-   - 在趋势强劲时，适当提升仓位介入标准，扩大收益潜力；在趋势不明朗时，降低风险敞口。
-
-4. **综合分析与交易计划制定**：  
-   - 针对当前趋势、技术指标和市场情绪，综合判断下一个交易日的价格波动区间。  
-   - 提出清晰的建仓计划（包括价格区间、分批建仓建议、初始止损位）。  
-   - 若当前趋势不明朗或信号冲突，建议保持观望，并说明原因。  
-
-请根据上述要求完成分析并提供交易建议。
+请根据以上信息，结合你的量化交易经验、资金管理策略和行业分析能力，
+给出具有深度、逻辑清晰、且能实际执行的交易分析报告。
 """
+    print(prompt)
     return prompt
 
 def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):

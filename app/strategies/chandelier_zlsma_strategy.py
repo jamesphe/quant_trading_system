@@ -6,6 +6,7 @@ import backtrader as bt
 import numpy as np
 import pandas as pd
 from data_fetch import get_a_share_list, get_stock_data
+from datetime import datetime, timedelta
 
 class LinearRegression(bt.Indicator):
     """
@@ -353,15 +354,22 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     cerebro.adddata(data_bt, name=symbol)
 
     # 设置初始资金
-    initial_cash = 20000.0
+    initial_cash = 50000.0
     cerebro.broker.setcash(initial_cash)
 
     # 设置交易佣金（例如 0.1%）
     cerebro.broker.setcommission(commission=0.001)
 
     # 添加分析器
-    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe',
-                        timeframe=bt.TimeFrame.Days, compression=1)
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, 
+        _name='sharpe',
+        timeframe=bt.TimeFrame.Days, 
+        compression=1,
+        riskfreerate=0.02,  # 设置年化无风险利率为2%
+        annualize=True,     # 年化处理
+        factor=252          # 设置年交易日数
+    )
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')  # 添加收益率分析器
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
 
     # 打印初始资金
@@ -372,29 +380,39 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
 
     # 获取第一个策略实例
     strat = results[0]
-    # 打印最终资金
+    
+    # 获取分析器结果
+    sharpe_ratio = strat.analyzers.sharpe.get_analysis()['sharperatio']
+    returns_analysis = strat.analyzers.returns.get_analysis()
+    
+    # 计算年化收益率
+    annual_return = returns_analysis.get('rnorm100', 0)  # 年化收益率（百分比）
+    
+    # 打印最终资金和收益信息
     final_cash = cerebro.broker.getvalue()
-    # 只计算已完成交易的收益
     total_profit = sum(trade.pnlcomm for trade in strat.trades if trade.isclosed)
     roi = (total_profit / initial_cash) * 100
 
     print(f'最终资金: {final_cash:.2f}')
     print(f'总收益: {total_profit:.2f}')
     print(f'收益率: {roi:.2f}%')
+    print(f'年化收益率: {annual_return:.2f}%')
     
     print(f"交易总数: {len(strat.trades)}")
     print(f"盈利交易数: {len([trade for trade in strat.trades if trade.pnl > 0])}")
+    
     # 计算胜率
-    win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100
-    print(f'胜率: {win_rate:.2f}%')
+    if len(strat.trades) > 0:  # 添加防御性检查
+        win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100
+        print(f'胜率: {win_rate:.2f}%')
+    else:
+        print('无交易记录，无法计算胜率')
 
-    # 计算夏普比率
-    sharpe_analysis = strat.analyzers.sharpe.get_analysis()
-    sharpe_ratio = sharpe_analysis.get('sharperatio', None)
+    # 打印夏普比率
     if sharpe_ratio is not None:
         print(f'夏普比率: {sharpe_ratio:.2f}')
     else:
-        print('夏普比率无法计算。')
+        print('夏普比率无法计算')
 
     # 计算最大回撤
     drawdown_analysis = strat.analyzers.drawdown.get_analysis()
@@ -421,6 +439,37 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     # 可选：绘制结果
     # cerebro.plot(style='candlestick', volume=False, barup='green', bardown='red')[0][0]
 
+def calculate_annualized_sharpe(returns, risk_free=0.02):
+    """
+    计算年化夏普比率
+    returns: 日收益率列表
+    risk_free: 年化无风险利率
+    """
+    returns = np.array(returns)
+    if len(returns) == 0:
+        return 0
+        
+    # 计算日化无风险利率
+    daily_rf = (1 + risk_free) ** (1/252) - 1
+    
+    # 计算超额收益
+    excess_returns = returns - daily_rf
+    
+    # 计算年化超额收益均值
+    annual_excess_return = np.mean(excess_returns) * 252
+    
+    # 计算年化波动率（使用总体标准差）
+    annual_volatility = np.std(excess_returns, ddof=0) * np.sqrt(252)
+    
+    # 避免除以零
+    if annual_volatility == 0:
+        return 0
+        
+    # 计算夏普比率
+    sharpe = annual_excess_return / annual_volatility
+    
+    return sharpe
+
 if __name__ == '__main__':
     # 获取A股列表
     import argparse
@@ -428,8 +477,12 @@ if __name__ == '__main__':
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='股票回测程序')
     parser.add_argument('symbol', type=str, help='股票代码')
-    parser.add_argument('--start_date', type=str, default='2024-05-01', help='回测开始日期 (YYYY-MM-DD)')
-    parser.add_argument('--end_date', type=str, default='2024-09-28', help='回测结束日期 (YYYY-MM-DD)')
+    parser.add_argument('--start_date', type=str, 
+                       default=(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
+                       help='回测开始日期 (YYYY-MM-DD)')
+    parser.add_argument('--end_date', type=str,
+                       default=datetime.now().strftime('%Y-%m-%d'),
+                       help='回测结束日期 (YYYY-MM-DD)')
     args = parser.parse_args()
 
     print(f"开始回测股票: {args.symbol}")

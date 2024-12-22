@@ -42,56 +42,99 @@ np.random.seed(RANDOM_SEED)
 
 
 def run_backtest(strategy, params, data_feed):
-    """运行回测并返回结果"""
-    cerebro = bt.Cerebro(stdstats=False)
-    cerebro.adddata(data_feed)
+    """
+    运行回测并返回优化结果
+
+    参数：
+    - strategy: 策略类
+    - params: 策略参数字典
+    - data_feed: 数据源
+    """
+    # 初始化 Cerebro 引擎
+    cerebro = bt.Cerebro()
+    
+    # 添加策略
     cerebro.addstrategy(strategy, **params)
-    cerebro.broker.setcash(100000.0)
-    cerebro.addsizer(bt.sizers.FixedSize, stake=1)
+    
+    # 添加数据
+    cerebro.adddata(data_feed)
+    
+    # 设置初始资金
+    initial_cash = 50000.0
+    cerebro.broker.setcash(initial_cash)
+    
+    # 设置交易佣金（0.1%）
     cerebro.broker.setcommission(commission=0.001)
     
     # 添加分析器
-    cerebro.addanalyzer(
-        bt.analyzers.SharpeRatio,
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, 
         _name='sharpe',
-        timeframe=bt.TimeFrame.Days,
-        compression=1
+        timeframe=bt.TimeFrame.Days, 
+        compression=1,
+        riskfreerate=0.02,  # 设置年化无风险利率为2%
+        annualize=True,     # 年化处理
+        factor=252          # 设置年交易日数
     )
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')  # 添加收益率分析器
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
-    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
-
-    try:
-        results = cerebro.run()
-        strat = results[0]
-
-        sharpe = strat.analyzers.sharpe.get_analysis().get('sharperatio', 0)
-        drawdown = (strat.analyzers.drawdown.get_analysis()
-                   .get('max', {}).get('drawdown', 0))
-        
-        # 计算总收益率
-        total_return = strat.analyzers.returns.get_analysis()['rtot']
-
-        signals = strat.signal.array if hasattr(strat, 'signal') else []
-        last_signal = signals[-1] if len(signals) > 0 else 0
-
-        total_trades = len(strat.trades)
-        winning_trades = sum(1 for trade in strat.trades if trade.pnlcomm > 0)
-        win_rate = winning_trades / total_trades if total_trades > 0 else 0
-
-        log_msg = (
-            f"策略: {strategy.__name__}, 参数: {params}, "
-            f"夏普比率: {sharpe}, 最大回撤: {drawdown}, "
-            f"胜率: {win_rate}, 总收益率: {total_return}, "
-            f"最后信号: {last_signal}"
-        )
-        logging.info(log_msg)
-
-        return sharpe, drawdown, win_rate, total_return, last_signal
-    except Exception as e:
-        logging.error(
-            f"回测失败，策略: {strategy.__name__}, 参数: {params}, 错误: {e}"
-        )
-        return 0.0, 0.0, 0.0, 0.0, 0
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
+    
+    # 运行回测
+    results = cerebro.run()
+    strat = results[0]
+    
+    # 获取最新信号
+    signals = strat.signal.array if hasattr(strat, 'signal') else []
+    last_signal = signals[-1] if signals else 0
+    
+    # 获取分析结果
+    sharpe_ratio = strat.analyzers.sharpe.get_analysis().get('sharperatio', 0)
+    returns_analysis = strat.analyzers.returns.get_analysis()
+    drawdown_analysis = strat.analyzers.drawdown.get_analysis()
+    trades_analysis = strat.analyzers.trades.get_analysis()
+    
+    # 计算各项指标
+    final_value = cerebro.broker.getvalue()
+    total_return = (final_value - initial_cash) / initial_cash
+    annual_return = returns_analysis.get('rnorm100', 0) / 100
+    max_drawdown = drawdown_analysis.get('max', {}).get('drawdown', 0)
+    
+    # 计算交易相关指标
+    total_trades = trades_analysis.get('total', {}).get('total', 0)
+    won_trades = trades_analysis.get('won', {}).get('total', 0)
+    win_rate = (won_trades / total_trades) if total_trades > 0 else 0
+    
+    # 安全地获取盈利和亏损的PNL
+    won_pnl = float(trades_analysis.get('won', {}).get('pnl', {}).get('total', 0))
+    lost_pnl = float(trades_analysis.get('lost', {}).get('pnl', {}).get('total', 0))
+    
+    # 计算盈亏比
+    profit_factor = abs(won_pnl / lost_pnl) if lost_pnl != 0 else 0
+    
+    # 安全地获取平均交易收益和最大盈亏
+    avg_trade = float(trades_analysis.get('pnl', {}).get('net', {}).get('average', 0))
+    largest_win = float(trades_analysis.get('won', {}).get('pnl', {}).get('max', 0))
+    largest_loss = float(trades_analysis.get('lost', {}).get('pnl', {}).get('max', 0))
+    
+    # 返回优化结果
+    return {
+        'final_value': final_value,
+        'total_return': total_return,
+        'annual_return': annual_return,
+        'sharpe_ratio': sharpe_ratio,
+        'max_drawdown': max_drawdown,
+        'total_trades': total_trades,
+        'win_rate': win_rate,
+        'params': params,
+        'won_trades': won_trades,
+        'lost_trades': total_trades - won_trades if total_trades > 0 else 0,
+        'initial_cash': initial_cash,
+        'profit_factor': profit_factor,
+        'avg_trade': avg_trade,
+        'largest_win': largest_win,
+        'largest_loss': largest_loss,
+        'last_signal': last_signal,
+    }
 
 
 def objective(trial, strategy, data_feed):
@@ -156,14 +199,15 @@ def objective(trial, strategy, data_feed):
         params = {}
 
     results = run_backtest(strategy, params, data_feed)
-    sharpe, drawdown, win_rate, total_return, last_signal = results
-
-    trial.set_user_attr('win_rate', win_rate)
-    trial.set_user_attr('max_drawdown', drawdown)
-    trial.set_user_attr('total_return', total_return)
-    trial.set_user_attr('last_signal', last_signal)
-
-    return -sharpe if sharpe else 0.0
+    
+    # 从结果字典中获取需要的值
+    trial.set_user_attr('win_rate', results['win_rate'])
+    trial.set_user_attr('max_drawdown', results['max_drawdown'])
+    trial.set_user_attr('total_return', results['total_return'])
+    trial.set_user_attr('last_signal', results['last_signal'])
+    
+    # 返回负的夏普率作为优化目标（因为optuna默认最小化目标）
+    return -results['sharpe_ratio'] if results['sharpe_ratio'] else 0.0
 
 
 def optimize_strategy(strategy, data_feed, n_trials=50, n_jobs=1):
@@ -450,7 +494,7 @@ def main():
             'max_drawdown': 'first',
             'win_rate': 'first',
             'total_return': 'first'
-        }).round(2)
+        }).round(4)
         
         performance_summary.columns = ['夏普比率', '最大回撤(%)', '胜率(%)', '总收益率(%)']
         performance_summary['胜率(%)'] = performance_summary['胜率(%)'] * 100

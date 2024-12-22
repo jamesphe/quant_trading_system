@@ -119,11 +119,13 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
                         temp_df['总收益'] = params_df.iloc[0]['total_return']
                         # 将数值信号转换为中文含义
                         signal_map = {
-                            1.0: "多头",
-                            -1.0: "空头", 
-                            0.0: "中性",
+                            1.0: "建仓信号",
+                            2.0: "加仓信号", 
                             3.0: "建仓预警",
-                            -2.0: "减仓预警"
+                            0.0: "无交易信号",
+                            -1.0: "清仓信号",
+                            -2.0: "减仓预警",
+                            -3.0: "减仓/清仓预警"
                         }
                         temp_df['最新信号'] = signal_map.get(params_df.iloc[0]['last_signal'], "未知")
                     else:
