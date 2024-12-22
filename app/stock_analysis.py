@@ -199,6 +199,12 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
     atr = round(prev_row['ATR'], 2)
     long_stop = round(prev_row['多头止损'], 2)
     short_stop = round(prev_row['空头止损'], 2)
+    # 检查是否存在回测相关列
+    sharpe_ratio = round(prev_row['夏普比率'], 2) if '夏普比率' in prev_row else None
+    max_drawdown = round(prev_row['最大回撤'], 2) if '最大回撤' in prev_row else None 
+    win_rate = round(prev_row['胜率'] * 100, 2) if '胜率' in prev_row else None
+    total_return = round(prev_row['总收益'] * 100, 2) if '总收益' in prev_row else None
+    latest_signal = prev_row['最新信号'] if '最新信号' in prev_row else None
 
     # 技术指标
     macd = round(latest_row['MACD'], 2)
@@ -264,6 +270,11 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 - ATR值: {atr:.2f}  
 - 多头止损价格: {long_stop:.2f}  
 - 空头止损价格: {short_stop:.2f}
+- 夏普比率: {sharpe_ratio if sharpe_ratio is not None else '未知'}
+- 最大回撤: {max_drawdown if max_drawdown is not None else '未知'}%
+- 胜率: {win_rate if win_rate is not None else '未知'}%
+- 总收益: {total_return if total_return is not None else '未知'}%
+- 最新信号: {latest_signal if latest_signal is not None else '未知'}
 
 【技术指标】  
 - MACD: {macd:.2f}, 信号线: {macd_signal:.2f}, 柱状图: {macd_hist:.2f}  
@@ -281,10 +292,16 @@ def get_stock_analysis_prompt(symbol: str, stock_data: pd.DataFrame, stock_name:
 {news_text}
 
 【分析要求】  
-1. **建仓时机的多指标验证**：  
-   - 利用Chandelier Exit多头止损位确认当前趋势信号（做多或观望）。  
-   - 使用辅助指标（MACD、RSI、BOLL、ZLSMA等）验证信号是否强劲，并评估趋势的潜在背离和超买超卖状态。  
-   - 结合最新资讯，评估市场情绪与基本面对当前趋势的正负面影响，确认是否适合建仓。  
+1. **建仓时机的多指标验证**：
+   - 分析Chandelier Exit策略的历史表现：
+     * 夏普比率{sharpe_ratio}反映风险调整后收益,大于1为佳
+     * 最大回撤{max_drawdown}%显示历史最大亏损幅度,控制在25%以内较好
+     * 胜率{win_rate}%反映策略的稳定性,建议>50%
+     * 总收益{total_return}%衡量策略盈利能力,结合夏普比率评估
+     * 最新信号{latest_signal}作为当前建仓时机的重要参考
+   - 利用Chandelier Exit多头止损位确认当前趋势信号（做多或观望）。
+   - 使用辅助指标（MACD、RSI、BOLL、ZLSMA等）验证信号是否强劲，并评估趋势的潜在背离和超买超卖状态。
+   - 结合最新资讯，评估市场情绪与基本面对当前趋势的正负面影响，确认是否适合建仓。
    - 提出明确的建仓建议：包括参考价格区间、初始止损位、分批建仓策略等。
 
 2. **提前逃顶信号与清仓计划**：  

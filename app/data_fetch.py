@@ -104,27 +104,45 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
         if include_chandelier:
             # 尝试读取优化参数文件
             try:
-                result_file = f"results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv"
+                result_file = (
+                    f"results/{symbol}_ChandelierZlSmaStrategy_optimization_results.csv"
+                )
                 if os.path.exists(result_file):
                     params_df = pd.read_csv(result_file)
                     if not params_df.empty:
                         chandelier_period = int(params_df.iloc[0]['period'])
                         chandelier_mult = float(params_df.iloc[0]['mult'])
+                        # 添加其他参数
+                        temp_df['夏普比率'] = params_df.iloc[0]['sharpe_ratio']
+                        temp_df['最大回撤'] = params_df.iloc[0]['max_drawdown']
+                        temp_df['胜率'] = params_df.iloc[0]['win_rate']
+                        temp_df['总收益'] = params_df.iloc[0]['total_return']
+                        # 将数值信号转换为中文含义
+                        signal_map = {
+                            1.0: "多头",
+                            -1.0: "空头", 
+                            0.0: "中性",
+                            3.0: "建仓预警",
+                            -2.0: "减仓预警"
+                        }
+                        temp_df['最新信号'] = signal_map.get(params_df.iloc[0]['last_signal'], "未知")
                     else:
                         chandelier_period = 14
                         chandelier_mult = 2.0
                 else:
                     chandelier_period = 14
                     chandelier_mult = 2.0
-            except Exception as e:
+            except Exception:
                 chandelier_period = 14
                 chandelier_mult = 2.0
             
             # 计算ATR
-            atr = talib.ATR(temp_df['High'].values,
-                          temp_df['Low'].values,
-                          temp_df['Close'].values,
-                          timeperiod=chandelier_period)
+            atr = talib.ATR(
+                temp_df['High'].values,
+                temp_df['Low'].values,
+                temp_df['Close'].values,
+                timeperiod=chandelier_period
+            )
             
             # 计算最高价和最低价
             high = temp_df['Close'].rolling(window=chandelier_period).max()
@@ -136,8 +154,12 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
             
             # 第一个有效值的计算
             first_valid = chandelier_period - 1
-            long_stop.iloc[first_valid] = high.iloc[first_valid] - (atr[first_valid] * chandelier_mult)
-            short_stop.iloc[first_valid] = low.iloc[first_valid] + (atr[first_valid] * chandelier_mult)
+            long_stop.iloc[first_valid] = (
+                high.iloc[first_valid] - (atr[first_valid] * chandelier_mult)
+            )
+            short_stop.iloc[first_valid] = (
+                low.iloc[first_valid] + (atr[first_valid] * chandelier_mult)
+            )
             
             # 动态调整止损点
             for i in range(first_valid + 1, len(temp_df)):
@@ -147,13 +169,17 @@ def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=
                 
                 # 动态调整多头止损点
                 if temp_df['Close'].iloc[i] > long_stop.iloc[i-1]:
-                    long_stop.iloc[i] = max(current_long_stop, long_stop.iloc[i-1])
+                    long_stop.iloc[i] = max(
+                        current_long_stop, long_stop.iloc[i-1]
+                    )
                 else:
                     long_stop.iloc[i] = current_long_stop
                 
                 # 动态调整空头止损点
                 if temp_df['Close'].iloc[i] < short_stop.iloc[i-1]:
-                    short_stop.iloc[i] = min(current_short_stop, short_stop.iloc[i-1])
+                    short_stop.iloc[i] = min(
+                        current_short_stop, short_stop.iloc[i-1]
+                    )
                 else:
                     short_stop.iloc[i] = current_short_stop
             
