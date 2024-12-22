@@ -1261,7 +1261,7 @@ function displayBacktestResults(data) {
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
     
-    // 使用 requestAnimationFrame 保过渡效果���常工���
+    // 使用 requestAnimationFrame 保过渡效果��������工���
     requestAnimationFrame(() => {
         backtestResults.style.transition = 'all 0.5s ease-in-out';
         backtestResults.style.opacity = '1';
@@ -2196,6 +2196,7 @@ function displayTargetStocks(stocks) {
         // 处理最佳胜率和最佳回报的颜色
         const winRateValue = parseFloat(stock['最佳胜率'] || 0);
         const returnValue = parseFloat(stock['最佳回报'] || 0);
+        const sharpeValue = parseFloat(stock['夏普比率'] || 0);
         
         // 根据胜率值设置颜色
         const winRateColor = winRateValue >= 0.6 ? 'text-green-600' : 
@@ -2204,6 +2205,12 @@ function displayTargetStocks(stocks) {
         // 根据回报值设置颜色
         const returnColor = returnValue >= 0.2 ? 'text-green-600' : 
                           returnValue >= 0 ? 'text-blue-600' : 'text-red-600';
+                          
+        // 根据夏普比率设置新的颜色规则
+        const sharpeColor = sharpeValue >= 2.0 ? 'text-green-600' :  // 优秀 - 绿色
+                          sharpeValue >= 1.0 ? 'text-blue-600' :     // 良好 - 蓝色
+                          sharpeValue >= 0.0 ? 'text-yellow-600' :   // 一般 - 黄色
+                          'text-red-600';                            // 较差 - 红色
         
         // 确保价格显示正确
         const price = parseFloat(stock['最新价格']);
@@ -2214,7 +2221,7 @@ function displayTargetStocks(stocks) {
                 <a href="javascript:void(0)" 
                    onclick="switchToTechnicalAnalysis('${stock['股票代码']}')"
                    class="text-blue-600 hover:text-blue-800 hover:underline">
-                    ${stock['股票���码']}
+                    ${stock['股票代码']}
                 </a>
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
@@ -2242,8 +2249,8 @@ function displayTargetStocks(stocks) {
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${returnColor} font-medium">
                 ${(returnValue * 100 >= 0 ? '+' : '')}${(returnValue * 100).toFixed(2)}%
             </td>
-            <td class="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
-                ${Number(stock['夏普比率']).toFixed(2)}
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${sharpeColor} font-medium">
+                ${Number(sharpeValue).toFixed(2)}
             </td>
         `;
         
