@@ -50,19 +50,31 @@ function optimize() {
 }
 
 function displayResults(data) {
-    console.log('开始显示结果:', data); // 调试日志
+    console.log('开始显示结果:', data); 
 
     // 首先确保股票信息显示
     const stockInfo = document.getElementById('stockInfo');
     const stockName = document.getElementById('stockName');
     const stockCode = document.getElementById('stockCode');
     
-    console.log('股票信息元素:', { stockInfo, stockName, stockCode }); // 调试日志
+    console.log('股票信息元素:', { stockInfo, stockName, stockCode }); 
     
     if (data.stockName) {
-        console.log('显示股票名称:', data.stockName); // 调试日志
+        console.log('显示股票名称:', data.stockName); 
+        
+        // 修改股票信息显示
         stockName.textContent = data.stockName;
-        stockCode.textContent = `股票代码：${document.getElementById('symbol').value}`;
+        const stockCodeSpan = stockCode.querySelector('.stock-code');
+        if (stockCodeSpan) {
+            stockCodeSpan.textContent = `股票代码：${document.getElementById('symbol').value}`;
+        } else {
+            stockCode.innerHTML = `
+                <span class="stock-code">股票代码：${document.getElementById('symbol').value}</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    A股
+                </span>
+            `;
+        }
         stockInfo.classList.remove('hidden');
     }
 
@@ -143,9 +155,15 @@ function displayResults(data) {
     });
     
     // 显示结果区域
-    console.log('显示结果区域'); // 调试日志
+    console.log('显示结果区域'); 
     resultsDiv.classList.remove('hidden');
     resultsDiv.style.animation = 'fadeIn 0.5s ease-in';
+    
+    // 先移除已存在的按钮组
+    const existingButtonGroup = document.querySelector('#results .button-group');
+    if (existingButtonGroup) {
+        existingButtonGroup.remove();
+    }
 }
 
 function getBackgroundColor(color) {
@@ -432,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化其他组件
     initializeOtherComponents();
     
-    // 绑定持���分析按钮事件
+    // 绑定持分析按钮事件
     const portfolioForm = document.getElementById('portfolioForm');
     if (portfolioForm) {
         console.log('找到持仓分析表单，添加提交事件监听器');
@@ -444,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('未找到持仓分析表单');
     }
     
-    // ... ���化朗读功能
+    // ... 化朗读功能
     SpeechController.init();
 });
 
@@ -849,7 +867,7 @@ async function handleAnalysis(event) {
                         }
                         
                     } catch (e) {
-                        console.warn('解析���据块失败:', e);
+                        console.warn('解析据块失败:', e);
                     }
                 }
             }
@@ -880,7 +898,7 @@ function applyMarkdownStyles(element) {
     // 添加容器类
     element.classList.add('markdown-content', 'prose', 'prose-indigo', 'max-w-none');
     
-    // 处理���格
+    // 处理格
     const tables = element.getElementsByTagName('table');
     Array.from(tables).forEach(table => {
         // 添加基础表格样式
@@ -1261,7 +1279,7 @@ function displayBacktestResults(data) {
     backtestResults.style.opacity = '0';
     backtestResults.style.transform = 'translateY(20px)';
     
-    // 使用 requestAnimationFrame 保过渡效果��������工���
+    // 使用 requestAnimationFrame 保过渡效果
     requestAnimationFrame(() => {
         backtestResults.style.transition = 'all 0.5s ease-in-out';
         backtestResults.style.opacity = '1';
@@ -1304,7 +1322,7 @@ function showError(message) {
     document.querySelector('#results-container').prepend(errorDiv);
 }
 
-// 在��始优化时显示股票名称
+// 在始优化时显示股票名称
 function startOptimization() {
     const symbol = document.getElementById('symbol').value;
     const startDate = document.getElementById('startDate').value;
@@ -2785,7 +2803,7 @@ function getCellValue(row, column) {
     const columnIndex = getColumnIndex(column);
     const cell = row.cells[columnIndex];
     
-    // 如果单元格包含链接，获取链接文本
+    // 如果单元格包含��接，获取链接文本
     const link = cell.querySelector('a');
     if (link) {
         return link.textContent.trim();
@@ -2812,7 +2830,7 @@ function getColumnIndex(column) {
 
 // 在文档加载完成后初始化排序事件监听
 document.addEventListener('DOMContentLoaded', function() {
-    // 为所有可排序的表头添��点击��件
+    // ��所有可排序的表头添点击件
     document.querySelectorAll('th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
             const column = th.getAttribute('data-sort');
