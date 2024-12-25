@@ -225,6 +225,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                         f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
                     )
             else:
+                self.buy_signal = False
                 self.signal[0] = -2
                 self.log('减仓预警: 多头趋势，但ZLSMA未上升')
         elif self.direction == -1 and current_direction == -1:  # 保持空头

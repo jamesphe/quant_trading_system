@@ -1237,7 +1237,10 @@ function displayBacktestResults(data) {
             <div class="fade-in" style="animation-delay: 0.5s">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">当前信号</h3>
                 <div class="p-4 bg-gray-50 rounded-lg">
-                    <p class="text-gray-700">${data.signal} （ ${data.reason} ）</p>
+                    <p class="text-gray-700">
+                        ${data.signal === -2 ? '减仓预警' : data.signal} 
+                        （ ${data.reason} ）
+                    </p>
                 </div>
             </div>
 
