@@ -36,13 +36,16 @@ class IndustryAnalyzer:
             DataFrame包含热门行业数据
         """
         try:
-            # 直接获取行业行情数据
+            # 获取行业行情数据
             industry_data = ak.stock_board_industry_name_em()
             
             if industry_data.empty:
                 print("未获取到行业数据")
                 return pd.DataFrame()
-                
+            
+            # 打印实际的列名，帮助调试
+            print("实际的列名:", industry_data.columns.tolist())
+            
             # 重命名列
             column_mapping = {
                 '板块名称': 'industry_name',
@@ -54,36 +57,66 @@ class IndustryAnalyzer:
                 '领涨股票-涨跌幅': 'leading_stock_pct'
             }
             
+            # 检查列是否存在，只重命名存在的列
+            available_columns = {k: v for k, v in column_mapping.items() 
+                               if k in industry_data.columns}
+            
+            if not available_columns:
+                print("未找到匹配的列名")
+                print("可用的列名:", industry_data.columns.tolist())
+                return pd.DataFrame()
+            
             # 选择并重命名列
-            df = industry_data[list(column_mapping.keys())].rename(columns=column_mapping)
+            df = industry_data[list(available_columns.keys())].rename(columns=available_columns)
+            
+            # 转换数据类型前先打印原始值
+            print("转换前的数据示例:")
+            print(df.head())
             
             # 转换数据类型
-            # 处理涨跌幅
-            df['change_pct'] = pd.to_numeric(
-                df['change_pct'].astype(str).str.replace('%', ''),
-                errors='coerce'
-            ) / 100
+            try:
+                # 处理涨跌幅
+                df['change_pct'] = pd.to_numeric(
+                    df['change_pct'].astype(str).str.replace('%', ''),
+                    errors='coerce'
+                ) / 100
+                
+                # 处理上涨家数
+                if 'up_count' in df.columns:
+                    df['up_count'] = pd.to_numeric(df['up_count'], errors='coerce')
+                
+                # 处理总市值（去除"亿"字并转换为数值）
+                if 'market_value' in df.columns:
+                    df['market_value'] = pd.to_numeric(
+                        df['market_value'].astype(str).str.replace('亿', ''),
+                        errors='coerce'
+                    )
+                
+                # 处理换手率
+                if 'turnover_rate' in df.columns:
+                    df['turnover_rate'] = pd.to_numeric(
+                        df['turnover_rate'].astype(str).str.replace('%', ''),
+                        errors='coerce'
+                    ) / 100
+                
+                # 处理领涨股票涨跌幅
+                if 'leading_stock_pct' in df.columns:
+                    df['leading_stock_pct'] = pd.to_numeric(
+                        df['leading_stock_pct'].astype(str).str.replace('%', ''),
+                        errors='coerce'
+                    ) / 100
+                    
+            except Exception as e:
+                print(f"数据类型转换失败: {e}")
+                print("问题数据:")
+                print(df[df.apply(lambda x: x.astype(str).str.contains('error|nan').any(), axis=1)])
+                
+            # 打印转换后的数据类型
+            print("\n转换后的数据类型:")
+            print(df.dtypes)
             
-            # 处理上涨家数
-            df['up_count'] = pd.to_numeric(df['up_count'], errors='coerce')
-            
-            # 处理总市值（去除"亿"字并转换为数值）
-            df['market_value'] = pd.to_numeric(
-                df['market_value'].astype(str).str.replace('亿', ''),
-                errors='coerce'
-            )
-            
-            # 处理换手率
-            df['turnover_rate'] = pd.to_numeric(
-                df['turnover_rate'].astype(str).str.replace('%', ''),
-                errors='coerce'
-            ) / 100
-            
-            # 处理领涨股票涨跌幅
-            df['leading_stock_pct'] = pd.to_numeric(
-                df['leading_stock_pct'].astype(str).str.replace('%', ''),
-                errors='coerce'
-            ) / 100
+            # 筛选热门行业前先打印筛选条件
+            print(f"\n筛选条件: 涨幅 >= {rise_threshold}%, 上涨家数 >= 5")
             
             # 筛选热门行业
             hot_industries = df[
@@ -91,9 +124,11 @@ class IndustryAnalyzer:
                 (df['up_count'] >= 5)  # 至少5家上涨
             ].sort_values(by='change_pct', ascending=False)
             
-            if hot_industries.empty:
-                print("未找到符合条件的热门行业")
-                return pd.DataFrame()
+            # 打印筛选结果
+            print(f"\n筛选后的行业数量: {len(hot_industries)}")
+            if not hot_industries.empty:
+                print("\n热门行业示例:")
+                print(hot_industries.head())
             
             return hot_industries
             
@@ -753,7 +788,7 @@ def main():
     # 设置命令行参数
     parser = argparse.ArgumentParser(description='行业分析工具')
     parser.add_argument('--stream', action='store_true', help='是否使用流式输出')
-    parser.add_argument('--save_dir', type=str, default='results', help='结果保存目录')
+    parser.add_argument('--save_dir', type=str, default='results', help='结果保���目录')
     parser.add_argument('--rise_threshold', type=float, default=2.0, help='涨幅阈值（百分比）')
     parser.add_argument('--fund_threshold', type=float, default=5000, help='资金流入阈值（万元）')
     args = parser.parse_args()
@@ -821,7 +856,7 @@ def main():
             print("\nAI分析结果:")
             print(analysis_text)
         
-        # 保存分析报告
+        # 保存分��报告
         print(f"\n正在保存分析报告到 {report_file}...")
         analyzer.save_analysis_report(
             hot_industries=hot_industries,
