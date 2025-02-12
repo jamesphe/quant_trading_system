@@ -22,7 +22,7 @@ import os
 from datetime import datetime, timedelta
 import subprocess
 import json
-from stock_analysis import ZhipuAIModel, KimiModel, OpenAIModel, analyze_stock
+from stock_analysis import ZhipuAIModel, KimiModel, OpenAIModel, analyze_stock, DeepSeekModel, SiliconFlowModel
 import markdown
 from pathlib import Path
 import requests
@@ -433,40 +433,43 @@ def api_daily_picks():
 @app.route('/analyze_stock', methods=['POST'])
 def analyze_stock_route():
     try:
-        logger.debug("开始处理股票分析请求")
+        print("[API] 开始处理股票分析请求")
         data = request.get_json()
-        logger.debug(f"接收到的请求数据: {data}")
+        print(f"[API] 接收到的请求数据: {data}")
         
         symbol = data.get('symbol')
         model_type = data.get('model', 'zhipu')
-        logger.debug(f"股票代码: {symbol}, 模型类型: {model_type}")
+        print(f"[API] 股票代码: {symbol}, 模型类型: {model_type}")
         
         if not symbol:
-            logger.warning("缺少股票代码参数")
+            print("[API WARNING] 缺少股票代码参数")
             return jsonify({
                 'success': False,
                 'error': '缺少股票代码参数'
             }), 400
 
+        # 添加日期计算
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
+        print(f"[API] 分析日期范围: {start_date} 到 {end_date}")
+
         def generate():
             try:
-                # 发送初始消息
-                yield 'data: {"content": "正在获取股票数据..."}\n\n'
-                
-                # 计算日期
-                end_date = datetime.now().strftime('%Y-%m-%d')
-                start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
-                
-                # 初始化选择的AI模型
-                if model_type == 'kimi':
+                print(f"[API] 初始化 {model_type} 模型")
+                if model_type == 'deepseek':
+                    print("[API] 使用 DeepSeek 模型")
+                    model = DeepSeekModel()
+                elif model_type == 'siliconflow':
+                    print("[API] 使用 SiliconFlow 模型")
+                    model = SiliconFlowModel()
+                elif model_type == 'kimi':
                     model = KimiModel()
                 elif model_type == 'openai':
-                    model = OpenAIModel() 
+                    model = OpenAIModel()
                 else:
                     model = ZhipuAIModel()
-                yield 'data: {"content": "正在进行分析..."}\n\n'
-                
-                # 使用生成器方式获取分析结果
+
+                print("[API] 开始生成分析结果")
                 for chunk in analyze_stock(
                     symbol=symbol,
                     start_date=start_date,
@@ -475,17 +478,11 @@ def analyze_stock_route():
                     stream=True
                 ):
                     if chunk:
-                        # 确保chunk是JSON格式的字
-                        if isinstance(chunk, str):
-                            yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
-                        else:
-                            yield f'data: {json.dumps({"content": chunk})}\n\n'
-                
-                # 发送完成消息
-                yield 'data: {"content": "\\n\\n============================\\n\\n分析完成"}\n\n'
+                        print(f"[API] 生成数据: {chunk[:50]}...")
+                        yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
                 
             except Exception as e:
-                logger.error(f"生成分析内容时出错: {str(e)}", exc_info=True)
+                print(f"[API ERROR] 生成分析内容时出错: {str(e)}")
                 error_msg = json.dumps({"error": str(e)})
                 yield f"data: {error_msg}\n\n"
 
@@ -499,7 +496,7 @@ def analyze_stock_route():
         )
         
     except Exception as e:
-        logger.error(f"处理请求时发生错误: {str(e)}", exc_info=True)
+        print(f"[API ERROR] 处理请求时发生错误: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'处理请求时发生错误: {str(e)}'

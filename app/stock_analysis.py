@@ -14,14 +14,6 @@ from openai import AsyncOpenAI, OpenAI
 import os
 
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-
 class AIModelBase(ABC):
     """AI模型基类"""
     
@@ -115,8 +107,15 @@ class OpenAIModel(AIModelBase):
     def __init__(self):
         config = Config()
         api_key = config.get_api_key('openai')
-        self.client = OpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
-        self.async_client = AsyncOpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
+        self.config = config.config.get('openai', {})
+        self.client = OpenAI(
+            api_key=api_key, 
+            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
+        )
+        self.async_client = AsyncOpenAI(
+            api_key=api_key, 
+            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
+        )
     
     def analyze(
         self,
@@ -127,7 +126,7 @@ class OpenAIModel(AIModelBase):
         messages = [
             {
                 "role": "system",
-                "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+                "content": self.config.get('system_prompt', "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。")
             },
             {
                 "role": "user",
@@ -136,10 +135,11 @@ class OpenAIModel(AIModelBase):
         ]
         
         response = self.client.chat.completions.create(
-            model="gpt-4o",  # 或使用其他可用模型
+            model=self.config.get('model', "gpt-4o"),
             messages=messages,
             stream=stream,
-            temperature=0.7
+            temperature=self.config.get('temperature', 0.7),
+            max_tokens=self.config.get('max_tokens', 4096)
         )
         
         if stream:
@@ -151,6 +151,120 @@ class OpenAIModel(AIModelBase):
         for chunk in response:
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
+
+
+class DeepSeekModel(AIModelBase):
+    """DeepSeek 模型实现"""
+    
+    def __init__(self):
+        try:
+            config = Config()
+            api_key = config.get_api_key('deepseek')
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.deepseek.com"
+            )
+        except Exception as e:
+            raise
+    
+    def analyze(self, prompt: str, stream: bool = False) -> Union[str, Generator]:
+        try:
+            messages = [
+                {
+                    "role": "system", 
+                    "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            try:
+                response = self.client.chat.completions.create(
+                    model="deepseek-reasoner",
+                    messages=messages,
+                    stream=stream,
+                    max_tokens=4096
+                )
+            except Exception as api_error:
+                raise
+            
+            if stream:
+                return self._handle_stream_response(response)
+            
+            result = response.choices[0].message.content
+            return result
+            
+        except Exception as e:
+            raise
+    
+    def _handle_stream_response(self, response):
+        """处理流式响应"""
+        try:
+            for chunk in response:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    yield content
+                    
+        except Exception as e:
+            raise
+
+
+class SiliconFlowModel(AIModelBase):
+    """SiliconFlow 模型实现"""
+    
+    def __init__(self):
+        config = Config()
+        self.api_key = config.get_api_key('siliconflow')
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.siliconflow.cn/v1"
+        )
+    
+    def analyze(
+        self,
+        prompt: str,
+        stream: bool = False
+    ) -> Union[str, Generator]:
+        try:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+                },
+                {
+                    "role": "user", 
+                    "content": prompt
+                }
+            ]
+            
+            response = self.client.chat.completions.create(
+                model="deepseek-ai/deepseek-r1",
+                messages=messages,
+                stream=stream,
+                temperature=0.7,
+                max_tokens=4096
+            )
+            
+            if stream:
+                return self._handle_stream_response(response)
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            raise
+    
+    def _handle_stream_response(self, response):
+        """处理流式响应"""
+        try:
+            for chunk in response:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    yield content
+                    
+        except Exception as e:
+            raise
+
 
 def get_cost_price(symbol: str) -> float:
     """获取指定股票的持仓成本价格
@@ -313,7 +427,7 @@ def get_stock_analysis_prompt(
    - 若消息面存在矛盾（如同一时间出现多空分歧），请给出如何辨别和甄别的建议。
 
 5. **深入的建仓与清仓策略**  
-   - 针对“多头止损价 {long_stop} 上方的区域是否适合建仓”，给出更细化的价格区间及分批建仓思路。
+   - 针对"多头止损价 {long_stop} 上方的区域是否适合建仓"，给出更细化的价格区间及分批建仓思路。
    - 若出现指标矛盾或信号减弱，如何执行止盈止损，包括参考价格区间、分批卖出的计划等。
 
 6. **风险控制与情景推演**  
@@ -367,7 +481,6 @@ def get_stock_analysis_prompt(
 请根据以上信息，结合你的量化交易经验、资金管理策略和行业分析能力，
 给出具有深度、逻辑清晰、且能实际执行的交易分析报告。
 """
-    print(prompt)
     return prompt
 
 def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):
@@ -431,29 +544,22 @@ def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params
 
 def analyze_stock(symbol, start_date, end_date, model, stream=False):
     try:
-        # 检查是否存在当天的分析结果文件
         now = datetime.now()
         today = now.strftime('%Y%m%d')
         model_name = model.__class__.__name__.lower().replace('model','')
         result_file = f"AIResult/{symbol}_{today}_{model_name}.md"
         
-        # 确保AIResult目录存在
         os.makedirs('AIResult', exist_ok=True)
         
         if os.path.exists(result_file):
-            # 判断当前时间是否超过下午4点
             current_hour = now.hour
-            
-            # 获取文件最后修改时间
             file_mtime = datetime.fromtimestamp(os.path.getmtime(result_file))
             
-            # 如果当前时间超过下午4点,需要确保文件是在当天下午4点后生成的
             if current_hour >= 16:
                 file_date = file_mtime.date()
                 file_hour = file_mtime.hour
                 
                 if file_date == now.date() and file_hour >= 16:
-                    # 文件是在当天下午4点后生成的,可以直接使用
                     with open(result_file, "r", encoding="utf-8") as f:
                         content = f.read()
                         
@@ -464,7 +570,6 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                         yield content
                     return
             else:
-                # 当前时间未超过下午4点,可以直接使用已有文件
                 with open(result_file, "r", encoding="utf-8") as f:
                     content = f.read()
                     
@@ -475,7 +580,6 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                     yield content
                 return
             
-        # 获取股票数据
         if symbol.startswith(('51', '159')):
             stock_data = get_etf_data(symbol, start_date, end_date)
         elif symbol.isdigit():
@@ -496,50 +600,20 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
             yield "未找到股票数据"
             return
 
-        # 获取股票名称和基本信息
         stock_name = get_stock_name(symbol)
         basic_info = get_stock_basic_info(symbol)
-        
-        # 获取最近的新闻（限制为5条）
         news_list = get_stock_news(symbol, limit=5)
-
-        # 构建提示信息，使用Markdown格式
+        
         prompt = get_stock_analysis_prompt(symbol, stock_data, stock_name, basic_info, news_list)
         
-        # 生成输出文件名
-        output_file = f"AIResult/{symbol}_{today}_{model_name}.md"
-        
-        # 获取分析结果
-        if stream:
-            # 流式分析,同时输出和收集结果
-            result = []
+        try:
             for chunk in model.analyze(prompt, stream=True):
                 if chunk:
-                    if isinstance(model, ZhipuAIModel):
-                        content = chunk.choices[0].delta.content
-                    elif isinstance(model, OpenAIModel):
-                        content = chunk  # OpenAI 流式响应已在模型类中处理
-                    else:  # KimiModel
-                        content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                    if content:
-                        result.append(content)
-                        yield content  # 流式输出每个片段
-                        
-            # 完整结果保存到文件
-            complete_result = "".join(result)
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(complete_result)
-                
-        else:
-            # 一次性分析
-            result = model.analyze(prompt, stream=False)
-            # 保存分析结果到文件
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(result)
-            yield result
-            
+                    yield chunk
+        except Exception as e:
+            raise
+
     except Exception as e:
-        logger.error(f"分析股票时发生错误: {str(e)}", exc_info=True)
         yield f"分析过程中发生错误: {str(e)}"
 
 
@@ -549,7 +623,7 @@ def main():
     parser.add_argument(
         '--model',
         type=str,
-        choices=['zhipu', 'kimi', 'openai'],
+        choices=['zhipu', 'kimi', 'openai', 'deepseek', 'siliconflow'],
         default='zhipu',
         help='选择AI模型'
     )
@@ -562,8 +636,14 @@ def main():
             model = ZhipuAIModel()
         elif args.model == 'openai':
             model = OpenAIModel()
-        else:
+        elif args.model == 'kimi':
             model = KimiModel()
+        elif args.model == 'deepseek':
+            model = DeepSeekModel()
+        elif args.model == 'siliconflow':
+            model = SiliconFlowModel()
+        else:
+            raise ValueError(f"未知模型: {args.model}")
         
         # 计算日期范围（最近30个交易日）
         end_date = datetime.now().strftime('%Y-%m-%d')
@@ -608,7 +688,7 @@ def main():
                 f.write(result)
             
     except Exception as e:
-        logger.error(f"程序执行错误: {str(e)}", exc_info=True)
+        print(f"程序执行错误: {str(e)}")
         sys.exit(1)
 
 
