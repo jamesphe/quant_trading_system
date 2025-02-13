@@ -1030,6 +1030,32 @@ def analyze_industry():
         }), 500
 
 
+@app.route('/api/followup', methods=['POST'])
+def handle_followup():
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        question = data.get('question')
+        conversation_history = data.get('conversation_history', [])
+        
+        if not symbol or not question:
+            return jsonify({'error': '缺少必要参数'}), 400
+            
+        # 使用生成器函数来流式返回响应
+        def generate():
+            try:
+                for chunk in stream_openai_followup(symbol, question, conversation_history):
+                    if chunk:  # 确保 chunk 不为空
+                        yield chunk  # 直接返回文本内容
+            except Exception as e:
+                yield str(e)  # 直接返回错误信息
+        
+        return Response(generate(), mimetype='text/plain')  # 使用 text/plain 类型
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     logger.info("注册的路由:")
     for rule in app.url_map.iter_rules():
