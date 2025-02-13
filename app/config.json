@@ -1,6 +1,6 @@
 {
     "api_keys": {
-        "openai": "7ae93724-9d05-4865-9241-21798394f2c6",
+        "openai": "",
         "zhipu": "your-zhipu-api-key",
         "kimi": "your-kimi-api-key",
         "deepseek": "your-deepseek-api-key",
@@ -8,7 +8,7 @@
     },
     "openai": {
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "model": "ep-20250212193805-gn2s5",
+        "model": "",
         "temperature": 0.5,
         "max_tokens": 4096,
         "system_prompt": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
