@@ -10,6 +10,8 @@ from zhipuai import ZhipuAI
 from abc import ABC, abstractmethod
 from config import Config
 from typing import Union, Generator
+import json
+import time
 
 class AIModelBase(ABC):
     """AI模型基类"""
@@ -30,8 +32,15 @@ class OpenAIModel(AIModelBase):
     def __init__(self):
         config = Config()
         api_key = config.get_api_key('openai')
-        self.client = OpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
-        self.async_client = AsyncOpenAI(api_key=api_key, base_url="https://api.chatanywhere.tech/v1")
+        self.config = config.config.get('openai', {})
+        self.client = OpenAI(
+            api_key=api_key, 
+            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
+        )
+        self.async_client = AsyncOpenAI(
+            api_key=api_key, 
+            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
+        )
     
     def analyze(
         self,
@@ -51,10 +60,11 @@ class OpenAIModel(AIModelBase):
         ]
         
         response = self.client.chat.completions.create(
-            model="gpt-4o",
+            model=self.config.get('model', "gpt-4o"),
             messages=messages,
             stream=stream,
-            temperature=0.7
+            temperature=self.config.get('temperature', 0.5),
+            max_tokens=self.config.get('max_tokens', 4096)
         )
         
         if stream:
@@ -502,6 +512,161 @@ def stream_openai_analysis(prompt):
         error_msg = f"OpenAI流式分析时发生错误: {str(e)}"
         print(error_msg)
         return error_msg
+
+
+def stream_zhipu_followup(symbol, question, conversation_history):
+    """处理智谱AI的后续对话"""
+    try:
+        retries = 3
+        retry_delay = 1
+        client = ZhipuAI(api_key="your_api_key")
+        
+        # 构建系统提示词
+        system_prompt = """你是一位专业的股票分析师，正在就特定股票进行持续对话。
+        请基于之前的对话历史和新的问题，提供专业、准确的分析和建议。
+        回答时请保持前后一致性，并参考之前讨论过的信息。"""
+        
+        # 构建消息历史
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(conversation_history)
+        messages.append({
+            "role": "system", 
+            "content": f"当前正在分析的股票代码是: {symbol}"
+        })
+        messages.append({"role": "user", "content": question})
+        
+        for attempt in range(retries):
+            try:
+                response = client.chat.completions.create(
+                    model="glm-4-plus",
+                    messages=messages,
+                    temperature=0.7,
+                    stream=True
+                )
+                
+                buffer = ""
+                skip_line = False
+                for chunk in response:
+                    if hasattr(chunk.choices[0].delta, 'content'):
+                        content = chunk.choices[0].delta.content
+                        if content:
+                            yield f"data: {json.dumps({'content': content})}\n\n"
+                
+                break
+            except Exception as e:
+                if attempt < retries - 1:
+                    print(f"[API] 第{attempt + 1}次尝试失败: {str(e)}")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    raise
+                    
+    except Exception as e:
+        error_message = f"分析过程发生错误: {str(e)}"
+        print(f"[API ERROR] {error_message}")
+        yield f"data: {json.dumps({'error': error_message}, ensure_ascii=False)}\n\n"
+
+def stream_kimi_followup(symbol, question, conversation_history):
+    """处理Kimi的后续对话"""
+    try:
+        client = OpenAI(
+            api_key="sk-5WISVUa4tF2lypG13gvpqmzZ3j3ASGlpK4yyxLur4itEpyeb",
+            base_url="https://api.moonshot.cn/v1",
+        )
+        
+        # 构建系统提示词
+        system_prompt = """你是一位专业的股票分析师，正在就特定股票进行持续对话。
+        请基于之前的对话历史和新的问题，提供专业、准确的分析和建议。
+        回答时请保持前后一致性，并参考之前讨论过的信息。
+        请直接给出分析内容，不要输出无关的格式化字符。
+        """
+        
+        # 构建消息历史
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(conversation_history)
+        messages.append({
+            "role": "system", 
+            "content": f"当前正在分析的股票代码是: {symbol}"
+        })
+        messages.append({"role": "user", "content": question})
+        
+        response = client.chat.completions.create(
+            model="moonshot-v1-8k",
+            messages=messages,
+            temperature=0.7,
+            stream=True
+        )
+        
+        buffer = ""
+        for chunk in response:
+            if hasattr(chunk.choices[0].delta, 'content'):
+                content = chunk.choices[0].delta.content
+                if content:
+                    buffer += content
+                    if content.endswith(('。', '！', '？', '\n')):
+                        yield f"data: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
+                        buffer = ""
+        
+        if buffer:
+            yield f"data: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
+                    
+    except Exception as e:
+        yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+def stream_openai_followup(symbol, question, conversation_history):
+    """处理OpenAI的后续对话"""
+    try:
+        retries = 3  # 添加重试机制
+        retry_delay = 1  # 重试延迟秒数
+        
+        model = OpenAIModel()
+        
+        # 构建系统提示词
+        system_prompt = """你是一位专业的股票分析师，正在就特定股票进行持续对话。
+        请基于之前的对话历史和新的问题，提供专业、准确的分析和建议。
+        回答时请保持前后一致性，并参考之前讨论过的信息。
+        请直接给出分析内容，不要输出无关的格式化字符。
+        """
+        
+        # 构建消息历史
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(conversation_history)
+        messages.append({
+            "role": "system", 
+            "content": f"当前正在分析的股票代码是: {symbol}"
+        })
+        messages.append({"role": "user", "content": question})
+        
+        for attempt in range(retries):
+            try:
+                response = model.client.chat.completions.create(
+                    model=model.config.get('model', "gpt-4"),
+                    messages=messages,
+                    temperature=0.7,
+                    stream=True
+                )
+                
+                buffer = ""
+                for chunk in response:
+                    if hasattr(chunk.choices[0].delta, 'content'):
+                        content = chunk.choices[0].delta.content
+                        if content:
+                            yield content
+                        
+                break  # 如果成功完成，跳出重试循环
+                
+            except Exception as e:
+                if attempt < retries - 1:  # 如果还有重试机会
+                    print(f"[API] 第{attempt + 1}次尝试失败: {str(e)}")
+                    time.sleep(retry_delay)  # 等待一段时间后重试
+                    continue
+                else:  # 如果已经用完所有重试机会
+                    raise  # 重新抛出异常
+                    
+    except Exception as e:
+        error_message = f"分析过程发生错误: {str(e)}"
+        print(f"[API ERROR] {error_message}")
+        yield error_message
 
 
 if __name__ == "__main__":

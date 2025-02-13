@@ -4,7 +4,6 @@ from flask import (
     request, 
     jsonify, 
     Response, 
-    stream_with_context
 )
 import backtrader as bt
 from optimizer import optimize_strategy
@@ -22,7 +21,19 @@ import os
 from datetime import datetime, timedelta
 import subprocess
 import json
-from stock_analysis import ZhipuAIModel, KimiModel, OpenAIModel, analyze_stock, DeepSeekModel, SiliconFlowModel
+from stock_analysis import (
+    ZhipuAIModel, 
+    KimiModel, 
+    OpenAIModel, 
+    analyze_stock, 
+    DeepSeekModel, 
+    SiliconFlowModel
+)
+from ai_stock_analysis import (
+    stream_zhipu_followup,
+    stream_kimi_followup,
+    stream_openai_followup
+)
 import markdown
 from pathlib import Path
 import requests
@@ -439,7 +450,9 @@ def analyze_stock_route():
         
         symbol = data.get('symbol')
         model_type = data.get('model', 'zhipu')
-        print(f"[API] 股票代码: {symbol}, 模型类型: {model_type}")
+        question = data.get('question')
+        conversation_history = data.get('conversationHistory', [])
+        is_new_conversation = data.get('isNewConversation', True)
         
         if not symbol:
             print("[API WARNING] 缺少股票代码参数")
@@ -448,58 +461,70 @@ def analyze_stock_route():
                 'error': '缺少股票代码参数'
             }), 400
 
-        # 添加日期计算
-        end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
-        print(f"[API] 分析日期范围: {start_date} 到 {end_date}")
+        # 如果是新对话，获取完整的股票分析
+        if is_new_conversation:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
+            
+            def generate():
+                try:
+                    print(f"[API] 初始化 {model_type} 模型")
+                    if model_type == 'deepseek':
+                        print("[API] 使用 DeepSeek 模型")
+                        model = DeepSeekModel()
+                    elif model_type == 'siliconflow':
+                        print("[API] 使用 SiliconFlow 模型")
+                        model = SiliconFlowModel()
+                    elif model_type == 'kimi':
+                        model = KimiModel()
+                    elif model_type == 'openai':
+                        model = OpenAIModel()
+                    else:
+                        model = ZhipuAIModel()
 
-        def generate():
-            try:
-                print(f"[API] 初始化 {model_type} 模型")
-                if model_type == 'deepseek':
-                    print("[API] 使用 DeepSeek 模型")
-                    model = DeepSeekModel()
-                elif model_type == 'siliconflow':
-                    print("[API] 使用 SiliconFlow 模型")
-                    model = SiliconFlowModel()
-                elif model_type == 'kimi':
-                    model = KimiModel()
-                elif model_type == 'openai':
-                    model = OpenAIModel()
-                else:
-                    model = ZhipuAIModel()
+                    print("[API] 开始生成分析结果")
+                    for chunk in analyze_stock(
+                        symbol=symbol,
+                        start_date=start_date,
+                        end_date=end_date,
+                        model=model,
+                        stream=True
+                    ):
+                        if chunk:
+                            print(f"[API] 生成数据: {chunk[:50]}...")
+                            yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
+                    
+                except Exception as e:
+                    print(f"[API ERROR] 生成分析内容时出错: {str(e)}")
+                    error_msg = json.dumps({"error": str(e)})
+                    yield f"data: {error_msg}\n\n"
 
-                print("[API] 开始生成分析结果")
-                for chunk in analyze_stock(
-                    symbol=symbol,
-                    start_date=start_date,
-                    end_date=end_date,
-                    model=model,
-                    stream=True
-                ):
-                    if chunk:
-                        print(f"[API] 生成数据: {chunk[:50]}...")
-                        yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
+            return Response(
+                generate(),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'X-Accel-Buffering': 'no'  # 禁用 Nginx 缓冲
+                }
+            )
+            
+        else:
+            # 处理后续问题
+            # 根据不同的模型类型调用相应的API
+            if model_type == 'zhipu':
+                response = stream_zhipu_followup(symbol, question, conversation_history)
+            elif model_type == 'kimi':
+                response = stream_kimi_followup(symbol, question, conversation_history)
+            else:
+                response = stream_openai_followup(symbol, question, conversation_history)
                 
-            except Exception as e:
-                print(f"[API ERROR] 生成分析内容时出错: {str(e)}")
-                error_msg = json.dumps({"error": str(e)})
-                yield f"data: {error_msg}\n\n"
-
-        return Response(
-            stream_with_context(generate()),
-            mimetype='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no'  # 禁用 Nginx 缓冲
-            }
-        )
-        
+            return Response(response, mimetype='text/event-stream')
+            
     except Exception as e:
-        print(f"[API ERROR] 处理请求时发生错误: {str(e)}")
+        print(f"[API ERROR] 分析过程发生错误: {str(e)}")
         return jsonify({
             'success': False,
-            'error': f'处理请求时发生错误: {str(e)}'
+            'error': f'分析失败: {str(e)}'
         }), 500
 
 

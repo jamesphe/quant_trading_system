@@ -2,6 +2,9 @@
 let currentSortColumn = null;
 let sortStates = {};  // 用于跟踪每列的排序状态: null(不排序) -> 'asc' -> 'desc'
 
+// 添加对话历史存储
+let conversationHistory = [];
+
 function optimize() {
     const symbol = document.getElementById('symbol').value;
     const startDate = document.getElementById('startDate').value;
@@ -762,6 +765,9 @@ async function handleAnalysis(event) {
     `;
     
     try {
+        // 清空之前的对话历史
+        conversationHistory = [];
+        
         // 显示结果区域和加载提示
         resultsDiv.classList.remove('hidden');
         contentDiv.innerHTML = `
@@ -785,7 +791,8 @@ async function handleAnalysis(event) {
             body: JSON.stringify({
                 symbol: symbol,
                 model: model,
-                additionalInfo: additionalInfo
+                additionalInfo: additionalInfo,
+                isNewConversation: true
             })
         });
 
@@ -872,6 +879,16 @@ async function handleAnalysis(event) {
                 }
             }
         }
+        
+        // 保存对话历史
+        conversationHistory.push({
+            role: 'user',
+            content: `分析股票 ${symbol}`
+        });
+        conversationHistory.push({
+            role: 'assistant',
+            content: analysisText
+        });
         
     } catch (error) {
         showToast(error.message, 'error');
@@ -3345,6 +3362,124 @@ document.addEventListener('DOMContentLoaded', function() {
     const copyBtn = document.getElementById('copyAnalysisBtn');
     if (copyBtn) {
         copyBtn.addEventListener('click', copyAnalysisContent);
+    }
+});
+
+// 添加发送后续问题的函数
+async function sendFollowupQuestion() {
+    const followupInput = document.getElementById('followupQuestion');
+    const question = followupInput.value.trim();
+    
+    if (!question) {
+        showToast('请输入问题', 'warning');
+        return;
+    }
+    
+    const contentDiv = document.getElementById('analysisContent');
+    const symbolInput = document.getElementById('analysisSymbol');
+    const modelSelect = document.getElementById('modelSelect');
+    
+    // 添加用户问题到对话界面
+    contentDiv.innerHTML += `
+        <div class="chat-message user-message mb-4">
+            <div class="bg-blue-50 rounded-lg p-3">
+                <p class="text-blue-800">${question}</p>
+            </div>
+        </div>
+    `;
+    
+    // 显示加载动画
+    contentDiv.innerHTML += `
+        <div id="loading-indicator" class="flex items-center justify-center py-4">
+            <div class="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+        </div>
+    `;
+    
+    // 清空输入框
+    followupInput.value = '';
+    
+    try {
+        const response = await fetch('/analyze_stock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                symbol: symbolInput.value,
+                model: modelSelect.value,
+                question: question,
+                conversationHistory: conversationHistory,
+                isNewConversation: false
+            })
+        });
+        
+        // 移除加载动画
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
+        }
+        
+        // 处理流式响应
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let aiResponse = '';
+        
+        contentDiv.innerHTML += `
+            <div class="chat-message ai-message mb-4">
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <div class="ai-response"></div>
+                </div>
+            </div>
+        `;
+        
+        const aiResponseDiv = contentDiv.querySelector('.ai-response');
+        
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            
+            const text = decoder.decode(value);
+            aiResponse += text;
+            aiResponseDiv.innerHTML = marked.parse(aiResponse);
+        }
+        
+        // 更新对话历史
+        conversationHistory.push({
+            role: 'user',
+            content: question
+        });
+        conversationHistory.push({
+            role: 'assistant',
+            content: aiResponse
+        });
+        
+        // 滚动到底部
+        contentDiv.scrollTop = contentDiv.scrollHeight;
+        
+    } catch (error) {
+        showToast('发送问题失败: ' + error.message, 'error');
+    }
+}
+
+// 在 DOMContentLoaded 事件中添加事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // ... 现有的初始化代码 ...
+    
+    // 添加发送按钮事件监听
+    const sendFollowupBtn = document.getElementById('sendFollowup');
+    if (sendFollowupBtn) {
+        sendFollowupBtn.addEventListener('click', sendFollowupQuestion);
+    }
+    
+    // 添加输入框回车事件监听
+    const followupInput = document.getElementById('followupQuestion');
+    if (followupInput) {
+        followupInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendFollowupQuestion();
+            }
+        });
     }
 });
 

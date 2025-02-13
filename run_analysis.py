@@ -74,7 +74,7 @@ def main():
     
     # 5. 运行 ai_stock_analysis.py
     run_command(
-        ["python", "app/ai_stock_analysis.py", "--mode", "csv", "--date", date, "--ai", "kimi"],
+        ["python", "app/ai_stock_analysis.py", "--mode", "csv", "--date", date, "--ai", "openai"],
         "AI分析股票"
     )
     
