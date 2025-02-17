@@ -6,6 +6,8 @@ import baostock as bs
 from datetime import datetime
 import talib
 import os
+import requests
+
 def get_a_share_list():
     """
     获取A股所有上市股票的代码和名称。
@@ -20,7 +22,7 @@ def get_a_share_list():
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()
 
-def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False, include_chandelier=False):
+def get_stock_data(symbol, start_date, end_date, source='baostock', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False, include_chandelier=False):
     """
     获取A股股票历史行情数据
 
@@ -947,3 +949,64 @@ def get_hot_industries(min_change_pct=0.015, min_up_count=5):
         if 'industry_data' in locals():
             print("列名:", industry_data.columns.tolist())
         return []
+
+def get_hot_stock_rank(data_type='大家都在看', date='hour'):
+    """
+    获取同花顺股票热榜排名数据
+    
+    参数:
+        data_type (str): 热榜类型，可选 '大家都在看' 或 '快速飙升中'
+        date (str): 时间维度，可选 'hour'(小时榜) 或 'day'(日榜)
+        
+    返回:
+        DataFrame: 包含以下字段:
+            - market: 市场(沪市/深市)
+            - code: 股票代码
+            - name: 股票名称
+            - hot_value: 热度值
+            - change_pct: 涨跌幅(%)
+    """
+    try:
+        print(f"开始获取同花顺{data_type}热榜数据...")
+        
+        url = 'https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/stock'
+        params = {
+            'type': date,
+            'list_type': data_type
+        }
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code != 200:
+            print(f"请求失败，状态码: {response.status_code}")
+            return pd.DataFrame()
+            
+        data = response.json()
+        if not data.get('data') or not data['data'].get('stock_list'):
+            print("未获取到有效数据")
+            return pd.DataFrame()
+            
+        # 转换为DataFrame
+        df = pd.DataFrame(data['data']['stock_list'])
+        
+        # 重命名列
+        df = df.rename(columns={
+            '市场': 'market',
+            '证券代码': 'code',
+            '股票名称': 'name',
+            '热度': 'hot_value',
+            '涨跌幅': 'change_pct'
+        })
+        
+        # 确保数值列为float类型
+        df['hot_value'] = pd.to_numeric(df['hot_value'], errors='coerce')
+        df['change_pct'] = pd.to_numeric(df['change_pct'].str.rstrip('%'), errors='coerce') / 100
+        
+        print(f"成功获取{len(df)}条热榜数据")
+        return df
+        
+    except Exception as e:
+        print(f"获取同花顺热榜数据时发生错误: {str(e)}")
+        return pd.DataFrame()
