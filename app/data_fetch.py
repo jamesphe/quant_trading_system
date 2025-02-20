@@ -22,7 +22,7 @@ def get_a_share_list():
         print(f"获取A股列表失败: {e}")
         return pd.DataFrame()
 
-def get_stock_data(symbol, start_date, end_date, source='baostock', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False, include_chandelier=False):
+def get_stock_data(symbol, start_date, end_date, source='akshare', include_macd=False, include_rsi=False, include_boll=False, include_zlsma=False, include_chandelier=False):
     """
     获取A股股票历史行情数据
 
