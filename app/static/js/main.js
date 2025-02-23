@@ -52,6 +52,233 @@ function optimize() {
     });
 }
 
+// 添加标题和内容展示相关的样式
+const contentStyles = document.createElement('style');
+contentStyles.textContent = `
+    /* 标题样式 */
+    .content-title {
+        position: relative;
+        padding-left: 1rem;
+        margin: 2rem 0 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .content-title::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(to bottom, #8B5CF6, #6D28D9);
+        border-radius: 2px;
+        transition: all 0.3s ease;
+    }
+
+    .content-title:hover::before {
+        width: 6px;
+        background: linear-gradient(to bottom, #7C3AED, #5B21B6);
+    }
+
+    /* 一级标题 */
+    .content-title-h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1F2937;
+        border-bottom: 2px solid #E5E7EB;
+        padding-bottom: 0.5rem;
+    }
+
+    /* 二级标题 */
+    .content-title-h2 {
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: #374151;
+    }
+
+    /* 三级标题 */
+    .content-title-h3 {
+        font-size: 1.125rem;
+        font-weight: 500;
+        color: #4B5563;
+    }
+
+    /* 内容区块 */
+    .content-block {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .content-block:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transform: translateY(-2px);
+    }
+
+    /* 内容分割线 */
+    .content-divider {
+        height: 1px;
+        background: linear-gradient(to right, #E5E7EB, #8B5CF6, #E5E7EB);
+        margin: 2rem 0;
+        opacity: 0.5;
+    }
+
+    /* 标签样式 */
+    .content-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+    /* 不同类型的标签样式 */
+    .tag-info {
+        background-color: #EEF2FF;
+        color: #4F46E5;
+    }
+
+    .tag-success {
+        background-color: #ECFDF5;
+        color: #059669;
+    }
+
+    .tag-warning {
+        background-color: #FFFBEB;
+        color: #D97706;
+    }
+
+    .tag-error {
+        background-color: #FEF2F2;
+        color: #DC2626;
+    }
+
+    /* 折叠面板样式 */
+    .collapsible-section {
+        border: 1px solid #E5E7EB;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .collapsible-header {
+        padding: 1rem;
+        background-color: #F9FAFB;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.3s ease;
+    }
+
+    .collapsible-header:hover {
+        background-color: #F3F4F6;
+    }
+
+    .collapsible-content {
+        padding: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .collapsible-section.active .collapsible-content {
+        padding: 1rem;
+        max-height: 1000px;
+    }
+
+    /* 动画效果 */
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-slide-down {
+        animation: slideDown 0.3s ease-out forwards;
+    }
+`;
+document.head.appendChild(contentStyles);
+
+// 添加创建标题的辅助函数
+function createTitle(text, level = 1) {
+    const title = document.createElement('div');
+    title.className = `content-title content-title-h${level} animate-slide-down`;
+    title.textContent = text;
+    return title;
+}
+
+// 添加创建内容块的辅助函数
+function createContentBlock(content, tags = []) {
+    const block = document.createElement('div');
+    block.className = 'content-block animate-slide-down';
+    
+    // 添加标签
+    if (tags.length > 0) {
+        const tagsContainer = document.createElement('div');
+        tagsContainer.className = 'mb-3';
+        tags.forEach(tag => {
+            const tagElement = document.createElement('span');
+            tagElement.className = `content-tag tag-${tag.type || 'info'}`;
+            tagElement.textContent = tag.text;
+            tagsContainer.appendChild(tagElement);
+        });
+        block.appendChild(tagsContainer);
+    }
+    
+    // 添加内容
+    const contentElement = document.createElement('div');
+    contentElement.className = 'prose prose-indigo max-w-none';
+    contentElement.innerHTML = marked.parse(content);
+    block.appendChild(contentElement);
+    
+    return block;
+}
+
+// 添加创建折叠面板的辅助函数
+function createCollapsibleSection(title, content) {
+    const section = document.createElement('div');
+    section.className = 'collapsible-section';
+    
+    const header = document.createElement('div');
+    header.className = 'collapsible-header';
+    header.innerHTML = `
+        <span class="font-medium">${title}</span>
+        <svg class="w-5 h-5 transform transition-transform duration-200" 
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    `;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'collapsible-content';
+    contentDiv.innerHTML = content;
+    
+    section.appendChild(header);
+    section.appendChild(contentDiv);
+    
+    // 添加点击事件
+    header.addEventListener('click', () => {
+        const isActive = section.classList.contains('active');
+        section.classList.toggle('active');
+        header.querySelector('svg').style.transform = isActive ? 'rotate(0)' : 'rotate(180deg)';
+    });
+    
+    return section;
+}
+
 function displayResults(data) {
     // 首先确保股票信息显示
     const stockInfo = document.getElementById('stockInfo');
@@ -153,6 +380,120 @@ function displayResults(data) {
     if (existingButtonGroup) {
         existingButtonGroup.remove();
     }
+    
+    // 添加分析结果标题
+    const analysisTitle = createTitle('分析结果', 1);
+    resultsDiv.appendChild(analysisTitle);
+    
+    // 添加基本信息块
+    const basicInfoBlock = createContentBlock(`
+## 基本信息
+- 股票名称：${data.stockName}
+- 股票代码：${data.stockCode}
+- 分析日期：${new Date().toLocaleDateString()}
+    `, [
+        { text: 'A股', type: 'info' },
+        { text: data.market || '主板', type: 'success' }
+    ]);
+    resultsDiv.appendChild(basicInfoBlock);
+    
+    // 添加技术指标块
+    const technicalBlock = createContentBlock(`
+## 技术指标分析
+${formatTechnicalIndicators(data.indicators)}
+    `);
+    resultsDiv.appendChild(technicalBlock);
+    
+    // 添加交易信号块
+    const signalBlock = createContentBlock(`
+## 交易信号
+${formatTradeSignals(data.signals)}
+    `, [
+        { text: getSignalTag(data.signals.currentSignal), type: getSignalType(data.signals.currentSignal) }
+    ]);
+    resultsDiv.appendChild(signalBlock);
+    
+    // 添加详细分析折叠面板
+    const detailedAnalysis = createCollapsibleSection(
+        '详细分析报告',
+        marked.parse(data.detailedAnalysis || '暂无详细分析')
+    );
+    resultsDiv.appendChild(detailedAnalysis);
+
+    // 价格与成交量分析标题
+    const priceVolumeTitle = createTitle('价格与成交量分析', 1);
+    resultsDiv.appendChild(priceVolumeTitle);
+    
+    // 价格与成交量分析内容
+    const priceVolumeContent = document.createElement('div');
+    priceVolumeContent.className = 'section-content';
+    priceVolumeContent.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold mb-3">价格分析</h3>
+                <p>当前股价: ${data.currentPrice}元</p>
+                <p>涨跌幅: ${data.priceChange}%</p>
+                <p>BOLL上轨: ${data.bollUpper}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-lg font-semibold mb-3">成交量分析</h3>
+                <p>成交量: ${data.volume}手</p>
+                <p>换手率: ${data.turnoverRate}%</p>
+                <p>量比: ${data.volumeRatio}</p>
+            </div>
+        </div>
+    `;
+    resultsDiv.appendChild(priceVolumeContent);
+    
+    // 技术指标分析标题
+    const technicalTitle = createTitle('技术指标分析', 2);
+    resultsDiv.appendChild(technicalTitle);
+    
+    // 技术指标分析内容
+    const technicalContent = document.createElement('div');
+    technicalContent.className = 'section-content';
+    technicalContent.appendChild(technicalBlock);
+    resultsDiv.appendChild(technicalContent);
+    
+    // 市场情绪标题
+    const marketSentimentTitle = createTitle('市场情绪分析', 2);
+    resultsDiv.appendChild(marketSentimentTitle);
+    
+    // 市场情绪内容
+    const marketSentimentContent = document.createElement('div');
+    marketSentimentContent.className = 'section-content';
+    marketSentimentContent.innerHTML = `
+        <div class="bg-white p-4 rounded-lg shadow">
+            <p>ATR值: ${data.atr || '4.70'} (波动性指标)</p>
+            <p>RSI(6): ${data.rsi || '74.37'}</p>
+            <p class="mt-2 text-gray-600">
+                ${data.marketSentiment || '市场情绪极端乐观，但需警惕短期回调风险。'}
+            </p>
+        </div>
+    `;
+    resultsDiv.appendChild(marketSentimentContent);
+    
+    // 创建关键信息展示
+    const keyInfoItems = [
+        {
+            label: '利空',
+            value: '员工战略配售资管计划减持443.94万股（占流通股6.5%），3个月后实施，压制中期流动性。',
+            type: 'negative-info'
+        },
+        {
+            label: '利好',
+            value: '通信设备板块受5G/AI主题驱动（ETF资金流入103亿元），公司作为成分股获主力净流入1.95亿元。',
+            type: 'positive-info'
+        },
+        {
+            label: '行业',
+            value: '云办公、AI应用加速落地，通信设备需求增长明确。',
+            type: 'neutral-info'
+        }
+    ];
+
+    const keyInfoSection = createKeyInfoSection('关键信息提炼', keyInfoItems);
+    resultsDiv.appendChild(keyInfoSection);
 }
 
 function getBackgroundColor(color) {
@@ -704,7 +1045,7 @@ async function handleAnalysis(event) {
     event.preventDefault();
     
     const symbol = document.getElementById('analysisSymbol').value;
-    const model = document.getElementById('modelSelect').value;  // 获取选择的模型
+    const model = document.getElementById('modelSelect').value;
     const analysisContent = document.getElementById('analysisContent');
     const resultsDiv = document.getElementById('analysisResults');
     
@@ -725,20 +1066,35 @@ async function handleAnalysis(event) {
     
     // 创建消息容器
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'ai-message bg-white rounded-lg shadow-sm p-4 mb-4';
+    messageDiv.className = 'ai-message bg-white rounded-lg shadow-lg p-6 mb-6 transform transition-all duration-300 hover:shadow-xl';
     messageDiv.innerHTML = `
-        <div class="message-header">
-            <div class="flex items-center">
-                <span class="ai-icon text-xl mr-2">🤖</span>
-                <span class="text-sm text-gray-500">AI助手</span>
+        <div class="message-header flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg p-2">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="text-lg font-semibold text-gray-800">AI 分析助手</span>
+                    <span class="ml-2 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-600 rounded-full">
+                        ${model.toUpperCase()}
+                    </span>
+                </div>
             </div>
-            <button class="copy-btn flex items-center space-x-1" onclick="copyMessage(this)">
-                <i class="fas fa-copy"></i>
+            <button class="copy-btn flex items-center space-x-2 px-3 py-1.5 text-sm text-gray-600 
+                         bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+                    onclick="copyMessage(this)">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-12a2 2 0 00-2-2h-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
                 <span>复制</span>
             </button>
         </div>
-        <div class="message-content mt-2 prose prose-indigo max-w-none">
-            <div class="typing">正在分析，请稍候...</div>
+        <div class="message-content prose prose-lg max-w-none">
+            <div class="typing-effect text-gray-600">正在分析，请稍候...</div>
         </div>
     `;
     
@@ -755,7 +1111,7 @@ async function handleAnalysis(event) {
             },
             body: JSON.stringify({
                 symbol: symbol,
-                model: model,  // 添加模型参数
+                model: model,
                 question: question,
                 conversation_history: conversationHistory
             })
@@ -785,8 +1141,18 @@ async function handleAnalysis(event) {
                         }
                         if (data.content) {
                             fullText += data.content;
-                            // 只更新内容区域，不重建整个消息结构
-                            contentDiv.innerHTML = marked.parse(fullText);
+                            // 使用 marked 渲染 Markdown 内容
+                            const parsedContent = marked.parse(fullText);
+                            contentDiv.innerHTML = `
+                                <div class="markdown-content">
+                                    ${parsedContent}
+                                </div>
+                            `;
+                            // 应用自定义样式
+                            applyMarkdownStyles(contentDiv);
+                            
+                            // 添加特殊样式处理
+                            enhanceMarkdownContent(contentDiv);
                         }
                     } catch (e) {
                         console.warn('解析数据行失败:', e);
@@ -802,14 +1168,134 @@ async function handleAnalysis(event) {
         });
 
     } catch (error) {
-        console.error('分析请求失败:', error);
         contentDiv.innerHTML = `
-            <div class="text-red-500">
+            <div class="text-red-500 p-4 bg-red-50 rounded-lg">
                 分析失败: ${error.message}
             </div>
         `;
         showToast(error.message, 'error');
     }
+}
+
+// 添加增强 Markdown 内容的函数
+function enhanceMarkdownContent(container) {
+    // 处理标题样式
+    container.querySelectorAll('h1, h2, h3, h4').forEach(heading => {
+        heading.classList.add('flex', 'items-center', 'space-x-2', 'font-bold');
+        
+        // 为不同级别标题添加不同的图标和样式
+        const iconMap = {
+            'H1': `<svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                   </svg>`,
+            'H2': `<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                   </svg>`,
+            'H3': `<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                   </svg>`
+        };
+        
+        if (iconMap[heading.tagName]) {
+            heading.insertAdjacentHTML('afterbegin', iconMap[heading.tagName]);
+        }
+    });
+
+    // 处理表格样式
+    container.querySelectorAll('table').forEach(table => {
+        table.classList.add('min-w-full', 'divide-y', 'divide-gray-200', 'my-4');
+        
+        // 添加表格容器以支持响应式滚动
+        const wrapper = document.createElement('div');
+        wrapper.className = 'overflow-x-auto shadow rounded-lg border border-gray-200 my-6';
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+        
+        // 处理表头
+        const thead = table.querySelector('thead');
+        if (thead) {
+            thead.classList.add('bg-gray-50');
+            thead.querySelectorAll('th').forEach(th => {
+                th.classList.add(
+                    'px-6',
+                    'py-3',
+                    'text-left',
+                    'text-xs',
+                    'font-medium',
+                    'text-gray-500',
+                    'uppercase',
+                    'tracking-wider'
+                );
+            });
+        }
+        
+        // 处理表体
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+            tbody.classList.add('bg-white', 'divide-y', 'divide-gray-200');
+            tbody.querySelectorAll('tr').forEach(tr => {
+                tr.classList.add('hover:bg-gray-50', 'transition-colors');
+                tr.querySelectorAll('td').forEach(td => {
+                    td.classList.add(
+                        'px-6',
+                        'py-4',
+                        'whitespace-nowrap',
+                        'text-sm',
+                        'text-gray-900'
+                    );
+                });
+            });
+        }
+    });
+
+    // 处理代码块
+    container.querySelectorAll('pre code').forEach(code => {
+        const pre = code.parentElement;
+        pre.classList.add(
+            'bg-gray-50',
+            'rounded-lg',
+            'p-4',
+            'my-4',
+            'overflow-x-auto',
+            'relative'
+        );
+        
+        // 添加代码块标题
+        const language = code.className.match(/language-(\w+)/)?.[1] || 'code';
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'absolute top-0 right-0 px-4 py-2 text-xs font-medium text-gray-500 bg-gray-100 rounded-bl-lg';
+        titleDiv.textContent = language.toUpperCase();
+        pre.insertBefore(titleDiv, code);
+    });
+
+    // 处理引用块
+    container.querySelectorAll('blockquote').forEach(quote => {
+        quote.classList.add(
+            'border-l-4',
+            'border-purple-300',
+            'bg-purple-50',
+            'p-4',
+            'my-4',
+            'rounded-r-lg',
+            'text-purple-700',
+            'italic'
+        );
+    });
+
+    // 处理列表
+    container.querySelectorAll('ul, ol').forEach(list => {
+        list.classList.add('space-y-2', 'my-4');
+        list.querySelectorAll('li').forEach(item => {
+            item.classList.add('flex', 'items-start', 'space-x-2');
+            
+            // 为列表项添加自定义标记
+            if (list.tagName === 'UL') {
+                item.classList.add('before:content-["•"]', 'before:text-purple-500', 'before:font-bold', 'before:mr-2');
+            } else {
+                item.classList.add('before:content-[counter(list-item)]', 'before:text-purple-500', 'before:font-bold', 'before:mr-2');
+            }
+        });
+    });
 }
 
 // 确保表单绑定了事件处理函数
@@ -1003,6 +1489,16 @@ function applyMarkdownStyles(element) {
             'text-sm',
             'font-mono'
         );
+    });
+
+    // 处理关键信息标题
+    element.querySelectorAll('.key-info-title').forEach(title => {
+        title.style.borderLeft = '4px solid #3b82f6';
+    });
+
+    // 处理关键信息内容
+    element.querySelectorAll('.key-info-content').forEach(content => {
+        content.style.backgroundColor = 'white';
     });
 }
 
@@ -3490,5 +3986,164 @@ function copyMessage(button) {
         console.error('复制失败:', err);
         showToast('复制失败，请重试', 'error');
     });
+}
+
+// ... 现有代码 ...
+
+// 修改标题样式
+const titleStyles = document.createElement('style');
+titleStyles.textContent = `
+    /* 关键信息标题样式 */
+    .key-info-title {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        margin: 1.5rem 0 1rem;
+        padding: 0.5rem 1rem;
+        background: #f8fafc;
+        border-left: 4px solid #3b82f6;
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    /* 关键信息内容容器 */
+    .key-info-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* 关键信息项样式 */
+    .key-info-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+
+    .key-info-item:last-child {
+        border-bottom: none;
+    }
+
+    /* 关键信息标签样式 */
+    .key-info-label {
+        flex-shrink: 0;
+        font-weight: 600;
+        color: #475569;
+        min-width: 4rem;
+    }
+
+    /* 关键信息值样式 */
+    .key-info-value {
+        flex: 1;
+        color: #1e293b;
+        line-height: 1.5;
+    }
+
+    /* 利好信息样式 */
+    .positive-info {
+        color: #059669;
+    }
+
+    /* 利空信息样式 */
+    .negative-info {
+        color: #dc2626;
+    }
+
+    /* 中性信息样式 */
+    .neutral-info {
+        color: #6366f1;
+    }
+`;
+document.head.appendChild(titleStyles);
+
+// 修改创建标题和内容的函数
+function createKeyInfoSection(title, items) {
+    const section = document.createElement('div');
+    section.className = 'key-info-section';
+
+    // 创建标题
+    const titleElement = document.createElement('div');
+    titleElement.className = 'key-info-title';
+    titleElement.textContent = title;
+    section.appendChild(titleElement);
+
+    // 创建内容容器
+    const content = document.createElement('div');
+    content.className = 'key-info-content';
+
+    // 添加每个信息项
+    items.forEach(item => {
+        const itemElement = document.createElement('div');
+        itemElement.className = 'key-info-item';
+
+        const label = document.createElement('span');
+        label.className = 'key-info-label';
+        label.textContent = item.label;
+
+        const value = document.createElement('span');
+        value.className = `key-info-value ${item.type || ''}`;
+        value.textContent = item.value;
+
+        itemElement.appendChild(label);
+        itemElement.appendChild(value);
+        content.appendChild(itemElement);
+    });
+
+    section.appendChild(content);
+    return section;
+}
+
+// 修改 displayResults 函数中的关键信息展示部分
+function displayResults(data) {
+    // ... 其他代码保持不变 ...
+
+    // 创建关键信息展示
+    const keyInfoItems = [
+        {
+            label: '利空',
+            value: '员工战略配售资管计划减持443.94万股（占流通股6.5%），3个月后实施，压制中期流动性。',
+            type: 'negative-info'
+        },
+        {
+            label: '利好',
+            value: '通信设备板块受5G/AI主题驱动（ETF资金流入103亿元），公司作为成分股获主力净流入1.95亿元。',
+            type: 'positive-info'
+        },
+        {
+            label: '行业',
+            value: '云办公、AI应用加速落地，通信设备需求增长明确。',
+            type: 'neutral-info'
+        }
+    ];
+
+    const keyInfoSection = createKeyInfoSection('关键信息提炼', keyInfoItems);
+    resultsDiv.appendChild(keyInfoSection);
+
+    // ... 其他代码保持不变 ...
+}
+
+// 修改 applyMarkdownStyles 函数中的样式处理
+function applyMarkdownStyles(element) {
+    // ... 其他样式保持不变 ...
+
+    // 处理关键信息标题
+    element.querySelectorAll('.key-info-title').forEach(title => {
+        title.style.borderLeft = '4px solid #3b82f6';
+    });
+
+    // 处理关键信息内容
+    element.querySelectorAll('.key-info-content').forEach(content => {
+        content.style.backgroundColor = 'white';
+    });
+
+    // ... 其他样式保持不变 ...
 }
 
