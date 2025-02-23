@@ -716,73 +716,55 @@ async function handleBacktest() {
     }
 }
 
-// 修改 handleAnalysis 函数
+// 修改 handleAnalysis 函数，添加对话历史记录
 async function handleAnalysis(event) {
     event.preventDefault();
     
-    // 获取必需的DOM元素
-    const symbolInput = document.getElementById('analysisSymbol');
-    const modelSelect = document.getElementById('modelSelect');
-    const additionalInfoInput = document.getElementById('additionalInfo');
+    const symbol = document.getElementById('analysisSymbol').value;
+    const model = document.getElementById('modelSelect').value;  // 获取选择的模型
+    const analysisContent = document.getElementById('analysisContent');
     const resultsDiv = document.getElementById('analysisResults');
-    const contentDiv = document.getElementById('analysisContent');
     
-    // 检查必需的元素是否存在
-    if (!symbolInput || !modelSelect || !resultsDiv || !contentDiv) {
-        showToast('页面元素加载失败，请刷新页面重试', 'error');
-        return;
-    }
-
-    const symbol = symbolInput.value;
-    const model = modelSelect.value;
-    const additionalInfo = additionalInfoInput ? additionalInfoInput.value.trim() : '';
-    
-    // 验证输入
     if (!symbol) {
         showToast('请输入股票代码', 'warning');
         return;
     }
     
-    // 在分析开始前停止朗读
-    if (typeof SpeechController !== 'undefined') {
-        SpeechController.stop();
-    }
-
-    const submitButton = event.target.querySelector('button[type="submit"]');
-    if (!submitButton) {
-        showToast('提交按钮未找到，请刷新页面重试', 'error');
-        return;
-    }
-
-    // 更新按钮状态
-    submitButton.disabled = true;
-    const originalButtonContent = submitButton.innerHTML;
-    submitButton.innerHTML = `
-        <div class="flex items-center justify-center space-x-2">
-            <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-            <span>分析中...</span>
+    // 不再重置对话历史，而是添加新的对话
+    const question = "请对下一个交易日的走势进行预判，并给出对应的交易策略";
+    conversationHistory = [{
+        role: "user",
+        content: question
+    }];
+    
+    // 显示结果区域
+    resultsDiv.classList.remove('hidden');
+    
+    // 创建消息容器
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'ai-message bg-white rounded-lg shadow-sm p-4 mb-4';
+    messageDiv.innerHTML = `
+        <div class="message-header">
+            <div class="flex items-center">
+                <span class="ai-icon text-xl mr-2">🤖</span>
+                <span class="text-sm text-gray-500">AI助手</span>
+            </div>
+            <button class="copy-btn flex items-center space-x-1" onclick="copyMessage(this)">
+                <i class="fas fa-copy"></i>
+                <span>复制</span>
+            </button>
+        </div>
+        <div class="message-content mt-2 prose prose-indigo max-w-none">
+            <div class="typing">正在分析，请稍候...</div>
         </div>
     `;
     
+    analysisContent.innerHTML = '';
+    analysisContent.appendChild(messageDiv);
+    
+    const contentDiv = messageDiv.querySelector('.message-content');
+    
     try {
-        // 清空之前的对话历史
-        conversationHistory = [];
-        
-        // 显示结果区域和加载提示
-        resultsDiv.classList.remove('hidden');
-        contentDiv.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-8 space-y-4">
-                <div class="relative">
-                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent"></div>
-                    <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-indigo-200 opacity-20"></div>
-                </div>
-                <div class="text-center">
-                    <p class="text-lg font-medium text-gray-600">AI正在分析 ${symbol}</p>
-                    <p class="text-sm text-gray-500 mt-2">这可能需要一些时间...</p>
-                </div>
-            </div>
-        `;
-
         const response = await fetch('/analyze_stock', {
             method: 'POST',
             headers: {
@@ -790,18 +772,20 @@ async function handleAnalysis(event) {
             },
             body: JSON.stringify({
                 symbol: symbol,
-                model: model,
-                additionalInfo: additionalInfo,
-                isNewConversation: true
+                model: model,  // 添加模型参数
+                question: question,
+                conversation_history: conversationHistory
             })
         });
 
-        // 创建EventSource来处理流式响应
+        if (!response.ok) {
+            throw new Error('请求失败');
+        }
+
+        // 处理流式响应
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let analysisText = '';
-        let isFirstChunk = true;
-        let hasReceivedAnalysis = false;
+        let fullText = '';
 
         while (true) {
             const {value, done} = await reader.read();
@@ -809,104 +793,75 @@ async function handleAnalysis(event) {
             
             const chunk = decoder.decode(value);
             const lines = chunk.split('\n');
-            
             for (const line of lines) {
                 if (line.startsWith('data: ')) {
                     try {
-                        const data = JSON.parse(line.slice(6));
+                        const data = JSON.parse(line.slice(5));
                         if (data.error) {
-                            showToast(data.error, 'error');
-                            contentDiv.innerHTML = `
-                                <div class="flex items-center p-4 bg-red-50 rounded-lg">
-                                    <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                    <span class="text-red-700">${data.error}</span>
-                                </div>
-                            `;
-                            return;
+                            throw new Error(data.error);
                         }
-                        
-                        const content = data.content || '';
-                        
-                        // 检查是否是提示信息
-                        if (content.includes('正在获取股票数据') || content.includes('正在进行分析')) {
-                            if (!hasReceivedAnalysis) {
-                                contentDiv.innerHTML = `
-                                    <div class="flex items-center justify-center space-x-2 text-gray-600">
-                                        <div class="animate-spin rounded-full h-4 w-4 border-2 border-indigo-500 border-t-transparent"></div>
-                                        <span>${content}</span>
-                                    </div>
-                                `;
-                            }
-                            continue;
+                        if (data.content) {
+                            fullText += data.content;
+                            // 只更新内容区域，不重建整个消息结构
+                            contentDiv.innerHTML = marked.parse(fullText);
                         }
-                        
-                        // 收到实际分析内容
-                        if (!hasReceivedAnalysis) {
-                            hasReceivedAnalysis = true;
-                            contentDiv.innerHTML = `
-                                <div class="chat-message-container fade-in">
-                                    <div class="chat-message">
-                                        <div class="markdown-content"></div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                        
-                        // 累积文本内容
-                        analysisText += content;
-                        
-                        // 更新显示
-                        const markdownContent = contentDiv.querySelector('.markdown-content');
-                        if (markdownContent) {
-                            markdownContent.innerHTML = marked.parse(analysisText);
-                            
-                            // 添加样式
-                            applyMarkdownStyles(markdownContent);
-                            
-                            // 平滑滚到底部
-                            smoothScrollToBottom(contentDiv);
-                            
-                            // 添加打字机效果的CSS类
-                            markdownContent.classList.add('typing-effect');
-                        }
-                        
                     } catch (e) {
-                        console.warn('解析据块失败:', e);
+                        console.warn('解析数据行失败:', e);
                     }
                 }
             }
         }
-        
-        // 保存对话历史
+
+        // 在成功接收完整响应后，添加AI回复到对话历史
         conversationHistory.push({
-            role: 'user',
-            content: `分析股票 ${symbol}`
+            role: "assistant",
+            content: fullText
         });
-        conversationHistory.push({
-            role: 'assistant',
-            content: analysisText
-        });
-        
+
     } catch (error) {
-        showToast(error.message, 'error');
+        console.error('分析请求失败:', error);
         contentDiv.innerHTML = `
-            <div class="flex items-center p-4 bg-red-50 rounded-lg">
-                <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <span class="text-red-700">请求失败: ${error.message}</span>
+            <div class="text-red-500">
+                分析失败: ${error.message}
             </div>
         `;
-    } finally {
-        // 恢复按钮状态
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalButtonContent;
-        }
+        showToast(error.message, 'error');
+    }
+}
+
+// 确保表单绑定了事件处理函数
+document.addEventListener('DOMContentLoaded', function() {
+    // 移除重复的事件绑定
+    const analysisForm = document.getElementById('analysisForm');
+    if (analysisForm) {
+        // 确保移除任何现有的事件监听器
+        analysisForm.removeEventListener('submit', handleAnalysis);
+        // 只添加一次事件监听器
+        analysisForm.addEventListener('submit', handleAnalysis, { once: true });
+    }
+
+    // 追问相关的事件监听器
+    const followupForm = document.getElementById('followupForm');
+    if (followupForm) {
+        followupForm.removeEventListener('submit', sendFollowupQuestion);
+        followupForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            sendFollowupQuestion();
+        });
+    }
+    
+    const followupInput = document.getElementById('followupQuestion');
+    if (followupInput) {
+        followupInput.removeEventListener('keypress', handleFollowupKeypress);
+        followupInput.addEventListener('keypress', handleFollowupKeypress);
+    }
+});
+
+// 将回车键处理提取为单独的函数
+function handleFollowupKeypress(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        sendFollowupQuestion();
     }
 }
 
@@ -2823,7 +2778,7 @@ function getCellValue(row, column) {
     const columnIndex = getColumnIndex(column);
     const cell = row.cells[columnIndex];
     
-    // 如果单元格包含��接，获取链接文本
+    // 如果单元格包含接，获取链接文本
     const link = cell.querySelector('a');
     if (link) {
         return link.textContent.trim();
@@ -2850,7 +2805,7 @@ function getColumnIndex(column) {
 
 // 在文档加载完成后初始化排序事件监听
 document.addEventListener('DOMContentLoaded', function() {
-    // ��所有可排序的表头添点击件
+    // 所有可排序的表头添点击件
     document.querySelectorAll('th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
             const column = th.getAttribute('data-sort');
@@ -3369,6 +3324,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function sendFollowupQuestion() {
     const followupInput = document.getElementById('followupQuestion');
     const question = followupInput.value.trim();
+    const model = document.getElementById('modelSelect').value;
     
     if (!question) {
         showToast('请输入问题', 'warning');
@@ -3378,7 +3334,7 @@ async function sendFollowupQuestion() {
     const contentDiv = document.getElementById('analysisContent');
     const symbolInput = document.getElementById('analysisSymbol');
     
-    // 创建新的问题容器
+    // 创建用户问题容器
     const questionContainer = document.createElement('div');
     questionContainer.className = 'chat-message user-message mb-4';
     questionContainer.innerHTML = `
@@ -3388,22 +3344,38 @@ async function sendFollowupQuestion() {
     `;
     contentDiv.appendChild(questionContainer);
     
-    // 创建新的回复容器
+    // 创建AI回复容器
     const responseContainer = document.createElement('div');
-    responseContainer.className = 'chat-message ai-message mb-4';
+    responseContainer.className = 'ai-message bg-white rounded-lg shadow-sm p-4 mb-4';
     responseContainer.innerHTML = `
-        <div class="bg-gray-50 rounded-lg p-3">
-            <div class="ai-response"></div>
+        <div class="message-header">
+            <div class="flex items-center">
+                <span class="ai-icon text-xl mr-2">🤖</span>
+                <span class="text-sm text-gray-500">AI助手</span>
+            </div>
+            <button class="copy-btn flex items-center space-x-1" onclick="copyMessage(this)">
+                <i class="fas fa-copy"></i>
+                <span>复制</span>
+            </button>
         </div>
+        <div class="message-content mt-2 prose prose-indigo max-w-none"></div>
     `;
     contentDiv.appendChild(responseContainer);
     
-    const aiResponseDiv = responseContainer.querySelector('.ai-response');
+    // 获取消息内容区域的引用
+    const messageContent = responseContainer.querySelector('.message-content');
+    messageContent.innerHTML = '<div class="typing">正在思考，请稍候...</div>';
     
     // 清空输入框
     followupInput.value = '';
     
     try {
+        // 将用户问题添加到对话历史
+        conversationHistory.push({
+            role: "user",
+            content: question
+        });
+
         const response = await fetch('/api/followup', {
             method: 'POST',
             headers: {
@@ -3411,70 +3383,122 @@ async function sendFollowupQuestion() {
             },
             body: JSON.stringify({
                 symbol: symbolInput.value,
+                model: model,
                 question: question,
-                conversation_history: conversationHistory || []  // 确保有默认值
+                conversation_history: conversationHistory
             })
         });
-        
+
+        // 检查响应状态
+        if (!response.ok) {
+            throw new Error(`请求失败: ${response.status}`);
+        }
+
+        // 检查响应头
+        const contentType = response.headers.get('content-type');
+        console.log('响应Content-Type:', contentType);
+
+        console.log('开始处理响应流');
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let responseText = '';
+        let fullText = '';
+        
+        // 清除 "正在思考" 的提示
+        messageContent.innerHTML = '';
         
         while (true) {
             const {value, done} = await reader.read();
-            if (done) break;
             
-            const text = decoder.decode(value);
-            // 直接显示文本内容
-            responseText += text;
-            try {
-                aiResponseDiv.innerHTML = marked.parse(responseText);
-            } catch (e) {
-                console.error('Error parsing markdown:', e);
-                aiResponseDiv.textContent = responseText;
+            // 检查每次读取的状态
+            console.log('读取状态:', { done, hasValue: !!value });
+            
+            if (done) {
+                console.log('响应流结束，完整文本:', fullText);
+                if (!fullText) {
+                    messageContent.innerHTML = `
+                        <div class="text-red-500">
+                            未收到任何响应内容
+                        </div>
+                    `;
+                }
+                break;
             }
+            
+            const chunk = decoder.decode(value);
+            console.log('原始数据块:', chunk);
+            
+            // 直接将收到的文本添加到 fullText
+            fullText += chunk;
+            
+            // 使用 marked 处理完整的文本内容
+            const parsedContent = marked.parse(fullText);
+            
+            // 更新显示
+            messageContent.innerHTML = parsedContent;
+            
+            // 应用 Markdown 样式
+            applyMarkdownStyles(messageContent);
+            
+            // 应用代码高亮
+            if (window.Prism) {
+                Prism.highlightAllUnder(messageContent);
+            }
+            
+            // 滚动到底部
+            contentDiv.scrollTop = contentDiv.scrollHeight;
         }
         
-        // 更新对话历史
-        if (!conversationHistory) {
-            conversationHistory = [];
+        // 检查最终结果
+        if (fullText) {
+            // 将AI回复添加到对话历史
+            conversationHistory.push({
+                role: "assistant",
+                content: fullText
+            });
         }
-        conversationHistory.push({
-            role: "user",
-            content: question
-        });
-        conversationHistory.push({
-            role: "assistant",
-            content: responseText
-        });
-        
-        // 滚动到底部
-        contentDiv.scrollTop = contentDiv.scrollHeight;
         
     } catch (error) {
-        console.error('Error:', error);
-        aiResponseDiv.innerHTML += `<div class="error">请求失败: ${error.message}</div>`;
+        console.error('追问请求失败:', error);
+        messageContent.innerHTML = `
+            <div class="text-red-500">
+                请求失败: ${error.message}
+            </div>
+        `;
+        showToast(error.message, 'error');
     }
 }
 
-// 确保事件监听器正确设置
+// 确保事件监听器只绑定一次
 document.addEventListener('DOMContentLoaded', function() {
     const followupForm = document.getElementById('followupForm');
     if (followupForm) {
-        followupForm.addEventListener('submit', function(event) {
+        // 移除所有现有的事件监听器
+        const newForm = followupForm.cloneNode(true);
+        followupForm.parentNode.replaceChild(newForm, followupForm);
+        
+        // 添加新的事件监听器
+        newForm.addEventListener('submit', function(event) {
             event.preventDefault();
             sendFollowupQuestion();
         });
     }
-    
-    const followupInput = document.getElementById('followupQuestion');
-    if (followupInput) {
-        followupInput.addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                sendFollowupQuestion();
-            }
-        });
-    }
 });
+
+function copyMessage(button) {
+    // 获取消息内容
+    const messageContent = button.closest('.ai-message').querySelector('.message-content').textContent;
+    
+    // 复制到剪贴板
+    navigator.clipboard.writeText(messageContent.trim()).then(() => {
+        // 临时改变按钮文字显示复制成功
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> 已复制';
+        setTimeout(() => {
+            button.innerHTML = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('复制失败:', err);
+        alert('复制失败，请重试');
+    });
+}
 

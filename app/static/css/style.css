@@ -1121,3 +1121,74 @@ select {
     background-color: #f8d7da;
     border-radius: 4px;
 }
+
+.copy-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #4b5563;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+    background-color: #e5e7eb;
+    border-color: #d1d5db;
+    color: #374151;
+}
+
+.copy-btn:active {
+    transform: scale(0.98);
+}
+
+.copy-btn i {
+    margin-right: 4px;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.ai-message {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.message-content {
+    min-height: 100px; /* 防止高度跳动 */
+    transition: all 0.3s ease; /* 平滑过渡 */
+}
+
+.typing {
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.typing::after {
+    content: '...';
+    animation: typing 1.5s infinite;
+    width: 12px;
+    display: inline-block;
+}
+
+@keyframes typing {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60% { content: '...'; }
+    80%, 100% { content: ''; }
+}
