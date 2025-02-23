@@ -53,18 +53,12 @@ function optimize() {
 }
 
 function displayResults(data) {
-    console.log('开始显示结果:', data); 
-
     // 首先确保股票信息显示
     const stockInfo = document.getElementById('stockInfo');
     const stockName = document.getElementById('stockName');
     const stockCode = document.getElementById('stockCode');
     
-    console.log('股票信息元素:', { stockInfo, stockName, stockCode }); 
-    
     if (data.stockName) {
-        console.log('显示股票名称:', data.stockName); 
-        
         // 修改股票信息显示
         stockName.textContent = data.stockName;
         const stockCodeSpan = stockCode.querySelector('.stock-code');
@@ -85,16 +79,12 @@ function displayResults(data) {
     const bestParamsDiv = document.getElementById('bestParams');
     const metricsDiv = document.getElementById('metrics');
     
-    console.log('结果显示元素:', { resultsDiv, bestParamsDiv, metricsDiv }); // 调试日志
-    
-    // 清所有内容
+    // 清除所有内容
     bestParamsDiv.innerHTML = '';
     metricsDiv.innerHTML = '';
     
     // 显示最优参数
-    console.log('开始显示最优参数:', data.bestParams); // 调试日志
     for (const [key, value] of Object.entries(data.bestParams)) {
-        console.log('处理参数:', key, value); // 调试日志
         const paramDiv = document.createElement('div');
         paramDiv.className = 'metric-item group';
         paramDiv.innerHTML = `
@@ -110,7 +100,6 @@ function displayResults(data) {
     
     // 显示策略指标
     const metrics = data.metrics;
-    console.log('开始显示策略指标:', metrics); // 调试日志
     
     const metricItems = [
         { key: 'sharpeRatio', label: '夏普比率', format: v => v.toFixed(2) },
@@ -122,7 +111,6 @@ function displayResults(data) {
             label: '最新信号',
             custom: true,
             render: (signal) => {
-                console.log('渲染信号:', signal); // 调试日志
                 const div = document.createElement('div');
                 div.className = 'metric-item';
                 div.innerHTML = `
@@ -137,7 +125,6 @@ function displayResults(data) {
     ];
     
     metricItems.forEach((item, index) => {
-        console.log('处理指标项:', item.key); // 调试日志
         if (item.custom) {
             metricsDiv.appendChild(item.render(metrics[item.key]));
         } else {
@@ -158,7 +145,6 @@ function displayResults(data) {
     });
     
     // 显示结果区域
-    console.log('显示结果区域'); 
     resultsDiv.classList.remove('hidden');
     resultsDiv.style.animation = 'fadeIn 0.5s ease-in';
     
@@ -603,13 +589,10 @@ function formatDisplayDate(dateStr) {
 
 // 修改 initializeTabs 函数
 function initializeTabs() {
-    console.log('Initializing tabs...');
-    
     // 为所有标签按钮添加点击事件
     document.querySelectorAll('.tab-button').forEach(button => {
         button.addEventListener('click', () => {
             const tabId = button.getAttribute('data-tab');
-            console.log('Tab button clicked:', tabId);
             switchTab(tabId);
         });
     });
@@ -3358,7 +3341,7 @@ async function sendFollowupQuestion() {
                 <span>复制</span>
             </button>
         </div>
-        <div class="message-content mt-2 prose prose-indigo max-w-none"></div>
+        <div class="message-content mt-2 prose prose-indigo max-w-none" data-raw-content=""></div>
     `;
     contentDiv.appendChild(responseContainer);
     
@@ -3433,8 +3416,9 @@ async function sendFollowupQuestion() {
             // 使用 marked 处理完整的文本内容
             const parsedContent = marked.parse(fullText);
             
-            // 更新显示
+            // 更新显示和保存原始内容
             messageContent.innerHTML = parsedContent;
+            messageContent.setAttribute('data-raw-content', fullText);
             
             // 应用 Markdown 样式
             applyMarkdownStyles(messageContent);
@@ -3485,20 +3469,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function copyMessage(button) {
-    // 获取消息内容
-    const messageContent = button.closest('.ai-message').querySelector('.message-content').textContent;
+    // 获取消息容器
+    const messageContent = button.closest('.ai-message').querySelector('.message-content');
+    // 获取原始内容
+    const rawContent = messageContent.getAttribute('data-raw-content');
     
     // 复制到剪贴板
-    navigator.clipboard.writeText(messageContent.trim()).then(() => {
+    navigator.clipboard.writeText(rawContent || messageContent.textContent).then(() => {
         // 临时改变按钮文字显示复制成功
         const originalText = button.innerHTML;
         button.innerHTML = '<i class="fas fa-check"></i> 已复制';
+        
+        // 显示成功提示
+        showToast('复制成功', 'success');
+        
         setTimeout(() => {
             button.innerHTML = originalText;
         }, 2000);
     }).catch(err => {
         console.error('复制失败:', err);
-        alert('复制失败，请重试');
+        showToast('复制失败，请重试', 'error');
     });
 }
 
