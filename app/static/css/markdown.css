@@ -1,0 +1,45 @@
+/* 基础容器样式 */
+.markdown-content {
+    @apply prose prose-indigo max-w-none;
+}
+
+/* 标题样式 */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    @apply font-bold mt-4 mb-2;
+}
+
+/* 段落样式 */
+.markdown-content p {
+    @apply my-2 leading-relaxed text-gray-700;
+}
+
+/* 列表样式 */
+.markdown-content ul,
+.markdown-content ol {
+    @apply my-2 ml-4;
+}
+
+/* 表格样式 */
+.markdown-content table {
+    @apply min-w-full border border-gray-200 my-4;
+}
+
+.markdown-content th,
+.markdown-content td {
+    @apply border border-gray-200 px-4 py-2;
+}
+
+/* 代码块样式 */
+.markdown-content pre code {
+    @apply rounded p-4 bg-gray-100;
+}
+
+/* 引用样式 */
+.markdown-content blockquote {
+    @apply border-l-4 border-gray-300 pl-4 my-4 italic;
+} 

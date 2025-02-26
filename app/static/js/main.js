@@ -6,9 +6,13 @@ let sortStates = {};  // 用于跟踪每列的排序状态: null(不排序) -> '
 let conversationHistory = [];
 
 function optimize() {
+    console.log('optimize function called'); // 调试日志
+    
     const symbol = document.getElementById('symbol').value;
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
+
+    console.log('Input values:', { symbol, startDate, endDate }); // 检查输入值
 
     if (!symbol || !startDate || !endDate) {
         alert('请填写完整的参数信息');
@@ -16,10 +20,24 @@ function optimize() {
     }
 
     // 显示加载动画，隐藏回测结果区域
-    document.getElementById('loading').classList.remove('hidden');
-    document.getElementById('results').classList.add('hidden');
-    document.getElementById('stockInfo').classList.add('hidden');
-    document.getElementById('backtestResults').classList.add('hidden');
+    const loadingEl = document.getElementById('loading');
+    const resultsEl = document.getElementById('results');
+    const stockInfoEl = document.getElementById('stockInfo');
+    const backtestResultsEl = document.getElementById('backtestResults');
+
+    console.log('Elements found:', { 
+        loading: !!loadingEl, 
+        results: !!resultsEl, 
+        stockInfo: !!stockInfoEl, 
+        backtestResults: !!backtestResultsEl 
+    }); // 检查元素是否存在
+
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (resultsEl) resultsEl.classList.add('hidden');
+    if (stockInfoEl) stockInfoEl.classList.add('hidden');
+    if (backtestResultsEl) backtestResultsEl.classList.add('hidden');
+
+    console.log('Sending fetch request...'); // 调试日志
 
     fetch('/optimize', {
         method: 'POST',
@@ -32,25 +50,87 @@ function optimize() {
             endDate: endDate
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response received:', response.status); // 检查响应状态
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
-        // 隐藏加载动画
-        document.getElementById('loading').classList.add('hidden');
+        console.log('Data received:', data); // 检查返回的数据
+        
+        if (loadingEl) loadingEl.classList.add('hidden');
         
         if (data.error) {
+            console.error('Error from server:', data.error);
             alert(data.error);
             return;
         }
         
         // 显示优化结果
-        displayResults(data);
+        const resultsDiv = document.getElementById('results');
+        console.log('Results div found:', !!resultsDiv);
+        
+        if (!resultsDiv) {
+            throw new Error('Results container not found');
+        }
+
+        // 添加数据验证
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid data received: ' + JSON.stringify(data));
+        }
+
+        // 检查必要的数据字段
+        if (!data.stockName) {
+            throw new Error('Missing stockName in data');
+        }
+        if (!data.bestParams || typeof data.bestParams !== 'object') {
+            throw new Error('Invalid or missing bestParams in data');
+        }
+        if (!data.metrics || typeof data.metrics !== 'object') {
+            throw new Error('Invalid or missing metrics in data');
+        }
+
+        console.log('Attempting to display results with data:', {
+            stockName: data.stockName,
+            bestParams: data.bestParams,
+            metrics: data.metrics
+        });
+
+        // 使用 window.displayResults 确保是全局函数
+        window.displayResults(data, resultsDiv);
     })
     .catch(error => {
-        console.error('优化请求错误:', error);
-        document.getElementById('loading').classList.add('hidden');
-        alert('优化过程中发生错误: ' + error);
+        console.error('Error in optimize:', error);
+        console.error('Error stack:', error.stack);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        alert('优化过程中发生错误: ' + error.message);
     });
 }
+
+// 确保在文档加载完成后绑定事件
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded event fired'); // 调试日志
+    
+    const optimizeForm = document.getElementById('optimizeForm');
+    console.log('Optimize form found:', !!optimizeForm); // 检查表单是否存在
+    
+    if (optimizeForm) {
+        // 移除所有现有的事件监听器
+        const newForm = optimizeForm.cloneNode(true);
+        optimizeForm.parentNode.replaceChild(newForm, optimizeForm);
+        
+        // 添加新的事件监听器，并使用 {once: true} 确保只触发一次
+        newForm.addEventListener('submit', function(event) {
+            console.log('Form submit event triggered'); // 调试日志
+            event.preventDefault();
+            optimize();
+        }, { once: true });
+    } else {
+        console.error('Optimize form not found'); // 记录错误
+    }
+});
 
 // 添加标题和内容展示相关的样式
 const contentStyles = document.createElement('style');
@@ -279,221 +359,101 @@ function createCollapsibleSection(title, content) {
     return section;
 }
 
-function displayResults(data) {
-    // 首先确保股票信息显示
-    const stockInfo = document.getElementById('stockInfo');
-    const stockName = document.getElementById('stockName');
-    const stockCode = document.getElementById('stockCode');
-    
-    if (data.stockName) {
-        // 修改股票信息显示
-        stockName.textContent = data.stockName;
-        const stockCodeSpan = stockCode.querySelector('.stock-code');
-        if (stockCodeSpan) {
-            stockCodeSpan.textContent = `股票代码：${document.getElementById('symbol').value}`;
-        } else {
-            stockCode.innerHTML = `
-                <span class="stock-code">股票代码：${document.getElementById('symbol').value}</span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    A股
-                </span>
-            `;
+function displayResults(data, resultsDiv) {
+    try {
+        console.log('displayResults started with data:', data);
+        
+        // 检查必要的数据字段
+        if (!data.stockName) {
+            throw new Error('Missing stockName in data');
         }
-        stockInfo.classList.remove('hidden');
-    }
+        if (!data.bestParams || typeof data.bestParams !== 'object') {
+            throw new Error('Invalid or missing bestParams in data');
+        }
+        if (!data.metrics || typeof data.metrics !== 'object') {
+            throw new Error('Invalid or missing metrics in data');
+        }
 
-    const resultsDiv = document.getElementById('results');
-    const bestParamsDiv = document.getElementById('bestParams');
-    const metricsDiv = document.getElementById('metrics');
-    
-    // 清除所有内容
-    bestParamsDiv.innerHTML = '';
-    metricsDiv.innerHTML = '';
-    
-    // 显示最优参数
-    for (const [key, value] of Object.entries(data.bestParams)) {
-        const paramDiv = document.createElement('div');
-        paramDiv.className = 'metric-item group';
-        paramDiv.innerHTML = `
-            <span class="metric-label group-hover:text-blue-600">
-                ${formatParamName(key)}
-            </span>
-            <span class="metric-value bg-blue-50 text-blue-600 group-hover:bg-blue-100">
-                ${value}
-            </span>
-        `;
-        bestParamsDiv.appendChild(paramDiv);
-    }
-    
-    // 显示策略指标
-    const metrics = data.metrics;
-    
-    const metricItems = [
-        { key: 'sharpeRatio', label: '夏普比率', format: v => v.toFixed(2) },
-        { key: 'maxDrawdown', label: '最大回撤', format: v => v.toFixed(2) + '%' },
-        { key: 'winRate', label: '胜率', format: v => v.toFixed(2) + '%' },
-        { key: 'totalReturn', label: '总收益率', format: v => v.toFixed(2) + '%' },
-        { 
-            key: 'lastSignal',
-            label: '最新信号',
-            custom: true,
-            render: (signal) => {
-                const div = document.createElement('div');
-                div.className = 'metric-item';
-                div.innerHTML = `
-                    <span class="metric-label">最新信号</span>
-                    <span class="signal-badge" style="color: ${signal.color}; background-color: ${getBackgroundColor(signal.color)}">
-                        ${signal.text}
+        // 首先确保股票信息显示
+        const stockInfo = document.getElementById('stockInfo');
+        const stockName = document.getElementById('stockName');
+        const stockCode = document.getElementById('stockCode');
+        
+        if (!stockInfo || !stockName || !stockCode) {
+            throw new Error('Required DOM elements not found');
+        }
+
+        // 修改股票信息显示
+        try {
+            stockName.textContent = data.stockName;
+            const stockCodeSpan = stockCode.querySelector('.stock-code');
+            const symbolValue = document.getElementById('symbol').value;
+            
+            if (stockCodeSpan) {
+                stockCodeSpan.textContent = `股票代码：${symbolValue}`;
+            } else {
+                stockCode.innerHTML = `
+                    <span class="stock-code">股票代码：${symbolValue}</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        A股
                     </span>
                 `;
-                return div;
             }
+            stockInfo.classList.remove('hidden');
+        } catch (err) {
+            console.error('Error updating stock info:', err);
+            throw err;
         }
-    ];
-    
-    metricItems.forEach((item, index) => {
-        if (item.custom) {
-            metricsDiv.appendChild(item.render(metrics[item.key]));
-        } else {
-            const metricDiv = document.createElement('div');
-            metricDiv.className = 'metric-item group';
-            const value = item.format(metrics[item.key]);
-            metricDiv.innerHTML = `
-                <span class="metric-label group-hover:text-green-600">
-                    ${item.label}
-                </span>
-                <span class="metric-value bg-green-50 text-green-600 group-hover:bg-green-100">
-                    ${value}
-                </span>
+
+        // 显示结果区域
+        resultsDiv.classList.remove('hidden');
+        resultsDiv.style.animation = 'fadeIn 0.5s ease-in';
+        
+        // 清除现有内容
+        resultsDiv.innerHTML = '';
+        
+        // 添加分析结果标题
+        const analysisTitle = createTitle('分析结果', 1);
+        resultsDiv.appendChild(analysisTitle);
+        
+        // 添加策略分析部分
+        const strategyTitle = createTitle('策略分析', 2);
+        resultsDiv.appendChild(strategyTitle);
+        
+        function createStrategySection(data) {
+            const section = document.createElement('div');
+            section.className = 'section-content';
+
+            const metrics = data.metrics || {};
+            const lastSignal = metrics.lastSignal || {};
+
+            section.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold mb-3">策略表现</h3>
+                        <p>最大回撤: ${metrics.maxDrawdown?.toFixed(2)}%</p>
+                        <p>夏普比率: ${metrics.sharpeRatio?.toFixed(2)}</p>
+                        <p>总收益率: ${metrics.totalReturn?.toFixed(2)}%</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold mb-3">交易信号</h3>
+                        <p>当前信号: <span class="signal-badge" style="color: ${lastSignal.color}; background-color: ${getBackgroundColor(lastSignal.color)}">${lastSignal.text}</span></p>
+                        <p>胜率: ${metrics.winRate?.toFixed(2)}%</p>
+                    </div>
+                </div>
             `;
-            metricDiv.style.animation = `fadeIn 0.5s ease-in ${index * 0.1}s both`;
-            metricsDiv.appendChild(metricDiv);
+            
+            return section;
         }
-    });
-    
-    // 显示结果区域
-    resultsDiv.classList.remove('hidden');
-    resultsDiv.style.animation = 'fadeIn 0.5s ease-in';
-    
-    // 先移除已存在的按钮组
-    const existingButtonGroup = document.querySelector('#results .button-group');
-    if (existingButtonGroup) {
-        existingButtonGroup.remove();
+
+        const strategySection = createStrategySection(data);
+        resultsDiv.appendChild(strategySection);
+        
+        console.log('displayResults completed');
+    } catch (err) {
+        console.error('Error in displayResults:', err);
+        throw err;
     }
-    
-    // 添加分析结果标题
-    const analysisTitle = createTitle('分析结果', 1);
-    resultsDiv.appendChild(analysisTitle);
-    
-    // 添加基本信息块
-    const basicInfoBlock = createContentBlock(`
-## 基本信息
-- 股票名称：${data.stockName}
-- 股票代码：${data.stockCode}
-- 分析日期：${new Date().toLocaleDateString()}
-    `, [
-        { text: 'A股', type: 'info' },
-        { text: data.market || '主板', type: 'success' }
-    ]);
-    resultsDiv.appendChild(basicInfoBlock);
-    
-    // 添加技术指标块
-    const technicalBlock = createContentBlock(`
-## 技术指标分析
-${formatTechnicalIndicators(data.indicators)}
-    `);
-    resultsDiv.appendChild(technicalBlock);
-    
-    // 添加交易信号块
-    const signalBlock = createContentBlock(`
-## 交易信号
-${formatTradeSignals(data.signals)}
-    `, [
-        { text: getSignalTag(data.signals.currentSignal), type: getSignalType(data.signals.currentSignal) }
-    ]);
-    resultsDiv.appendChild(signalBlock);
-    
-    // 添加详细分析折叠面板
-    const detailedAnalysis = createCollapsibleSection(
-        '详细分析报告',
-        marked.parse(data.detailedAnalysis || '暂无详细分析')
-    );
-    resultsDiv.appendChild(detailedAnalysis);
-
-    // 价格与成交量分析标题
-    const priceVolumeTitle = createTitle('价格与成交量分析', 1);
-    resultsDiv.appendChild(priceVolumeTitle);
-    
-    // 价格与成交量分析内容
-    const priceVolumeContent = document.createElement('div');
-    priceVolumeContent.className = 'section-content';
-    priceVolumeContent.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h3 class="text-lg font-semibold mb-3">价格分析</h3>
-                <p>当前股价: ${data.currentPrice}元</p>
-                <p>涨跌幅: ${data.priceChange}%</p>
-                <p>BOLL上轨: ${data.bollUpper}</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h3 class="text-lg font-semibold mb-3">成交量分析</h3>
-                <p>成交量: ${data.volume}手</p>
-                <p>换手率: ${data.turnoverRate}%</p>
-                <p>量比: ${data.volumeRatio}</p>
-            </div>
-        </div>
-    `;
-    resultsDiv.appendChild(priceVolumeContent);
-    
-    // 技术指标分析标题
-    const technicalTitle = createTitle('技术指标分析', 2);
-    resultsDiv.appendChild(technicalTitle);
-    
-    // 技术指标分析内容
-    const technicalContent = document.createElement('div');
-    technicalContent.className = 'section-content';
-    technicalContent.appendChild(technicalBlock);
-    resultsDiv.appendChild(technicalContent);
-    
-    // 市场情绪标题
-    const marketSentimentTitle = createTitle('市场情绪分析', 2);
-    resultsDiv.appendChild(marketSentimentTitle);
-    
-    // 市场情绪内容
-    const marketSentimentContent = document.createElement('div');
-    marketSentimentContent.className = 'section-content';
-    marketSentimentContent.innerHTML = `
-        <div class="bg-white p-4 rounded-lg shadow">
-            <p>ATR值: ${data.atr || '4.70'} (波动性指标)</p>
-            <p>RSI(6): ${data.rsi || '74.37'}</p>
-            <p class="mt-2 text-gray-600">
-                ${data.marketSentiment || '市场情绪极端乐观，但需警惕短期回调风险。'}
-            </p>
-        </div>
-    `;
-    resultsDiv.appendChild(marketSentimentContent);
-    
-    // 创建关键信息展示
-    const keyInfoItems = [
-        {
-            label: '利空',
-            value: '员工战略配售资管计划减持443.94万股（占流通股6.5%），3个月后实施，压制中期流动性。',
-            type: 'negative-info'
-        },
-        {
-            label: '利好',
-            value: '通信设备板块受5G/AI主题驱动（ETF资金流入103亿元），公司作为成分股获主力净流入1.95亿元。',
-            type: 'positive-info'
-        },
-        {
-            label: '行业',
-            value: '云办公、AI应用加速落地，通信设备需求增长明确。',
-            type: 'neutral-info'
-        }
-    ];
-
-    const keyInfoSection = createKeyInfoSection('关键信息提炼', keyInfoItems);
-    resultsDiv.appendChild(keyInfoSection);
 }
 
 function getBackgroundColor(color) {
@@ -1141,18 +1101,28 @@ async function handleAnalysis(event) {
                         }
                         if (data.content) {
                             fullText += data.content;
-                            // 使用 marked 渲染 Markdown 内容
-                            const parsedContent = marked.parse(fullText);
-                            contentDiv.innerHTML = `
-                                <div class="markdown-content">
-                                    ${parsedContent}
-                                </div>
-                            `;
-                            // 应用自定义样式
-                            applyMarkdownStyles(contentDiv);
-                            
-                            // 添加特殊样式处理
-                            enhanceMarkdownContent(contentDiv);
+                            // 使用 markdown-it 处理分析报告
+                            const md = window.markdownit({
+                                html: true,
+                                linkify: true,
+                                typographer: true,
+                                highlight: function (str, lang) {
+                                    if (lang && hljs.getLanguage(lang)) {
+                                        try {
+                                            return hljs.highlight(str, { language: lang }).value;
+                                        } catch (__) {}
+                                    }
+                                    return ''; // 使用默认的转义
+                                }
+                            });
+
+                            // 添加插件支持
+                            md.use(window.markdownitEmoji);
+                            md.use(window.markdownitFootnote);
+                            md.use(window.markdownitTaskLists);
+
+                            // 渲染markdown内容
+                            contentDiv.innerHTML = md.render(fullText);
                         }
                     } catch (e) {
                         console.warn('解析数据行失败:', e);
@@ -1175,127 +1145,6 @@ async function handleAnalysis(event) {
         `;
         showToast(error.message, 'error');
     }
-}
-
-// 添加增强 Markdown 内容的函数
-function enhanceMarkdownContent(container) {
-    // 处理标题样式
-    container.querySelectorAll('h1, h2, h3, h4').forEach(heading => {
-        heading.classList.add('flex', 'items-center', 'space-x-2', 'font-bold');
-        
-        // 为不同级别标题添加不同的图标和样式
-        const iconMap = {
-            'H1': `<svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                   </svg>`,
-            'H2': `<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                   </svg>`,
-            'H3': `<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                   </svg>`
-        };
-        
-        if (iconMap[heading.tagName]) {
-            heading.insertAdjacentHTML('afterbegin', iconMap[heading.tagName]);
-        }
-    });
-
-    // 处理表格样式
-    container.querySelectorAll('table').forEach(table => {
-        table.classList.add('min-w-full', 'divide-y', 'divide-gray-200', 'my-4');
-        
-        // 添加表格容器以支持响应式滚动
-        const wrapper = document.createElement('div');
-        wrapper.className = 'overflow-x-auto shadow rounded-lg border border-gray-200 my-6';
-        table.parentNode.insertBefore(wrapper, table);
-        wrapper.appendChild(table);
-        
-        // 处理表头
-        const thead = table.querySelector('thead');
-        if (thead) {
-            thead.classList.add('bg-gray-50');
-            thead.querySelectorAll('th').forEach(th => {
-                th.classList.add(
-                    'px-6',
-                    'py-3',
-                    'text-left',
-                    'text-xs',
-                    'font-medium',
-                    'text-gray-500',
-                    'uppercase',
-                    'tracking-wider'
-                );
-            });
-        }
-        
-        // 处理表体
-        const tbody = table.querySelector('tbody');
-        if (tbody) {
-            tbody.classList.add('bg-white', 'divide-y', 'divide-gray-200');
-            tbody.querySelectorAll('tr').forEach(tr => {
-                tr.classList.add('hover:bg-gray-50', 'transition-colors');
-                tr.querySelectorAll('td').forEach(td => {
-                    td.classList.add(
-                        'px-6',
-                        'py-4',
-                        'whitespace-nowrap',
-                        'text-sm',
-                        'text-gray-900'
-                    );
-                });
-            });
-        }
-    });
-
-    // 处理代码块
-    container.querySelectorAll('pre code').forEach(code => {
-        const pre = code.parentElement;
-        pre.classList.add(
-            'bg-gray-50',
-            'rounded-lg',
-            'p-4',
-            'my-4',
-            'overflow-x-auto',
-            'relative'
-        );
-        
-        // 添加代码块标题
-        const language = code.className.match(/language-(\w+)/)?.[1] || 'code';
-        const titleDiv = document.createElement('div');
-        titleDiv.className = 'absolute top-0 right-0 px-4 py-2 text-xs font-medium text-gray-500 bg-gray-100 rounded-bl-lg';
-        titleDiv.textContent = language.toUpperCase();
-        pre.insertBefore(titleDiv, code);
-    });
-
-    // 处理引用块
-    container.querySelectorAll('blockquote').forEach(quote => {
-        quote.classList.add(
-            'border-l-4',
-            'border-purple-300',
-            'bg-purple-50',
-            'p-4',
-            'my-4',
-            'rounded-r-lg',
-            'text-purple-700',
-            'italic'
-        );
-    });
-
-    // 处理列表
-    container.querySelectorAll('ul, ol').forEach(list => {
-        list.classList.add('space-y-2', 'my-4');
-        list.querySelectorAll('li').forEach(item => {
-            item.classList.add('flex', 'items-start', 'space-x-2');
-            
-            // 为列表项添加自定义标记
-            if (list.tagName === 'UL') {
-                item.classList.add('before:content-["•"]', 'before:text-purple-500', 'before:font-bold', 'before:mr-2');
-            } else {
-                item.classList.add('before:content-[counter(list-item)]', 'before:text-purple-500', 'before:font-bold', 'before:mr-2');
-            }
-        });
-    });
 }
 
 // 确保表单绑定了事件处理函数
@@ -3566,9 +3415,28 @@ async function handleStockAnalysis(event) {
         document.getElementById('analysisStockName').textContent = data.stockName;
         document.getElementById('analysisStockCode').textContent = `股票代码：${symbol}`;
         
-        // 显示分析报告
-        analysisContent.innerHTML = marked.parse(data.content);
-        applyMarkdownStyles(analysisContent);
+        // 使用 markdown-it 处理分析报告
+        const md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true,
+            highlight: function (str, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(str, { language: lang }).value;
+                    } catch (__) {}
+                }
+                return ''; // 使用默认的转义
+            }
+        });
+
+        // 添加插件支持
+        md.use(window.markdownitEmoji);
+        md.use(window.markdownitFootnote);
+        md.use(window.markdownitTaskLists);
+
+        // 渲染markdown内容
+        analysisContent.innerHTML = md.render(data.content);
         
     } catch (error) {
         console.error('个股分析失败:', error);
@@ -3583,221 +3451,6 @@ async function handleStockAnalysis(event) {
         showToast(error.message, 'error');
     }
 }
-
-// 在文档加载完成后添加事件监听
-document.addEventListener('DOMContentLoaded', function() {
-    // ... 现有的初始化代码 ...
-    
-    // 添加个股分析表单提交事件监听
-    const stockAnalysisForm = document.getElementById('stockAnalysisForm');
-    if (stockAnalysisForm) {
-        stockAnalysisForm.addEventListener('submit', handleStockAnalysis);
-    }
-    
-    // 添加复制分析报告按钮事件监听
-    const copyAnalysisBtn = document.getElementById('copyAnalysisBtn');
-    if (copyAnalysisBtn) {
-        copyAnalysisBtn.addEventListener('click', async function() {
-            const analysisContent = document.getElementById('analysisContent');
-            if (!analysisContent) {
-                showToast('未找到分析内容', 'error');
-                return;
-            }
-            
-            try {
-                await navigator.clipboard.writeText(analysisContent.innerText);
-                showToast('分析报告已复制到剪贴板', 'success');
-            } catch (error) {
-                showToast('复制失败，请重试', 'error');
-            }
-        });
-    }
-});
-
-// 添加执行行业分析的函数
-async function runIndustryAnalysis(date) {
-    try {
-        const reportContent = document.getElementById('reportContent');
-        
-        // 显示加载状态
-        reportContent.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-8 space-y-4">
-                <div class="relative">
-                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
-                    <div class="absolute top-0 left-0 h-12 w-12 rounded-full border-4 border-purple-200 opacity-20"></div>
-                </div>
-                <div class="text-center">
-                    <p class="text-lg font-medium text-gray-600">正在分析行业数据</p>
-                    <p class="text-sm text-gray-500 mt-2">这可能需要几分钟时间...</p>
-                </div>
-            </div>
-        `;
-
-        // 调用后端执行行业分析
-        const response = await fetch('/api/industry/analyze', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ date: date })
-        });
-
-        if (!response.ok) {
-            throw new Error('行业分析请求失败');
-        }
-
-        const data = await response.json();
-        
-        if (data.success) {
-            // 分析完成后重新加载数据
-            await handleIndustryAnalysis(date);
-            showToast('行业分析完成', 'success');
-        } else {
-            throw new Error(data.error || '行业分析失败');
-        }
-
-    } catch (error) {
-        console.error('执行行业分析失败:', error);
-        reportContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-red-500 mb-4">${error.message}</div>
-                <button onclick="runIndustryAnalysis('${date}')"
-                        class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg 
-                               shadow-lg hover:shadow-xl transition-all duration-200 
-                               flex items-center justify-center space-x-2 mx-auto">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    <span>重试</span>
-                </button>
-            </div>
-        `;
-        showToast(error.message, 'error');
-    }
-}
-
-// 修改数值格式化函数
-function formatNumber(value, decimals = 2) {
-    const num = parseFloat(value);
-    if (isNaN(num)) return '-';
-    return num.toFixed(decimals);
-}
-
-// 修改涨跌幅格式化函数
-function formatChangePercent(value) {
-    const num = parseFloat(value);
-    if (isNaN(num)) return '-';
-    return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
-}
-
-// 修改复制功能的处理代码
-async function copyAnalysisContent() {
-    const content = document.getElementById('analysisContent');
-    if (!content) {
-        showToast('未找到分析内容', 'error');
-        return;
-    }
-
-    try {
-        const textContent = content.innerText;
-        await copyToClipboard(textContent);
-        
-        // 更新复制按钮状态
-        const copyBtn = document.getElementById('copyAnalysisBtn');
-        if (copyBtn) {
-            const originalContent = copyBtn.innerHTML;
-            copyBtn.innerHTML = `
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M5 13l4 4L19 7"/>
-                </svg>
-                <span class="text-sm font-medium">已复制</span>
-            `;
-            copyBtn.classList.remove('bg-green-50', 'hover:bg-green-100', 'text-green-600');
-            copyBtn.classList.add('bg-green-100', 'text-green-700');
-            
-            // 显示成功提示
-            showToast('分析内容已复制到剪贴板', 'success');
-            
-            // 2秒后恢复按钮原始状态
-            setTimeout(() => {
-                copyBtn.innerHTML = originalContent;
-                copyBtn.classList.remove('bg-green-100', 'text-green-700');
-                copyBtn.classList.add('bg-green-50', 'hover:bg-green-100', 'text-green-600');
-            }, 2000);
-        }
-    } catch (err) {
-        console.error('复制失败:', err);
-        showToast('复制失败，请重试', 'error');
-    }
-}
-
-// 添加通用的复制到剪贴板函数
-async function copyToClipboard(text) {
-    try {
-        // 优先使用现代 Clipboard API
-        if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(text);
-            return;
-        }
-        
-        // 后备方案：使用传统方法
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        
-        // 设置样式使其不可见
-        textArea.style.position = 'fixed';
-        textArea.style.top = '0';
-        textArea.style.left = '0';
-        textArea.style.width = '2em';
-        textArea.style.height = '2em';
-        textArea.style.padding = '0';
-        textArea.style.border = 'none';
-        textArea.style.outline = 'none';
-        textArea.style.boxShadow = 'none';
-        textArea.style.background = 'transparent';
-        
-        document.body.appendChild(textArea);
-        
-        // 特殊处理 iOS 设备
-        if (navigator.userAgent.match(/ipad|iphone/i)) {
-            textArea.contentEditable = true;
-            textArea.readOnly = false;
-            
-            const range = document.createRange();
-            range.selectNodeContents(textArea);
-            
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-            textArea.setSelectionRange(0, 999999);
-        } else {
-            textArea.select();
-        }
-        
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        if (!successful) {
-            throw new Error('复制命令执行失败');
-        }
-    } catch (err) {
-        console.error('复制失败:', err);
-        throw err;
-    }
-}
-
-// 修改事件监听器的绑定
-document.addEventListener('DOMContentLoaded', function() {
-    // ... 其他初始化代码 ...
-    
-    // 为复制按钮添加事件监听
-    const copyBtn = document.getElementById('copyAnalysisBtn');
-    if (copyBtn) {
-        copyBtn.addEventListener('click', copyAnalysisContent);
-    }
-});
 
 // 添加发送后续问题的函数
 async function sendFollowupQuestion() {
@@ -3909,11 +3562,28 @@ async function sendFollowupQuestion() {
             // 直接将收到的文本添加到 fullText
             fullText += chunk;
             
-            // 使用 marked 处理完整的文本内容
-            const parsedContent = marked.parse(fullText);
-            
-            // 更新显示和保存原始内容
-            messageContent.innerHTML = parsedContent;
+            // 使用 markdown-it 处理完整的文本内容
+            const md = window.markdownit({
+                html: true,
+                linkify: true,
+                typographer: true,
+                highlight: function (str, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        try {
+                            return hljs.highlight(str, { language: lang }).value;
+                        } catch (__) {}
+                    }
+                    return ''; // 使用默认的转义
+                }
+            });
+
+            // 添加插件支持
+            md.use(window.markdownitEmoji);
+            md.use(window.markdownitFootnote);
+            md.use(window.markdownitTaskLists);
+
+            // 渲染markdown内容
+            messageContent.innerHTML = md.render(fullText);
             messageContent.setAttribute('data-raw-content', fullText);
             
             // 应用 Markdown 样式
@@ -4101,49 +3771,108 @@ function createKeyInfoSection(title, items) {
     return section;
 }
 
-// 修改 displayResults 函数中的关键信息展示部分
-function displayResults(data) {
-    // ... 其他代码保持不变 ...
+// 添加格式化技术指标的函数
+function formatTechnicalIndicators(indicators) {
+    if (!indicators) return '暂无技术指标数据';
+    
+    return `
+### 趋势指标
+- MACD: ${indicators.MACD || 'N/A'}
+- KDJ: ${indicators.KDJ || 'N/A'}
+- RSI: ${indicators.RSI || 'N/A'}
 
-    // 创建关键信息展示
-    const keyInfoItems = [
-        {
-            label: '利空',
-            value: '员工战略配售资管计划减持443.94万股（占流通股6.5%），3个月后实施，压制中期流动性。',
-            type: 'negative-info'
-        },
-        {
-            label: '利好',
-            value: '通信设备板块受5G/AI主题驱动（ETF资金流入103亿元），公司作为成分股获主力净流入1.95亿元。',
-            type: 'positive-info'
-        },
-        {
-            label: '行业',
-            value: '云办公、AI应用加速落地，通信设备需求增长明确。',
-            type: 'neutral-info'
-        }
-    ];
+### 支撑压力
+- 支撑位: ${indicators.support || 'N/A'}
+- 压力位: ${indicators.resistance || 'N/A'}
+- BOLL带: ${indicators.BOLL || 'N/A'}
 
-    const keyInfoSection = createKeyInfoSection('关键信息提炼', keyInfoItems);
-    resultsDiv.appendChild(keyInfoSection);
-
-    // ... 其他代码保持不变 ...
+### 成交量
+- 量比: ${indicators.volumeRatio || 'N/A'}
+- 主力资金: ${indicators.mainForce || 'N/A'}
+    `;
 }
 
-// 修改 applyMarkdownStyles 函数中的样式处理
-function applyMarkdownStyles(element) {
-    // ... 其他样式保持不变 ...
+// 添加格式化交易信号的函数
+function formatTradeSignals(signals) {
+    if (!signals) return '暂无交易信号数据';
+    
+    const currentSignal = signals.currentSignal || '无明确信号';
+    const trendStrength = signals.trendStrength || 'N/A';
+    const reliability = signals.reliability || 'N/A';
+    const recentSignals = signals.recentSignals || [];
+    
+    return `
+### 当前信号
+${currentSignal}
 
-    // 处理关键信息标题
-    element.querySelectorAll('.key-info-title').forEach(title => {
-        title.style.borderLeft = '4px solid #3b82f6';
-    });
+### 信号强度
+- 趋势强度: ${trendStrength}
+- 信号可信度: ${reliability}
 
-    // 处理关键信息内容
-    element.querySelectorAll('.key-info-content').forEach(content => {
-        content.style.backgroundColor = 'white';
-    });
-
-    // ... 其他样式保持不变 ...
+### 近期信号
+${recentSignals.length > 0 ? recentSignals.join('\n') : '暂无近期信号'}
+    `;
 }
 
+// 添加获取信号标签的函数
+function getSignalTag(signal) {
+    if (!signal) return '观望';
+    
+    const signalMap = {
+        'buy': '买入',
+        'sell': '卖出',
+        'hold': '持有',
+        'watch': '观望'
+    };
+    
+    return signalMap[signal.toLowerCase()] || signal;
+}
+
+// 添加获取信号类型的函数
+function getSignalType(signal) {
+    if (!signal) return 'warning';
+    
+    const typeMap = {
+        'buy': 'success',
+        'sell': 'error',
+        'hold': 'info',
+        'watch': 'warning'
+    };
+    
+    return typeMap[signal.toLowerCase()] || 'warning';
+}
+
+// 添加创建标题的函数
+function createTitle(text, level = 1) {
+    const title = document.createElement('div');
+    title.className = `content-title content-title-h${level} animate-slide-down`;
+    title.textContent = text;
+    return title;
+}
+
+// 添加创建内容块的函数
+function createContentBlock(content, tags = []) {
+    const block = document.createElement('div');
+    block.className = 'content-block animate-slide-down';
+    
+    // 添加标签
+    if (tags.length > 0) {
+        const tagsContainer = document.createElement('div');
+        tagsContainer.className = 'mb-3';
+        tags.forEach(tag => {
+            const tagElement = document.createElement('span');
+            tagElement.className = `content-tag tag-${tag.type || 'info'}`;
+            tagElement.textContent = tag.text;
+            tagsContainer.appendChild(tagElement);
+        });
+        block.appendChild(tagsContainer);
+    }
+    
+    // 添加内容
+    const contentElement = document.createElement('div');
+    contentElement.className = 'prose prose-indigo max-w-none';
+    contentElement.innerHTML = marked.parse(content);
+    block.appendChild(contentElement);
+    
+    return block;
+}

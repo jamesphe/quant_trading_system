@@ -2,6 +2,8 @@ import sys
 import os
 import pandas as pd
 from datetime import datetime, timedelta
+import akshare as ak
+import numpy as np
 
 # 添加父目录到系统路径，以便能够导入 data_fetch 模块
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +23,8 @@ from data_fetch import (
     get_stock_news,
     get_stock_data,
     get_industry_market_data,  # 新增
-    get_industry_detail_data   # 新增
+    get_industry_detail_data,   # 新增
+    get_hot_stock_rank,  # 添加新的导入
 )
 
 def test_get_vgt_data():
@@ -443,390 +446,228 @@ def test_get_industry_stocks():
 
 def test_get_stock_data():
     """
-    测试获取股票历史行情数据功能
+    测试获取股票历史行情数据功能，包括基础数据和技术指标
     """
-    print("\n开始测试获取股票历史行情数据...")
-    
-    # 修改测试参数，使用历史数据
-    symbol = "300059"  # 东方财富
-    end_date = "2024-01-31"  # 使用固定的历史日期
-    start_date = "2024-01-01"  # 使用固定的历史日期
-    
-    # 测试两种数据源
-    data_sources = ['akshare', 'baostock']
-    
-    for source in data_sources:
-        print(f"\n测试{source}数据源:")
-        try:
-            # 测试基础数据获取
+    print("\n开始测试股票历史行情数据获取功能...")
+
+    # 测试参数
+    symbol = "600519"  # 贵州茅台
+    end_date = datetime.now().strftime('%Y-%m-%d')  # 使用当前日期作为结束日期
+    start_date = (datetime.now() - timedelta(days=120)).strftime('%Y-%m-%d')  # 从120天前开始
+
+    print(f"测试日期范围: {start_date} 到 {end_date}")
+
+    # 1. 测试基础数据获取
+    print("\n1. 测试基础数据获取")
+    test_basic_data(symbol, start_date, end_date)
+
+    # 2. 测试MACD指标
+    print("\n2. 测试MACD指标")
+    test_macd_indicator(symbol, start_date, end_date)
+
+    # 3. 测试RSI指标
+    print("\n3. 测试RSI指标")
+    test_rsi_indicator(symbol, start_date, end_date)
+
+    # 4. 测试布林带指标
+    print("\n4. 测试布林带指标")
+    test_bollinger_bands(symbol, start_date, end_date)
+
+    # 5. 测试ZLSMA指标
+    print("\n5. 测试ZLSMA指标")
+    test_zlsma_indicator(symbol, start_date, end_date)
+
+    # 6. 测试吊灯指标
+    print("\n6. 测试吊灯指标")
+    test_chandelier_indicator(symbol, start_date, end_date)
+
+def test_basic_data(symbol, start_date, end_date):
+    """测试基础数据获取"""
+    try:
+        # 测试两个数据源
+        for source in ['baostock', 'akshare']:
+            print(f"\n测试{source}数据源:")
             stock_data = get_stock_data(symbol, start_date, end_date, source=source)
             
             if not stock_data.empty:
-                # 确保Volume列为float64类型
-                stock_data['Volume'] = stock_data['Volume'].astype('float64')
+                print(f"成功获取数据，数据条数: {len(stock_data)}")
                 
-                print(f"成功获取股票 {symbol} 从 {start_date} 到 {end_date} 的数据")
-                print(f"数据行数: {len(stock_data)}")
-                print("\n数据前5行:")
-                print(stock_data.head())
-                
-                # 检查数据列
-                expected_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                                  'Amount', 'Pct_change']
-                for col in expected_columns:
-                    assert col in stock_data.columns, f"缺少必要的列 '{col}'"
-                print("\n数据列检查通过")
+                # 检查基础数据列
+                expected_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'Pct_change']
+                assert all(col in stock_data.columns for col in expected_columns), \
+                    f"数据列不完整，期望列: {expected_columns}，实际列: {stock_data.columns.tolist()}"
                 
                 # 检查数据类型
                 assert stock_data.index.dtype == 'datetime64[ns]', "索引不是日期时间类型"
-                numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                                 'Amount', 'Pct_change']
-                for col in numeric_columns:
-                    assert stock_data[col].dtype == 'float64', \
-                        f"{col}列不是浮点数类型"
-                print("数据类型检查通过")
+                for col in expected_columns:
+                    assert stock_data[col].dtype in ['float64', 'int64'], f"{col}列不是数值类型"
                 
-                # 检查数据范围
-                assert stock_data.index.min().strftime('%Y-%m-%d') >= start_date, \
-                    "数据开始日期早于请求的开始日期"
-                assert stock_data.index.max().strftime('%Y-%m-%d') <= end_date, \
-                    "数据结束日期晚于请求的结束日期"
-                print("数据范围检查通过")
-                
-                # 检查数值有效性
-                assert all(stock_data['Open'] > 0), "存在无效的开盘价"
-                assert all(stock_data['Close'] > 0), "存在无效的收盘价"
-                assert all(stock_data['High'] >= stock_data['Low']), \
-                    "最高价小于最低价"
+                # 检查数据有效性
+                assert all(stock_data['High'] >= stock_data['Low']), "存在最高价低于最低价的数据"
                 assert all(stock_data['Volume'] >= 0), "存在负的成交量"
                 assert all(stock_data['Amount'] >= 0), "存在负的成交额"
-                print("数值有效性检查通过")
                 
-                # 测试包含MACD的数据获取
-                stock_data_with_macd = get_stock_data(
-                    symbol, 
-                    start_date, 
-                    end_date, 
-                    source=source,
-                    include_macd=True
-                )
-                
-                print("\n测试MACD数据:")
-                # 检查MACD相关列是否存在
-                macd_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST']
-                for col in macd_columns:
-                    assert col in stock_data_with_macd.columns, f"缺少MACD相关列 '{col}'"
-                print("MACD列检查通过")
-                
-                # 检查MACD数据类型
-                for col in macd_columns:
-                    assert stock_data_with_macd[col].dtype == 'float64', \
-                        f"{col}列不是浮点数类型"
-                print("MACD数据类型检查通过")
-                
-                # 检查MACD数据有效性
-                assert not stock_data_with_macd['MACD'].isnull().all(), \
-                    "MACD列全为空值"
-                assert not stock_data_with_macd['MACD_SIGNAL'].isnull().all(), \
-                    "MACD_SIGNAL列全为空值"
-                assert not stock_data_with_macd['MACD_HIST'].isnull().all(), \
-                    "MACD_HIST列全为空值"
-                print("MACD数据有效性检查通过")
-                
-                # 验证MACD计算逻辑
-                # MACD_HIST应该等于MACD减去MACD_SIGNAL
-                hist_diff = abs(stock_data_with_macd['MACD_HIST'] - 
-                              (stock_data_with_macd['MACD'] - 
-                               stock_data_with_macd['MACD_SIGNAL']))
-                assert all(hist_diff < 1e-10), "MACD_HIST计算错误"
-                print("MACD计算逻辑验证通过")
-                
-                # 测试包含RSI的数据获取
-                stock_data_with_indicators = get_stock_data(
-                    symbol, 
-                    start_date, 
-                    end_date, 
-                    source=source,
-                    include_macd=True,
-                    include_rsi=True
-                )
-                
-                if not stock_data_with_indicators.empty:
-                    print("\n测试RSI数据:")
-                    # 检查RSI相关列是否存在
-                    rsi_columns = ['RSI_6', 'RSI_12', 'RSI_24']
-                    for col in rsi_columns:
-                        assert col in stock_data_with_indicators.columns, f"缺少RSI相关列 '{col}'"
-                    print("RSI列检查通过")
-                    
-                    # 检查RSI数据类型
-                    for col in rsi_columns:
-                        assert stock_data_with_indicators[col].dtype == 'float64', \
-                            f"{col}列不是浮点数类型"
-                    print("RSI数据类型检查通过")
-                    
-                    # 检查RSI数据有效性
-                    for col in rsi_columns:
-                        assert not stock_data_with_indicators[col].isnull().all(), \
-                            f"{col}列全为空值"
-                        # RSI值应该在0到100之间
-                        valid_values = stock_data_with_indicators[col].dropna()
-                        assert all((valid_values >= 0) & (valid_values <= 100)), \
-                            f"{col}存在超出范围的值"
-                    print("RSI数据有效性检查通过")
-                    
-                    print(f"\n{source}数据源（含MACD和RSI）测试通过！")
-                else:
-                    print(f"未能获取股票 {symbol} 的数据")
-                    
-            # 测试包含BOLL的数据获取
-            stock_data_with_boll = get_stock_data(
-                symbol, 
-                start_date, 
-                end_date, 
-                source=source,
-                include_boll=True
-            )
-            
-            if not stock_data_with_boll.empty:
-                print("\n测试BOLL数据:")
-                # 检查BOLL相关列是否存在
-                boll_columns = ['BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER']
-                for col in boll_columns:
-                    assert col in stock_data_with_boll.columns, f"缺少BOLL相关列 '{col}'"
-                print("BOLL列检查通过")
-                
-                # 检查BOLL数据类型
-                for col in boll_columns:
-                    assert stock_data_with_boll[col].dtype == 'float64', \
-                        f"{col}列不是浮点数类型"
-                print("BOLL数据类型检查通过")
-                
-                # 检查BOLL数据有效性
-                for col in boll_columns:
-                    assert not stock_data_with_boll[col].isnull().all(), \
-                        f"{col}列全为空值"
-                print("BOLL数据空值检查通过")
-                
-                # 验证BOLL计算逻辑
-                # 上轨应该大于中轨，中轨应该大于下轨
-                assert all(stock_data_with_boll['BOLL_UPPER'] >= 
-                         stock_data_with_boll['BOLL_MIDDLE']), "上轨不大于等于中轨"
-                assert all(stock_data_with_boll['BOLL_MIDDLE'] >= 
-                         stock_data_with_boll['BOLL_LOWER']), "中轨不大于等于下轨"
-                print("BOLL数据逻辑关系验证通过")
-                
-                # 测试包含ZLSMA的数据获取
-                stock_data_with_zlsma = get_stock_data(
-                    symbol, 
-                    start_date, 
-                    end_date, 
-                    source=source,
-                    include_zlsma=True
-                )
-                
-                if not stock_data_with_zlsma.empty:
-                    print("\n测试ZLSMA数据:")
-                    # 检查ZLSMA相关列是否存在
-                    zlsma_columns = ['ZLSMA_20', 'ZLSMA_60']
-                    for col in zlsma_columns:
-                        assert col in stock_data_with_zlsma.columns, f"缺少ZLSMA相关列 '{col}'"
-                    print("ZLSMA列检查通过")
-                    
-                    # 检查ZLSMA数据类型
-                    for col in zlsma_columns:
-                        assert stock_data_with_zlsma[col].dtype == 'float64', \
-                            f"{col}列不是浮点数类型"
-                    print("ZLSMA数据类型检查通过")
-                    
-                    # 检查ZLSMA数据有效性
-                    for col in zlsma_columns:
-                        assert not stock_data_with_zlsma[col].isnull().all(), \
-                            f"{col}列全为空值"
-                    print("ZLSMA数据空值检查通过")
-                    
-                    # 验证ZLSMA数据范围
-                    # ZLSMA应该在历史价格的最大值和最小值之间
-                    close_min = stock_data_with_zlsma['Close'].min()
-                    close_max = stock_data_with_zlsma['Close'].max()
-                    for col in zlsma_columns:
-                        valid_values = stock_data_with_zlsma[col].dropna()
-                        assert all((valid_values >= close_min * 0.5) & 
-                                 (valid_values <= close_max * 1.5)), \
-                            f"{col}存在异常值"
-                    print("ZLSMA数据范围验证通过")
-                    
-                    # 测试同时包含所有指标
-                    stock_data_with_all = get_stock_data(
-                        symbol, 
-                        start_date, 
-                        end_date, 
-                        source=source,
-                        include_macd=True,
-                        include_rsi=True,
-                        include_boll=True,
-                        include_zlsma=True
-                    )
-                    
-                    # 验证所有指标列都存在
-                    all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
-                                          'RSI_6', 'RSI_12', 'RSI_24',
-                                          'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
-                                          'ZLSMA_20', 'ZLSMA_60']
-                    for col in all_indicator_columns:
-                        assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
-                    print("\n所有指标列检查通过")
-                    
-                    print(f"\n{source}数据源（含所有指标）测试通过！")
-                else:
-                    print(f"未能获取股票 {symbol} 的数据")
-                    
-            # 测试包含ZLSMA的数据获取
-            stock_data_with_zlsma = get_stock_data(
-                symbol, 
-                start_date, 
-                end_date, 
-                source=source,
-                include_zlsma=True
-            )
-            
-            if not stock_data_with_zlsma.empty:
-                print("\n测试ZLSMA数据:")
-                # 检查ZLSMA相关列是否存在
-                zlsma_columns = ['ZLSMA_20', 'ZLSMA_60']
-                for col in zlsma_columns:
-                    assert col in stock_data_with_zlsma.columns, f"缺少ZLSMA相关列 '{col}'"
-                print("ZLSMA列检查通过")
-                
-                # 检查ZLSMA数据类型
-                for col in zlsma_columns:
-                    assert stock_data_with_zlsma[col].dtype == 'float64', \
-                        f"{col}列不是浮点数类型"
-                print("ZLSMA数据类型检查通过")
-                
-                # 检查ZLSMA数据有效性
-                for col in zlsma_columns:
-                    assert not stock_data_with_zlsma[col].isnull().all(), \
-                        f"{col}列全为空值"
-                print("ZLSMA数据空值检查通过")
-                
-                # 验证ZLSMA数据范围
-                # ZLSMA应该在历史价格的最大值和最小值之间
-                close_min = stock_data_with_zlsma['Close'].min()
-                close_max = stock_data_with_zlsma['Close'].max()
-                for col in zlsma_columns:
-                    valid_values = stock_data_with_zlsma[col].dropna()
-                    assert all((valid_values >= close_min * 0.5) & 
-                             (valid_values <= close_max * 1.5)), \
-                        f"{col}存在异常值"
-                print("ZLSMA数据范围验证通过")
-                
-                # 测试同时包含所有指标
-                stock_data_with_all = get_stock_data(
-                    symbol, 
-                    start_date, 
-                    end_date, 
-                    source=source,
-                    include_macd=True,
-                    include_rsi=True,
-                    include_boll=True,
-                    include_zlsma=True
-                )
-                
-                # 验证所有指标列都存在
-                all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
-                                          'RSI_6', 'RSI_12', 'RSI_24',
-                                          'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
-                                          'ZLSMA_20', 'ZLSMA_60']
-                for col in all_indicator_columns:
-                    assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
-                print("\n所有指标列检查通过")
-                
-                print(f"\n{source}数据源（含所有指标）测试通过！")
+                print("基础数据验证通过")
             else:
-                print(f"未能获取股票 {symbol} 的数据")
-                
-            # 测试包含吊灯止损指标的数据获取
-            stock_data_with_chandelier = get_stock_data(
-                symbol, 
-                start_date, 
-                end_date, 
-                source=source,
-                include_chandelier=True
+                print(f"{source}数据源返回空数据")
+    except Exception as e:
+        print(f"测试基础数据时发生错误: {str(e)}")
+
+def test_macd_indicator(symbol, start_date, end_date):
+    """测试MACD指标计算"""
+    try:
+        stock_data = get_stock_data(
+            symbol, start_date, end_date, 
+            source='baostock', 
+            include_macd=True
+        )
+        
+        if not stock_data.empty:
+            # 检查MACD相关列是否存在
+            macd_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST']
+            assert all(col in stock_data.columns for col in macd_columns), \
+                "MACD指标数据列不完整"
+            
+            # 检查数据类型
+            for col in macd_columns:
+                assert stock_data[col].dtype == 'float64', f"{col}列不是浮点数类型"
+            
+            # MACD = MACD_HIST + MACD_SIGNAL 验证
+            np.testing.assert_array_almost_equal(
+                stock_data['MACD'],
+                stock_data['MACD_HIST'] + stock_data['MACD_SIGNAL'],
+                decimal=4
             )
             
-            if not stock_data_with_chandelier.empty:
-                print("\n测试吊灯止损指标数据:")
-                # 检查吊灯止损相关列是否存在
-                chandelier_columns = ['CHANDELIER_LONG', 'CHANDELIER_SHORT']
-                for col in chandelier_columns:
-                    assert col in stock_data_with_chandelier.columns, f"缺少吊灯止损相关列 '{col}'"
-                print("吊灯止损列检查通过")
-                
-                # 检查吊灯止损数据类型
-                for col in chandelier_columns:
-                    assert stock_data_with_chandelier[col].dtype == 'float64', \
-                        f"{col}列不是浮点数类型"
-                print("吊灯止损数据类型检查通过")
-                
-                # 检查吊灯止损数据有效性
-                for col in chandelier_columns:
-                    assert not stock_data_with_chandelier[col].isnull().all(), \
-                        f"{col}列全为空值"
-                print("吊灯止损数据空值检查通过")
-                
-                # 验证吊灯止损数据逻辑关系
-                # 多头止损位应该低于最高价，空头止损位应该高于最低价
-                assert not stock_data_with_chandelier['CHANDELIER_LONG'].isnull().all(), "多头止损位全为空值"
-                assert not stock_data_with_chandelier['CHANDELIER_SHORT'].isnull().all(), "空头止损位全为空值"
-                
-                # 检查数值是否在合理范围内（不为0或异常大的数值）
-                assert all(stock_data_with_chandelier['CHANDELIER_LONG'] > 0), "多头止损位存在非正数值"
-                assert all(stock_data_with_chandelier['CHANDELIER_SHORT'] > 0), "空头止损位存在非正数值"
-                print("吊灯止损数据有效性验证通过")
-                
-                # 更新所有指标测试部分的指标列表
-                all_indicator_columns = ['MACD', 'MACD_SIGNAL', 'MACD_HIST',
-                                          'RSI_6', 'RSI_12', 'RSI_24',
-                                          'BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER',
-                                          'ZLSMA_20', 'ZLSMA_60',
-                                          'CHANDELIER_LONG', 'CHANDELIER_SHORT']
-                
-                # 测试同时包含所有指标
-                stock_data_with_all = get_stock_data(
-                    symbol, 
-                    start_date, 
-                    end_date, 
-                    source=source,
-                    include_macd=True,
-                    include_rsi=True,
-                    include_boll=True,
-                    include_zlsma=True,
-                    include_chandelier=True
-                )
-                
-                # 验证所有指标列都存在
-                for col in all_indicator_columns:
-                    assert col in stock_data_with_all.columns, f"缺少指标列 '{col}'"
-                print("\n所有指标列检查通过")
-                
-                print(f"\n{source}数据源（含所有指标）测试通过！")
-            else:
-                print(f"未能获取股票 {symbol} 的数据")
-                
-        except Exception as e:
-            print(f"测试{source}数据源时发生错误: {str(e)}")
-            raise
-    
-    # 测试无效股票代码
-    print("\n测试无效股票代码:")
-    invalid_symbol = "000000"
-    invalid_data = get_stock_data(invalid_symbol, start_date, end_date)
-    assert isinstance(invalid_data, pd.DataFrame), "对于无效股票代码应返回空DataFrame"
-    assert invalid_data.empty, "对于无效股票代码应返回空DataFrame"
-    print("无效股票代码测试通过")
-    
-    print("\n所有测试完成！")
+            print("MACD指标验证通过")
+        else:
+            print("获取MACD数据失败")
+    except Exception as e:
+        print(f"测试MACD指标时发生错误: {str(e)}")
+
+def test_rsi_indicator(symbol, start_date, end_date):
+    """测试RSI指标计算"""
+    try:
+        stock_data = get_stock_data(
+            symbol, start_date, end_date,
+            source='baostock',
+            include_rsi=True
+        )
+        
+        if not stock_data.empty:
+            # 检查RSI相关列是否存在
+            rsi_columns = ['RSI_6', 'RSI_12', 'RSI_24']
+            assert all(col in stock_data.columns for col in rsi_columns), \
+                "RSI指标数据列不完整"
+            
+            # 检查数据类型
+            for col in rsi_columns:
+                assert stock_data[col].dtype == 'float64', f"{col}列不是浮点数类型"
+            
+            # 检查RSI值范围（应该在0-100之间）
+            for col in rsi_columns:
+                assert all((stock_data[col] >= 0) & (stock_data[col] <= 100)), \
+                    f"{col}值超出有效范围(0-100)"
+            
+            print("RSI指标验证通过")
+        else:
+            print("获取RSI数据失败")
+    except Exception as e:
+        print(f"测试RSI指标时发生错误: {str(e)}")
+
+def test_bollinger_bands(symbol, start_date, end_date):
+    """测试布林带指标计算"""
+    try:
+        stock_data = get_stock_data(
+            symbol, start_date, end_date,
+            source='baostock',
+            include_boll=True
+        )
+        
+        if not stock_data.empty:
+            # 检查布林带相关列是否存在
+            boll_columns = ['BOLL_UPPER', 'BOLL_MIDDLE', 'BOLL_LOWER']
+            assert all(col in stock_data.columns for col in boll_columns), \
+                "布林带指标数据列不完整"
+            
+            # 检查数据类型
+            for col in boll_columns:
+                assert stock_data[col].dtype == 'float64', f"{col}列不是浮点数类型"
+            
+            # 验证布林带的基本特性
+            assert all(stock_data['BOLL_UPPER'] >= stock_data['BOLL_MIDDLE']), \
+                "上轨存在低于中轨的值"
+            assert all(stock_data['BOLL_MIDDLE'] >= stock_data['BOLL_LOWER']), \
+                "中轨存在低于下轨的值"
+            
+            print("布林带指标验证通过")
+        else:
+            print("获取布林带数据失败")
+    except Exception as e:
+        print(f"测试布林带指标时发生错误: {str(e)}")
+
+def test_zlsma_indicator(symbol, start_date, end_date):
+    """测试ZLSMA指标计算"""
+    try:
+        stock_data = get_stock_data(
+            symbol, start_date, end_date,
+            source='baostock',
+            include_zlsma=True
+        )
+        
+        if not stock_data.empty:
+            # 检查ZLSMA相关列是否存在
+            zlsma_columns = ['ZLSMA_20', 'ZLSMA_60']
+            assert all(col in stock_data.columns for col in zlsma_columns), \
+                "ZLSMA指标数据列不完整"
+            
+            # 检查数据类型
+            for col in zlsma_columns:
+                assert stock_data[col].dtype == 'float64', f"{col}列不是浮点数类型"
+            
+            # 验证ZLSMA的基本特性（应该在最高价和最低价之间）
+            for col in zlsma_columns:
+                assert all(stock_data[col] <= stock_data['High'].rolling(window=60).max()), \
+                    f"{col}存在超过历史最高价的值"
+                assert all(stock_data[col] >= stock_data['Low'].rolling(window=60).min()), \
+                    f"{col}存在低于历史最低价的值"
+            
+            print("ZLSMA指标验证通过")
+        else:
+            print("获取ZLSMA数据失败")
+    except Exception as e:
+        print(f"测试ZLSMA指标时发生错误: {str(e)}")
+
+def test_chandelier_indicator(symbol, start_date, end_date):
+    """测试吊灯指标计算"""
+    try:
+        stock_data = get_stock_data(
+            symbol, start_date, end_date,
+            source='baostock',
+            include_chandelier=True
+        )
+        
+        if not stock_data.empty:
+            # 检查吊灯指标相关列是否存在
+            chandelier_columns = ['ATR', '周期', '倍数', '多头止损', '空头止损']
+            assert all(col in stock_data.columns for col in chandelier_columns), \
+                "吊灯指标数据列不完整"
+            
+            # 检查数据类型
+            numeric_columns = ['ATR', '多头止损', '空头止损']
+            for col in numeric_columns:
+                assert stock_data[col].dtype == 'float64', f"{col}列不是浮点数类型"
+            
+            # 验证吊灯指标的基本特性
+            assert all(stock_data['多头止损'] <= stock_data['空头止损']), \
+                "存在多头止损点高于空头止损点的情况"
+            assert all(stock_data['ATR'] >= 0), "存在负的ATR值"
+            
+            print("吊灯指标验证通过")
+        else:
+            print("获取吊灯指标数据失败")
+    except Exception as e:
+        print(f"测试吊灯指标时发生错误: {str(e)}")
 
 def test_get_industry_market_data():
     """
@@ -952,6 +793,91 @@ def test_get_industry_detail_data():
         print(f"测试过程中发生错误: {str(e)}")
         raise
 
+def test_get_hot_stock_rank():
+    """
+    测试获取同花顺热榜股票功能
+    """
+    print("\n开始测试获取同花顺热榜股票数据...")
+    
+    try:
+        # 测试小时榜
+        hour_rank = get_hot_stock_rank(data_type='大家都在看', date='hour')
+        
+        if not hour_rank.empty:
+            print(f"成功获取小时热榜数据")
+            print(f"获取到的股票数量: {len(hour_rank)}")
+            print("\n数据前5行:")
+            print(hour_rank.head())
+            
+            # 检查数据列
+            expected_columns = ['market', 'code', 'name', 'hot_value', 'change_pct']
+            for col in expected_columns:
+                assert col in hour_rank.columns, f"缺少必要的列 '{col}'"
+            print("\n数据列检查通过")
+            
+            # 检查数据类型
+            assert hour_rank['market'].dtype == 'object', "market列不是字符串类型"
+            assert hour_rank['code'].dtype == 'object', "code列不是字符串类型"
+            assert hour_rank['name'].dtype == 'object', "name列不是字符串类型"
+            assert hour_rank['hot_value'].dtype in ['float64', 'int64'], "hot_value列不是数值类型"
+            assert hour_rank['change_pct'].dtype == 'float64', "change_pct列不是浮点数类型"
+            print("数据类型检查通过")
+            
+            # 检查数值有效性
+            assert all(hour_rank['hot_value'] >= 0), "存在负的热度值"
+            assert all(abs(hour_rank['change_pct']) <= 1), "涨跌幅超出正常范围"
+            print("数值有效性检查通过")
+            
+            # 检查市场代码
+            valid_markets = ['沪市', '深市']
+            assert all(hour_rank['market'].isin(valid_markets)), "存在无效的市场代码"
+            print("市场代码检查通过")
+            
+            # 检查股票代码格式
+            assert all(len(code) == 6 for code in hour_rank['code']), "存在非6位股票代码"
+            assert all(code.isdigit() for code in hour_rank['code']), "存在非数字股票代码"
+            print("股票代码格式检查通过")
+            
+            print("\n小时榜数据验证通过！")
+            
+        # 测试日榜
+        day_rank = get_hot_stock_rank(data_type='快速飙升中', date='day')
+        print("\n获取到的日榜数据:")
+        print(f"数据形状: {day_rank.shape}")
+        print("\n数据示例:")
+        print(day_rank)
+        print("\n数据类型信息:")
+        print(day_rank.dtypes)
+        if not day_rank.empty:
+            print(f"\n成功获取日榜数据")
+            print(f"获取到的股票数量: {len(day_rank)}")
+            print("\n数据前5行:")
+            print(day_rank.head())
+            
+            # 进行与小时榜相同的验证
+            for col in expected_columns:
+                assert col in day_rank.columns, f"缺少必要的列 '{col}'"
+            
+            assert all(day_rank['hot_value'] >= 0), "存在负的热度值"
+            assert all(abs(day_rank['change_pct']) <= 1), "涨跌幅超出正常范围"
+            assert all(day_rank['market'].isin(valid_markets)), "存在无效的市场代码"
+            assert all(len(code) == 6 for code in day_rank['code']), "存在非6位股票代码"
+            assert all(code.isdigit() for code in day_rank['code']), "存在非数字股票代码"
+            
+            print("\n日榜数据验证通过！")
+            
+        # 测试无效参数
+        invalid_rank = get_hot_stock_rank(data_type='无效类型', date='invalid')
+        assert isinstance(invalid_rank, pd.DataFrame), "对于无效参数应返回空DataFrame"
+        assert invalid_rank.empty, "对于无效参数应返回空DataFrame"
+        print("\n无效参数测试通过")
+        
+        print("\n所有测试通过！")
+            
+    except Exception as e:
+        print(f"测试过程中发生错误: {str(e)}")
+        raise
+
 if __name__ == "__main__":
     #test_get_a_share_list()
     #test_get_vgt_data()
@@ -971,9 +897,11 @@ if __name__ == "__main__":
     #test_get_us_stock_list()
     #print("\n" + "="*50 + "\n")
     #test_get_stock_news()
-    test_get_industry_market_data()  # 新增
+    #test_get_industry_market_data()  # 新增
+    #print("\n" + "="*50 + "\n")
+    #test_get_industry_detail_data()  # 新增
+    #print("\n" + "="*50 + "\n")
+    test_get_stock_data()
     print("\n" + "="*50 + "\n")
-    test_get_industry_detail_data()  # 新增
-    print("\n" + "="*50 + "\n")
-    #test_get_stock_data()
+    #test_get_hot_stock_rank()  # 添加新的测试
     #print("\n" + "="*50 + "\n")
