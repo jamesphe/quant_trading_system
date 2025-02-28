@@ -67,6 +67,17 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         ('investment_fraction', 0.8), # 每次交易使用可用资金的比例
         ('max_pyramiding', 0),        # 允许的最大加仓次数
         ('min_trade_unit', 100),      # 最小交易单位
+        ('use_volume_filter', True),    # 是否启用成交量过滤
+        ('volume_period', 20),          # 成交量均线周期
+        ('volume_threshold', 1.2),      # 成交量需大于均线的倍数
+        ('use_rsi_filter', True),       # 是否启用RSI过滤
+        ('rsi_period', 14),             # RSI计算周期
+        ('rsi_overbought', 70),         # RSI超买阈值
+        ('rsi_oversold', 30),           # RSI超卖阈值
+        ('use_volatility_filter', True), # 是否启用波动率过滤
+        ('volatility_period', 20),       # 波动率计算周期
+        ('volatility_threshold', 0.02),  # 波动率阈值
+        ('confirm_period', 2),           # 信号确认周期
     )
 
     def log(self, txt, dt=None):
@@ -127,6 +138,43 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
         self.signal = self.lines.signal  # 如果需要，可以添加这行
 
+        # 添加过滤指标
+        self.volume_ma = bt.ind.SMA(self.data.volume, period=self.p.volume_period)
+        self.rsi = bt.ind.RSI(self.data.close, period=self.p.rsi_period)
+        self.volatility = bt.ind.StdDev(
+            bt.ind.PercentChange(self.data.close, period=1),
+            period=self.p.volatility_period
+        )
+        
+        # 信号确认计数器
+        self.buy_signal_count = 0
+        self.sell_signal_count = 0
+
+    def check_filters(self, is_buy_signal):
+        """检查各项过滤条件"""
+        # 成交量过滤
+        if self.p.use_volume_filter:
+            if self.data.volume[0] <= self.volume_ma[0] * self.p.volume_threshold:
+                print(f"成交量过滤: 当前成交量 {self.data.volume[0]} 不足")
+                return False
+
+        # RSI过滤
+        if self.p.use_rsi_filter:
+            if is_buy_signal and self.rsi[0] > self.p.rsi_overbought:
+                print(f"RSI过滤: 当前RSI {self.rsi[0]:.2f} 超买")
+                return False
+            if not is_buy_signal and self.rsi[0] < self.p.rsi_oversold:
+                print(f"RSI过滤: 当前RSI {self.rsi[0]:.2f} 超卖")
+                return False
+
+        # 波动率过滤
+        if self.p.use_volatility_filter:
+            if self.volatility[0] < self.p.volatility_threshold:
+                print(f"波动率过滤: 当前波动率 {self.volatility[0]:.4f} 过低")
+                return False
+
+        return True
+
     def next(self):
         """
         每个时间步执行的逻辑。
@@ -171,7 +219,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                      f'和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
 
         # 记录日志
-        self.log(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {self.reason}')
+        print(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {self.reason}')
 
         # 检查方向是否发生变化
         direction_change = False
@@ -183,30 +231,30 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 if current_close > self.zlsma[0]:
                     self.buy_signal = True
                     self.signal[0] = 1
-                    self.log(
+                    print(
                         f'建仓信号: 方向转多头，收盘价{current_close:.2f} > '
                         f'ZLSMA {self.zlsma[0]:.2f}'
                     )
                 else:
                     self.signal[0] = 0
-                    self.log('建仓信号: 方向转多头，但价格未高于ZLSMA，无交易')
+                    print('建仓信号: 方向转多头，但价格未高于ZLSMA，无交易')
             elif current_direction == -1:  # 转为空头
                 self.buy_signal = False
                 self.signal[0] = -1
-                self.log(
+                print(
                     f'清仓信号: 转空头，价格{current_close:.2f} < '
                     f'止损价{prev_long_stop:.2f}'
                 )
             elif current_direction == 2:  # 建仓预警
                 self.buy_signal = False
                 self.signal[0] = 3
-                self.log(
+                print(
                     f'建仓预警: 价格{current_close:.2f} > 空头止损价 {prev_short_stop:.2f}'
                 )
             elif current_direction == -2:  # 减仓预警
                 self.buy_signal = False
                 self.signal[0] = -3
-                self.log(
+                print(
                     f'减仓预警: 价格{current_close:.2f} < 多头止损价 {prev_long_stop:.2f}'
                 )
         elif self.direction == 1 and current_direction == 1:  # 保持多头
@@ -214,63 +262,75 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 self.buy_signal = True
                 if not self.position:
                     self.signal[0] = 1
-                    self.log(
+                    print(
                         f'建仓信号: 多头趋势，ZLSMA上升 '
                         f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
                     )
                 else:
                     self.signal[0] = 2
-                    self.log(
+                    print(
                         f'加仓信号: 多头趋势，ZLSMA上升 '
                         f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
                     )
             else:
                 self.buy_signal = False
                 self.signal[0] = -2
-                self.log('减仓预警: 多头趋势，但ZLSMA未上升')
+                print('减仓预警: 多头趋势，但ZLSMA未上升')
         elif self.direction == -1 and current_direction == -1:  # 保持空头
-            self.signal[0] = -1
-            self.log('清仓信号: 持续空头')
+            print('清仓信号: 持续空头')
             if self.position:
                 self.buy_signal = False
-                self.log('清仓信号: 持续空头状态')
+                print('清仓信号: 持续空头状态')
         elif self.direction == 2 and current_direction == 2:  # 保持建仓预警
-            self.signal[0] = 2
-            self.log(
+            print(
                 f'建仓预警: 价格{current_close:.2f} > '
                 f'空头止损价{prev_short_stop:.2f}'
             )
         elif self.direction == -2 and current_direction == -2:  # 保持减仓预警
-            self.signal[0] = -3
-            self.log(
+            print(
                 f'减仓预警: 价格{current_close:.2f} < '
                 f'多头止损价{prev_long_stop:.2f}'
             )
         else:
-            self.signal[0] = 0
-            self.log('无交易信号')
+            print('无交易信号')
 
-        # 执行交易
+        # 在执行交易前应用过滤器
         if not self.position:
             if self.buy_signal:
-                self.log(f'买入信号 - 价格: {current_close:.2f}, 首次建仓, 买入数量: {stake}')
-                self.buy(size=stake)
-                self.current_pyramiding = 0
+                if self.check_filters(True):
+                    self.buy_signal_count += 1
+                    if self.buy_signal_count >= self.p.confirm_period:
+                        print(f'买入信号确认 - 价格: {current_close:.2f}, 首次建仓, 买入数量: {stake}')
+                        self.buy(size=stake)
+                        self.current_pyramiding = 0
+                        self.buy_signal_count = 0
+                    else:
+                        print(f'买入信号确认中 ({self.buy_signal_count}/{self.p.confirm_period})')
+                else:
+                    self.buy_signal_count = 0
         else:
             if self.direction == 1:
                 if direction_change:
-                    self.log('**卖出信号触发**：方向变化，执行卖出操作')
-                    self.sell(size=current_positions)
-                    self.current_pyramiding = 0
+                    if self.check_filters(False):
+                        self.sell_signal_count += 1
+                        if self.sell_signal_count >= self.p.confirm_period:
+                            print('**卖出信号确认**：方向变化，执行卖出操作')
+                            self.sell(size=current_positions)
+                            self.current_pyramiding = 0
+                            self.sell_signal_count = 0
+                        else:
+                            print(f'卖出信号确认中 ({self.sell_signal_count}/{self.p.confirm_period})')
+                    else:
+                        self.sell_signal_count = 0
                 elif self.zlsma[-1] > self.zlsma[0] and current_close < self.zlsma[0] and self.zlsma[-2] > self.zlsma[-1]:
-                    self.log('**卖出信号触发**：ZLSMA下降且当前价格低于ZLSMA，执行卖出操作')
+                    print('**卖出信号触发**：ZLSMA下降且当前价格低于ZLSMA，执行卖出操作')
                     self.sell(size=current_positions)
                     self.current_pyramiding = 0
                 elif current_close > self.position.price * 1.03:
                     if self.current_pyramiding < self.max_pyramiding:
                         self.buy(size=stake)
                         self.current_pyramiding += 1
-                        self.log(f'加仓信号 - 价格: {current_close:.2f}, 加仓次数: {self.current_pyramiding}')
+                        print(f'加仓信号 - 价格: {current_close:.2f}, 加仓次数: {self.current_pyramiding}')
          
         # 更新方向
         self.direction = current_direction
@@ -281,27 +341,27 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         """
         if order.status in [order.Submitted, order.Accepted]:
             # 订单已提交/被接受，尚未执行
-            self.log(f'订单状态: {"已提交" if order.status == order.Submitted else "已接受"}')
+            print(f'订单状态: {"已提交" if order.status == order.Submitted else "已接受"}')
             return
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
-                self.log(f'当前持仓: {self.position.size}')
+                print(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                print(f'当前持仓: {self.position.size}')
             elif order.issell():
-                self.log(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
-                self.log(f'当前持仓: {self.position.size}')
+                print(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                print(f'当前持仓: {self.position.size}')
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log(f'订单状态: {"已取消" if order.status == order.Canceled else "保证金不足" if order.status == order.Margin else "被拒绝"}')
-            self.log(f'订单详情: {order}')
+            print(f'订单状态: {"已取消" if order.status == order.Canceled else "保证金不足" if order.status == order.Margin else "被拒绝"}')
+            print(f'订单详情: {order}')
 
         # 添加调试信息
-        self.log(f'当前账户价值: {self.broker.getvalue():.2f}')
-        self.log(f'当前现金: {self.broker.getcash():.2f}')
-        self.log(f'当前ZLSMA值: {self.zlsma[0]:.2f}')
-        self.log(f'当前Chandelier Exit Long: {self.chandelier_exit_long[0]:.2f}')
-        self.log(f'当前Chandelier Exit Short: {self.chandelier_exit_short[0]:.2f}')
+        print(f'当前账户价值: {self.broker.getvalue():.2f}')
+        print(f'当前现金: {self.broker.getcash():.2f}')
+        print(f'当前ZLSMA值: {self.zlsma[0]:.2f}')
+        print(f'当前Chandelier Exit Long: {self.chandelier_exit_long[0]:.2f}')
+        print(f'当前Chandelier Exit Short: {self.chandelier_exit_short[0]:.2f}')
 
     def notify_trade(self, trade):
         """
@@ -313,13 +373,13 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 # 如果找到相同的交易引用,则更新它
                 self.trades[i] = trade
                 if trade.isclosed:
-                    self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
+                    print(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
                 return
                 
         # 如果是新交易则添加到列表
         self.trades.append(trade)
         if trade.isclosed:
-            self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
+            print(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
 
 def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
     """
@@ -427,14 +487,17 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     print("\n交易记录:")
     for i, trade in enumerate(strat.trades):
         print(f"交易 {i+1}:")
-        print(f"  开仓日期: {bt.num2date(trade.dtopen)}")
+        if trade.dtopen:  # 检查是否有开仓日期
+            print(f"  开仓日期: {bt.num2date(trade.dtopen)}")
         print(f"  开仓价格: {trade.price:.2f}")
         print(f"  开仓数量: {trade.size}")
-        print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
-        # print(f"  平仓价格: {trade.barclose:.2f}")
-        print(f"  交易盈亏: {trade.pnl:.2f}")
-        print(f"  交易佣金: {trade.commission:.2f}")
-        print(f"  净盈亏: {trade.pnlcomm:.2f}")
+        if trade.isclosed:  # 只有在交易已关闭时才打印关闭日期
+            print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
+            print(f"  交易盈亏: {trade.pnl:.2f}")
+            print(f"  交易佣金: {trade.commission:.2f}")
+            print(f"  净盈亏: {trade.pnlcomm:.2f}")
+        else:
+            print("  交易尚未平仓")
         print()
 
     # 可选：绘制结果
