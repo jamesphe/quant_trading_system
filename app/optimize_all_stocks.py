@@ -80,6 +80,7 @@ def optimize_single_stock(symbol):
             'best_max_drawdown': round(best_trial.user_attrs['max_drawdown'], 2),
             'best_return': round(best_trial.user_attrs['total_return'], 2),
             'last_signal': best_trial.user_attrs['last_signal'],
+            'signal_strength': best_trial.user_attrs['signal_strength'],
             **best_params
         }
     except Exception:

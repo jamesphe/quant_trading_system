@@ -5,6 +5,48 @@ let sortStates = {};  // 用于跟踪每列的排序状态: null(不排序) -> '
 // 添加对话历史存储
 let conversationHistory = [];
 
+// 在文件开头添加以下格式化函数
+
+// 格式化数字，保留2位小数
+function formatNumber(value) {
+    if (value === null || value === undefined || isNaN(value)) {
+        return '-';
+    }
+    return Number(value).toFixed(2);
+}
+
+// 格式化涨跌幅
+function formatChangePercent(value) {
+    if (value === null || value === undefined || isNaN(value)) {
+        return '-';
+    }
+    const num = Number(value);
+    return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+}
+
+// 根据数值获取对应的颜色类名
+function getValueColor(value) {
+    if (value === null || value === undefined || isNaN(value)) {
+        return 'text-gray-500';
+    }
+    const num = Number(value);
+    if (num >= 0.6) return 'text-green-600';
+    if (num >= 0.5) return 'text-blue-600';
+    return 'text-red-600';
+}
+
+// 获取夏普比率的颜色
+function getSharpeColor(value) {
+    if (value === null || value === undefined || isNaN(value)) {
+        return 'text-gray-500';
+    }
+    const num = Number(value);
+    if (num >= 2.0) return 'text-green-600';  // 优秀
+    if (num >= 1.0) return 'text-blue-600';   // 良好
+    if (num >= 0.0) return 'text-yellow-600'; // 一般
+    return 'text-red-600';                    // 较差
+}
+
 // 修改表单提交处理
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded event fired');
@@ -3093,9 +3135,6 @@ async function updateTargetStocks(date) {
 
         // 渲染数据
         tbody.innerHTML = data.data.map((stock, index) => {
-            const changePercent = parseFloat(stock.最新涨跌幅);
-            const changeClass = changePercent >= 0 ? 'text-red-600' : 'text-green-600';
-            
             return `
                 <tr class="hover:bg-gray-50" data-original-index="${index}">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
@@ -3108,19 +3147,25 @@ async function updateTargetStocks(date) {
                             ${stock.股票名称}
                         </a>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${stock.所属行业 || '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatNumber(stock.最新价格)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${changeClass}">
-                        ${formatChangePercent(stock.最新涨跌幅)}
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${stock.所属行业 || '-'}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatNumber(stock.换手率)}%</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${formatNumber(stock.最新价格)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${stock.最新涨跌幅 >= 0 ? 'text-red-600' : 'text-green-600'}">
+                        ${formatChangePercent(stock.最新涨跅幅)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${formatNumber(stock.换手率)}%
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳胜率)} font-medium">
                         ${formatNumber(stock.最佳胜率 * 100)}%
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.最佳回报)} font-medium">
                         ${formatNumber(stock.最佳回报 * 100)}%
                     </td>
-                    <td class="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${getSharpeColor(stock.夏普比率)} font-medium">
                         ${formatNumber(stock.夏普比率)}
                     </td>
                 </tr>
