@@ -5,18 +5,69 @@ let sortStates = {};  // 用于跟踪每列的排序状态: null(不排序) -> '
 // 添加对话历史存储
 let conversationHistory = [];
 
+// 修改表单提交处理
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded event fired');
+    
+    const optimizeForm = document.getElementById('optimizeForm');
+    console.log('Optimize form found:', !!optimizeForm);
+    
+    if (optimizeForm) {
+        // 移除所有现有的事件监听器
+        const newForm = optimizeForm.cloneNode(true);
+        optimizeForm.parentNode.replaceChild(newForm, optimizeForm);
+        
+        // 添加新的事件监听器
+        newForm.addEventListener('submit', function(event) {
+            console.log('Form submit event fired');
+            
+            // 确保阻止默认行为
+            event.preventDefault();
+            event.stopPropagation();  // 添加这行来阻止事件冒泡
+            
+            // 禁用提交按钮，防止重复提交
+            const submitButton = this.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+                console.log('Submit button disabled');
+            }
+            
+            // 调用优化函数
+            optimize().finally(() => {
+                // 优化完成后重新启用提交按钮
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    console.log('Submit button re-enabled');
+                }
+            });
+            
+            // 确保返回 false
+            return false;
+        });
+        
+        // 防止回车键触发表单提交
+        newForm.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                return false;
+            }
+        });
+    }
+});
+
+// 修改 optimize 函数，添加调试日志
 function optimize() {
-    console.log('optimize function called'); // 调试日志
+    console.log('optimize function called');
     
     const symbol = document.getElementById('symbol').value;
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
 
-    console.log('Input values:', { symbol, startDate, endDate }); // 检查输入值
+    console.log('Parameters:', { symbol, startDate, endDate }); // 添加参数日志
 
     if (!symbol || !startDate || !endDate) {
         alert('请填写完整的参数信息');
-        return;
+        return Promise.reject(new Error('参数不完整'));
     }
 
     // 显示加载动画，隐藏回测结果区域
@@ -25,21 +76,20 @@ function optimize() {
     const stockInfoEl = document.getElementById('stockInfo');
     const backtestResultsEl = document.getElementById('backtestResults');
 
-    console.log('Elements found:', { 
+    console.log('DOM elements:', { 
         loading: !!loadingEl, 
         results: !!resultsEl, 
         stockInfo: !!stockInfoEl, 
         backtestResults: !!backtestResultsEl 
-    }); // 检查元素是否存在
+    }); // 添加DOM元素检查日志
 
     if (loadingEl) loadingEl.classList.remove('hidden');
     if (resultsEl) resultsEl.classList.add('hidden');
     if (stockInfoEl) stockInfoEl.classList.add('hidden');
     if (backtestResultsEl) backtestResultsEl.classList.add('hidden');
 
-    console.log('Sending fetch request...'); // 调试日志
-
-    fetch('/optimize', {
+    // 返回 Promise
+    return fetch('/optimize', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -51,86 +101,44 @@ function optimize() {
         })
     })
     .then(response => {
-        console.log('Response received:', response.status); // 检查响应状态
+        console.log('Response status:', response.status); // 添加响应状态日志
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Data received:', data); // 检查返回的数据
+        console.log('Received data:', data); // 添加接收到的数据日志
         
         if (loadingEl) loadingEl.classList.add('hidden');
         
         if (data.error) {
-            console.error('Error from server:', data.error);
-            alert(data.error);
-            return;
+            throw new Error(data.error);
         }
         
-        // 显示优化结果
         const resultsDiv = document.getElementById('results');
-        console.log('Results div found:', !!resultsDiv);
+        console.log('Results div found:', !!resultsDiv); // 添加结果容器检查日志
         
         if (!resultsDiv) {
             throw new Error('Results container not found');
         }
 
-        // 添加数据验证
-        if (!data || typeof data !== 'object') {
-            throw new Error('Invalid data received: ' + JSON.stringify(data));
+        // 显示结果
+        try {
+            displayResults(data, resultsDiv);
+        } catch (displayError) {
+            console.error('Error in displayResults:', displayError);
+            throw displayError;
         }
-
-        // 检查必要的数据字段
-        if (!data.stockName) {
-            throw new Error('Missing stockName in data');
-        }
-        if (!data.bestParams || typeof data.bestParams !== 'object') {
-            throw new Error('Invalid or missing bestParams in data');
-        }
-        if (!data.metrics || typeof data.metrics !== 'object') {
-            throw new Error('Invalid or missing metrics in data');
-        }
-
-        console.log('Attempting to display results with data:', {
-            stockName: data.stockName,
-            bestParams: data.bestParams,
-            metrics: data.metrics
-        });
-
-        // 使用 window.displayResults 确保是全局函数
-        window.displayResults(data, resultsDiv);
     })
     .catch(error => {
         console.error('Error in optimize:', error);
         console.error('Error stack:', error.stack);
         if (loadingEl) loadingEl.classList.add('hidden');
         alert('优化过程中发生错误: ' + error.message);
+        throw error;
     });
 }
-
-// 确保在文档加载完成后绑定事件
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOMContentLoaded event fired'); // 调试日志
-    
-    const optimizeForm = document.getElementById('optimizeForm');
-    console.log('Optimize form found:', !!optimizeForm); // 检查表单是否存在
-    
-    if (optimizeForm) {
-        // 移除所有现有的事件监听器
-        const newForm = optimizeForm.cloneNode(true);
-        optimizeForm.parentNode.replaceChild(newForm, optimizeForm);
-        
-        // 添加新的事件监听器，并使用 {once: true} 确保只触发一次
-        newForm.addEventListener('submit', function(event) {
-            console.log('Form submit event triggered'); // 调试日志
-            event.preventDefault();
-            optimize();
-        }, { once: true });
-    } else {
-        console.error('Optimize form not found'); // 记录错误
-    }
-});
 
 // 添加标题和内容展示相关的样式
 const contentStyles = document.createElement('style');
@@ -362,47 +370,20 @@ function createCollapsibleSection(title, content) {
 function displayResults(data, resultsDiv) {
     try {
         console.log('displayResults started with data:', data);
+        console.log('resultsDiv:', resultsDiv);
         
         // 检查必要的数据字段
         if (!data.stockName) {
+            console.error('Missing stockName in data');
             throw new Error('Missing stockName in data');
         }
         if (!data.bestParams || typeof data.bestParams !== 'object') {
+            console.error('Invalid or missing bestParams in data');
             throw new Error('Invalid or missing bestParams in data');
         }
         if (!data.metrics || typeof data.metrics !== 'object') {
+            console.error('Invalid or missing metrics in data');
             throw new Error('Invalid or missing metrics in data');
-        }
-
-        // 首先确保股票信息显示
-        const stockInfo = document.getElementById('stockInfo');
-        const stockName = document.getElementById('stockName');
-        const stockCode = document.getElementById('stockCode');
-        
-        if (!stockInfo || !stockName || !stockCode) {
-            throw new Error('Required DOM elements not found');
-        }
-
-        // 修改股票信息显示
-        try {
-            stockName.textContent = data.stockName;
-            const stockCodeSpan = stockCode.querySelector('.stock-code');
-            const symbolValue = document.getElementById('symbol').value;
-            
-            if (stockCodeSpan) {
-                stockCodeSpan.textContent = `股票代码：${symbolValue}`;
-            } else {
-                stockCode.innerHTML = `
-                    <span class="stock-code">股票代码：${symbolValue}</span>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        A股
-                    </span>
-                `;
-            }
-            stockInfo.classList.remove('hidden');
-        } catch (err) {
-            console.error('Error updating stock info:', err);
-            throw err;
         }
 
         // 显示结果区域
@@ -412,48 +393,168 @@ function displayResults(data, resultsDiv) {
         // 清除现有内容
         resultsDiv.innerHTML = '';
         
-        // 添加分析结果标题
-        const analysisTitle = createTitle('分析结果', 1);
-        resultsDiv.appendChild(analysisTitle);
+        // 创建主容器
+        const mainContainer = document.createElement('div');
+        mainContainer.className = 'bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-lg p-6 space-y-8';
         
-        // 添加策略分析部分
-        const strategyTitle = createTitle('策略分析', 2);
-        resultsDiv.appendChild(strategyTitle);
-        
-        function createStrategySection(data) {
-            const section = document.createElement('div');
-            section.className = 'section-content';
+        console.log('Creating main container with data:', {
+            stockName: data.stockName,
+            metrics: data.metrics,
+            bestParams: data.bestParams
+        });
 
-            const metrics = data.metrics || {};
-            const lastSignal = metrics.lastSignal || {};
-
-            section.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-white p-4 rounded-lg shadow">
-                        <h3 class="text-lg font-semibold mb-3">策略表现</h3>
-                        <p>最大回撤: ${metrics.maxDrawdown?.toFixed(2)}%</p>
-                        <p>夏普比率: ${metrics.sharpeRatio?.toFixed(2)}</p>
-                        <p>总收益率: ${metrics.totalReturn?.toFixed(2)}%</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg shadow">
-                        <h3 class="text-lg font-semibold mb-3">交易信号</h3>
-                        <p>当前信号: <span class="signal-badge" style="color: ${lastSignal.color}; background-color: ${getBackgroundColor(lastSignal.color)}">${lastSignal.text}</span></p>
-                        <p>胜率: ${metrics.winRate?.toFixed(2)}%</p>
-                    </div>
+        // 添加股票信息标题和 AI 分析按钮
+        console.log('Adding stock info section...');
+        const stockInfoTitle = document.createElement('div');
+        stockInfoTitle.className = 'flex items-center justify-between mb-6';
+        stockInfoTitle.innerHTML = `
+            <div class="flex items-center space-x-3">
+                <div class="flex-shrink-0">
+                    <div class="h-10 w-1 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
                 </div>
-            `;
-            
-            return section;
-        }
-
-        const strategySection = createStrategySection(data);
-        resultsDiv.appendChild(strategySection);
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">${data.stockName}</h1>
+                    <p class="text-sm text-gray-500">股票代码：${document.getElementById('symbol')?.value || ''}</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    A股
+                </div>
+                <button onclick="switchToAIAnalysis('${document.getElementById('symbol')?.value || ''}')"
+                        class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 
+                               text-white text-sm font-medium rounded-lg transition-colors duration-200 
+                               shadow-md hover:shadow-lg space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span>AI 分析</span>
+                </button>
+            </div>
+        `;
+        mainContainer.appendChild(stockInfoTitle);
         
+        // 添加分析结果标题
+        console.log('Adding metrics section...');
+        const analysisTitle = document.createElement('div');
+        analysisTitle.className = 'flex items-center space-x-3 mb-6';
+        analysisTitle.innerHTML = `
+            <div class="flex-shrink-0">
+                <div class="h-10 w-1 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            </div>
+            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+                分析结果
+            </h1>
+        `;
+        mainContainer.appendChild(analysisTitle);
+        
+        // 创建策略分析部分
+        console.log('Adding strategy section...');
+        const strategySection = createStrategySection(data);
+        mainContainer.appendChild(strategySection);
+        
+        // 最后将主容器添加到结果区域
+        resultsDiv.appendChild(mainContainer);
         console.log('displayResults completed');
+        
     } catch (err) {
         console.error('Error in displayResults:', err);
+        console.error('Error stack:', err.stack);
         throw err;
     }
+}
+
+// 创建策略分析部分的辅助函数
+function createStrategySection(data) {
+    const section = document.createElement('div');
+    section.className = 'space-y-6';
+
+    const metrics = data.metrics || {};
+    const lastSignal = metrics.lastSignal || {};
+
+    // 修改这里：直接使用API返回的signalStrength，而不是计算
+    const signalStrength = {
+        value: (data.metrics.signalStrength || 0) * 100, // 转换为百分比
+        color: getSignalColor(data.metrics.signalStrength * 100),
+        description: getSignalDescription(data.metrics.signalStrength * 100)
+    };
+
+    // 添加基本信息卡片
+    const basicInfo = document.createElement('div');
+    basicInfo.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
+    basicInfo.innerHTML = `
+        <div class="bg-white rounded-xl shadow-sm p-4 transform hover:scale-105 transition-transform duration-300">
+            <div class="text-sm text-gray-500 mb-1">初始资金</div>
+            <div class="text-xl font-semibold">¥100,000</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 transform hover:scale-105 transition-transform duration-300">
+            <div class="text-sm text-gray-500 mb-1">最终资金</div>
+            <div class="text-xl font-semibold">¥${(100000 * (1 + metrics.totalReturn/100)).toFixed(2)}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4 transform hover:scale-105 transition-transform duration-300">
+            <div class="text-sm text-gray-500 mb-1">总收益</div>
+            <div class="text-xl font-semibold text-green-600">¥${(100000 * metrics.totalReturn/100).toFixed(2)}</div>
+        </div>
+    `;
+    section.appendChild(basicInfo);
+
+    // 添加详细指标卡片
+    const detailsCard = document.createElement('div');
+    detailsCard.className = 'grid grid-cols-1 md:grid-cols-2 gap-6';
+    detailsCard.innerHTML = `
+        <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
+            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">策略表现</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">收益率</span>
+                    <span class="text-lg font-medium ${metrics.totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${metrics.totalReturn?.toFixed(2)}%
+                    </span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">胜率</span>
+                    <span class="text-lg font-medium text-blue-600">${metrics.winRate?.toFixed(2)}%</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">最大回撤</span>
+                    <span class="text-lg font-medium text-red-600">${metrics.maxDrawdown?.toFixed(2)}%</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">夏普比率</span>
+                    <span class="text-lg font-medium text-purple-600">${metrics.sharpeRatio?.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
+            <h3 class="text-lg font-semibold text-gray-800 border-b pb-2">交易信号</h3>
+            <div class="space-y-4">
+                <div class="flex flex-col">
+                    <span class="text-gray-600 mb-2">当前信号</span>
+                    <span class="inline-flex items-center px-4 py-2 rounded-lg text-base font-medium ${
+                        lastSignal.color === 'green' ? 'bg-green-100 text-green-800' :
+                        lastSignal.color === 'red' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                    }">
+                        ${lastSignal.text}
+                    </span>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-500">信号强度</span>
+                        <span class="text-sm font-medium">${signalStrength.description} (${signalStrength.value.toFixed(0)}%)</span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full ${signalStrength.color} rounded-full transition-all duration-500" 
+                             style="width: ${signalStrength.value}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    section.appendChild(detailsCard);
+    
+    return section;
 }
 
 function getBackgroundColor(color) {
@@ -1488,7 +1589,7 @@ function displayBacktestResults(data) {
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Chandelier Exit Long -->
                     <div class="p-4 bg-gray-50 rounded-lg">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">多头出</h4>
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">多头出场</h4>
                         <div class="space-y-2">
                             <div class="flex justify-between">
                                 <span class="text-sm text-gray-600">当前值:</span>
@@ -1739,7 +1840,7 @@ function runPortfolioAnalysis(event) {
     .then(data => {
         if (data.success) {
             const html = displayPortfolioResults(data);
-            resultsDiv.innerHTML = html;
+           
             showToast('分析完成', 'success');
         } else {
             throw new Error(data.error || '分析失败，未知错误');
@@ -1789,7 +1890,7 @@ function switchToTechnicalAnalysis(stockCode) {
     document.getElementById('optimizeForm').dispatchEvent(new Event('submit'));
 }
 
-// 添加切换到AI分析页面的函数
+// 修改 switchToAIAnalysis 函数，添加自动触发分析的功能
 function switchToAIAnalysis(stockCode) {
     // 切换到个股分析标签页
     switchTab('analysis-tab');
@@ -1802,7 +1903,10 @@ function switchToAIAnalysis(stockCode) {
         // 自动触发分析
         const analysisForm = document.getElementById('analysisForm');
         if (analysisForm) {
-            analysisForm.dispatchEvent(new Event('submit'));
+            // 使用 setTimeout 确保标签页切换完成后再触发分析
+            setTimeout(() => {
+                analysisForm.dispatchEvent(new Event('submit'));
+            }, 100);
         }
     }
 }
@@ -2028,6 +2132,15 @@ function displayPortfolioResults(data) {
         // 从股票名称中提取股票代码
         const stockCode = result.stock.match(/（([^)]+)）/)?.[1] || '';
         
+        console.log('tradeData:', tradeData);
+        // 解析信号强度（假设在 tradeData 中添加了 '信号强度' 字段）
+        const signalStrength = parseFloat(tradeData['信号强度'] || 0) * 100;
+        const strengthColor = getSignalColor(signalStrength);
+        const strengthDesc = getSignalDescription(signalStrength);
+        console.log('signalStrength:', signalStrength);
+        console.log('strengthColor:', strengthColor);
+        console.log('strengthDesc:', strengthDesc);
+        
         html += `
             <div class="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
                 <div class="p-4">
@@ -2064,15 +2177,26 @@ function displayPortfolioResults(data) {
                         </div>
                     </div>
                     
-                    <!-- 交易建议部分 -->
+                    <!-- 交易建议和信号强度部分 -->
                     <div class="mb-4 ${signalStyle.bg} rounded-lg p-3 border ${signalStyle.border}">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 ${signalStyle.color} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${signalStyle.icon}"/>
-                            </svg>
-                            <p class="text-sm font-medium ${signalStyle.color}">
-                                ${tradeData['交易建议'] || '无交易建议'}
-                            </p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 ${signalStyle.color} mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${signalStyle.icon}"/>
+                                </svg>
+                                <p class="text-sm font-medium ${signalStyle.color}">
+                                    ${tradeData['交易建议'] || '无交易建议'}
+                                </p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm text-gray-600">信号强度:</span>
+                                <div class="flex items-center">
+                                    <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-full ${strengthColor} rounded-full" style="width: ${signalStrength}%"></div>
+                                    </div>
+                                    <span class="ml-2 text-sm font-medium ${strengthColor.replace('bg-', 'text-')}">${strengthDesc}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -2155,7 +2279,25 @@ function displayPortfolioResults(data) {
     });
     
     html += '</div>';
-    return html;
+    // 检查 portfolioResults 元素是否存在
+    const portfolioResults = document.getElementById('portfolioResults');
+    console.log('portfolioResults:', portfolioResults);
+    if (!portfolioResults) {
+        console.error('找不到 portfolioResults 元素');
+        return;
+    }
+
+    // 检查 html 是否为空
+    if (!html || typeof html !== 'string') {
+        console.error('html 内容无效:', html);
+        return;
+    }
+
+    try {
+        portfolioResults.innerHTML = html;
+    } catch (error) {
+        console.error('设置 portfolioResults 内容时出错:', error);
+    }
 }
 
 // 处理每日选股表单提交
@@ -3875,4 +4017,21 @@ function createContentBlock(content, tags = []) {
     block.appendChild(contentElement);
     
     return block;
+}
+
+// 保留这些辅助函数，因为它们仍然需要用来格式化显示
+function getSignalColor(score) {
+    if (score >= 80) return 'bg-green-500';
+    if (score >= 60) return 'bg-blue-500';
+    if (score >= 40) return 'bg-yellow-500';
+    if (score >= 20) return 'bg-orange-500';
+    return 'bg-red-500';
+}
+
+function getSignalDescription(score) {
+    if (score >= 80) return '强烈';
+    if (score >= 60) return '较强';
+    if (score >= 40) return '中等';
+    if (score >= 20) return '较弱';
+    return '微弱';
 }

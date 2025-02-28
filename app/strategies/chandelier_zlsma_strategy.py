@@ -53,6 +53,48 @@ class ZLSMA(bt.Indicator):
         # 将计算结果赋值给指标线
         self.lines.zlsma = self.zlsma
 
+class SignalStrength(bt.Indicator):
+    """
+    信号强度计算指标
+    综合考虑价格动量、成交量支持、波动率适配、RSI位置等因素
+    """
+    lines = ('strength',)
+    
+    params = (
+        ('period', 20),
+        ('weights', [0.3, 0.2, 0.25, 0.15, 0.1]),  # 各维度权重
+        ('volatility_lookback', 50),                # 波动率回看周期
+    )
+
+    def __init__(self):
+        # 价格动量：收盘价与ZLSMA的偏离度
+        self.zlsma = ZLSMA(self.data.close, period=self.p.period)
+        price_deviation = (self.data.close - self.zlsma) / self.zlsma
+        
+        # 成交量支持：当前成交量与均量比值
+        volume_ma = bt.ind.SMA(self.data.volume, period=self.p.period)
+        volume_ratio = self.data.volume / volume_ma
+        
+        # 波动率适配：ATR在近期的百分位
+        atr = bt.ind.ATR(self.data, period=14)
+        atr_rank = bt.ind.PercentRank(atr, period=self.p.volatility_lookback)
+        
+        # RSI位置评分
+        rsi = bt.ind.RSI(self.data.close, period=14)
+        rsi_score = bt.If(
+            rsi > 50,
+            (70 - rsi) / 20,  # RSI高位得分递减
+            (rsi - 30) / 20   # RSI低位得分递增
+        )
+        
+        # 综合强度计算
+        self.lines.strength = (
+            price_deviation * self.p.weights[0] +
+            volume_ratio * self.p.weights[1] +
+            atr_rank * self.p.weights[2] +
+            rsi_score * self.p.weights[3]
+        )
+
 class ChandelierZlSmaStrategy(bt.Strategy):
     """
     基于 Chandelier Exit 和 ZLSMA 的交易策略。
@@ -78,6 +120,9 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         ('volatility_period', 20),       # 波动率计算周期
         ('volatility_threshold', 0.02),  # 波动率阈值
         ('confirm_period', 2),           # 信号确认周期
+        ('strength_threshold', 50),      # 信号强度最小阈值
+        ('strength_scale', True),        # 是否根据信号强度调整仓位
+        ('max_position_scale', 1.5),     # 最大仓位缩放倍数
     )
 
     def log(self, txt, dt=None):
@@ -149,6 +194,17 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 信号确认计数器
         self.buy_signal_count = 0
         self.sell_signal_count = 0
+
+        # 添加信号强度计算
+        self.signal_strength = SignalStrength(
+            self.data,
+            period=self.p.period
+        )
+        
+        # 信号持续性跟踪
+        self.signal_duration = 0
+        self.last_signal = 0
+        self.current_strength = 0
 
     def check_filters(self, is_buy_signal):
         """检查各项过滤条件"""
@@ -294,44 +350,44 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         else:
             print('无交易信号')
 
-        # 在执行交易前应用过滤器
+        # 计算信号持续性
+        if self.signal[0] == self.last_signal:
+            self.signal_duration += 1
+        else:
+            self.signal_duration = 1
+        self.last_signal = self.signal[0]
+        
+        # 计算当前信号强度(0-100)
+        base_strength = self.signal_strength.strength[0]
+        duration_bonus = min(self.signal_duration / 5, 1.0) * 0.2  # 最多额外20%强度加成
+        self.current_strength = max(0, min(100, int((base_strength + duration_bonus) * 100)))
+        
+        # 交易执行逻辑
         if not self.position:
             if self.buy_signal:
-                if self.check_filters(True):
-                    self.buy_signal_count += 1
-                    if self.buy_signal_count >= self.p.confirm_period:
-                        print(f'买入信号确认 - 价格: {current_close:.2f}, 首次建仓, 买入数量: {stake}')
-                        self.buy(size=stake)
-                        self.current_pyramiding = 0
-                        self.buy_signal_count = 0
+                if self.current_strength >= self.p.strength_threshold:
+                    # 计算仓位规模
+                    base_size = self.calculate_trade_size(self.data.close[0])
+                    if self.p.strength_scale:
+                        strength_multiplier = 1 + (self.current_strength - self.p.strength_threshold) / \
+                            (100 - self.p.strength_threshold) * (self.p.max_position_scale - 1)
+                        adjusted_size = int(base_size * strength_multiplier)
                     else:
-                        print(f'买入信号确认中 ({self.buy_signal_count}/{self.p.confirm_period})')
+                        adjusted_size = base_size
+                    
+                    print(f'买入信号确认 - 强度: {self.current_strength}/100, 规模: {adjusted_size}')
+                    self.buy(size=adjusted_size)
                 else:
-                    self.buy_signal_count = 0
+                    print(f'信号强度不足 ({self.current_strength}/100) - 放弃交易')
         else:
             if self.direction == 1:
                 if direction_change:
-                    if self.check_filters(False):
-                        self.sell_signal_count += 1
-                        if self.sell_signal_count >= self.p.confirm_period:
-                            print('**卖出信号确认**：方向变化，执行卖出操作')
-                            self.sell(size=current_positions)
-                            self.current_pyramiding = 0
-                            self.sell_signal_count = 0
-                        else:
-                            print(f'卖出信号确认中 ({self.sell_signal_count}/{self.p.confirm_period})')
+                    if self.current_strength >= self.p.strength_threshold:
+                        print(f'卖出信号确认 - 强度: {self.current_strength}/100')
+                        self.sell(size=self.position.size)
                     else:
-                        self.sell_signal_count = 0
-                elif self.zlsma[-1] > self.zlsma[0] and current_close < self.zlsma[0] and self.zlsma[-2] > self.zlsma[-1]:
-                    print('**卖出信号触发**：ZLSMA下降且当前价格低于ZLSMA，执行卖出操作')
-                    self.sell(size=current_positions)
-                    self.current_pyramiding = 0
-                elif current_close > self.position.price * 1.03:
-                    if self.current_pyramiding < self.max_pyramiding:
-                        self.buy(size=stake)
-                        self.current_pyramiding += 1
-                        print(f'加仓信号 - 价格: {current_close:.2f}, 加仓次数: {self.current_pyramiding}')
-         
+                        print(f'卖出信号强度不足 ({self.current_strength}/100) - 保持观望')
+
         # 更新方向
         self.direction = current_direction
 
@@ -380,6 +436,16 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         self.trades.append(trade)
         if trade.isclosed:
             print(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
+
+    def calculate_trade_size(self, current_price):
+        """计算基础交易规模"""
+        remaining_pyramiding = self.params.max_pyramiding - self.current_pyramiding
+        available_cash = self.broker.getcash() * self.params.investment_fraction
+        available_cash_per_trade = available_cash / max(1, remaining_pyramiding)
+        base_size = int(available_cash_per_trade / current_price)
+        # 确保交易数量是最小交易单位的倍数
+        base_size = (base_size // self.params.min_trade_unit) * self.params.min_trade_unit
+        return base_size
 
 def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
     """

@@ -83,9 +83,25 @@ def run_backtest(strategy, params, data_feed):
     results = cerebro.run()
     strat = results[0]
     
-    # 获取最新信号
+    # 获取最新信号和信号强度
     signals = strat.signal.array if hasattr(strat, 'signal') else []
     last_signal = signals[-1] if signals else 0
+    
+    # 获取信号强度
+    signal_strength = 0
+    if hasattr(strat, 'signal_strength'):
+        # 如果是指标对象，获取其最新值
+        if isinstance(strat.signal_strength, bt.Indicator):
+            signal_strength = strat.signal_strength[0]
+        # 如果是数值，直接使用
+        elif isinstance(strat.signal_strength, (int, float)):
+            signal_strength = float(strat.signal_strength)
+        # 其他情况，尝试转换为浮点数
+        else:
+            try:
+                signal_strength = float(strat.signal_strength)
+            except (ValueError, TypeError):
+                signal_strength = 0
     
     # 获取分析结果
     sharpe_ratio = strat.analyzers.sharpe.get_analysis().get('sharperatio', 0)
@@ -134,6 +150,7 @@ def run_backtest(strategy, params, data_feed):
         'largest_win': largest_win,
         'largest_loss': largest_loss,
         'last_signal': last_signal,
+        'signal_strength': signal_strength,
     }
 
 
@@ -205,6 +222,7 @@ def objective(trial, strategy, data_feed):
     trial.set_user_attr('max_drawdown', results['max_drawdown'])
     trial.set_user_attr('total_return', results['total_return'])
     trial.set_user_attr('last_signal', results['last_signal'])
+    trial.set_user_attr('signal_strength', results['signal_strength'])
     
     # 返回负的夏普率作为优化目标（因为optuna默认最小化目标）
     return -results['sharpe_ratio'] if results['sharpe_ratio'] else 0.0
@@ -428,6 +446,7 @@ def main():
                   f'{best_trial.user_attrs["total_return"]*100:.2f}%')
             print(f'  最后信号    : '
                   f'{best_trial.user_attrs["last_signal"]:.2f}')
+            print(f'  信号强度    : {best_trial.user_attrs["signal_strength"]:.2f}')
 
             result = {
                 'symbol': symbol,
@@ -440,7 +459,8 @@ def main():
                 'win_rate': round(best_trial.user_attrs['win_rate'], 2),
                 'total_return':
                     round(best_trial.user_attrs['total_return'], 4),
-                'last_signal': best_trial.user_attrs['last_signal']
+                'last_signal': best_trial.user_attrs['last_signal'],
+                'signal_strength': best_trial.user_attrs['signal_strength']
             }
             optimization_results.append(result)
             all_optimization_results.append(result)
@@ -493,10 +513,13 @@ def main():
             'sharpe_ratio': 'first',
             'max_drawdown': 'first',
             'win_rate': 'first',
-            'total_return': 'first'
+            'total_return': 'first',
+            'signal_strength': 'first'
         }).round(4)
         
-        performance_summary.columns = ['夏普比率', '最大回撤(%)', '胜率(%)', '总收益率(%)']
+        performance_summary.columns = [
+            '夏普比率', '最大回撤(%)', '胜率(%)', '总收益率(%)', '信号强度'
+        ]
         performance_summary['胜率(%)'] = performance_summary['胜率(%)'] * 100
         performance_summary['总收益率(%)'] = performance_summary['总收益率(%)'] * 100
         

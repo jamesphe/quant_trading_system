@@ -168,7 +168,7 @@ def analyze_stock(symbol, start_date, end_date):
     - str，分析结果
     """
     # 获取股票数据
-    stock_data = get_stock_data(symbol, start_date, end_date)
+    stock_data = get_stock_data(symbol, start_date, end_date, include_macd=True, include_rsi=True, include_boll=True, include_zlsma=True, include_chandelier=True)
     
     if stock_data.empty:
         return f"无法获取股票 {symbol} 的数据"

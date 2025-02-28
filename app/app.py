@@ -124,7 +124,8 @@ def optimize():
                             'maxDrawdown': round(float(best_row['max_drawdown']), 2),
                             'winRate': round(float(best_row['win_rate']) * 100, 2),
                             'totalReturn': round(float(best_row['total_return']) * 100, 2),
-                            'lastSignal': _convert_signal_to_text(best_row['last_signal'])
+                            'lastSignal': _convert_signal_to_text(best_row['last_signal']),
+                            'signalStrength': round(float(best_row['signal_strength']), 2)
                         }
                     }
                     return jsonify(result)
@@ -197,7 +198,8 @@ def optimize():
                 ),
                 'lastSignal': _convert_signal_to_text(
                     best_trial.user_attrs['last_signal']
-                )
+                ),
+                'signalStrength': round(best_trial.user_attrs['signal_strength'], 2)
             }
         }
 
@@ -211,6 +213,7 @@ def optimize():
             'win_rate': round(best_trial.user_attrs['win_rate'], 2),
             'total_return': round(best_trial.user_attrs['total_return'], 4),
             'last_signal': best_trial.user_attrs['last_signal'],
+            'signal_strength': round(best_trial.user_attrs['signal_strength'], 2),
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
@@ -491,7 +494,6 @@ def analyze_stock_route():
                         stream=True
                     ):
                         if chunk:
-                            print(f"[API] 生成数据: {chunk[:50]}...")
                             yield f'data: {{"content": {json.dumps(chunk)}}}\n\n'
                     
                 except Exception as e:

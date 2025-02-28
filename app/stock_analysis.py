@@ -481,6 +481,7 @@ def get_stock_analysis_prompt(
 请根据以上信息，结合你的量化交易经验、资金管理策略和行业分析能力，
 给出具有深度、逻辑清晰、且能实际执行的交易分析报告。
 """
+    print(f"openai 提示词: {prompt}")
     return prompt
 
 def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):
