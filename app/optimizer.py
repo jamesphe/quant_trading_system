@@ -174,11 +174,13 @@ def objective(trial, strategy, data_feed):
         mult = trial.suggest_float('mult', 1.5, 2.5, step=0.1)
         inv_fraction = trial.suggest_float('investment_fraction', 0.5, 1.0)
         max_pyramiding = trial.suggest_int('max_pyramiding', 0, 3)
+        strength_threshold = trial.suggest_int('strength_threshold', 10, 70, step=5)
         params = {
             'period': period,
             'mult': mult,
             'investment_fraction': inv_fraction,
             'max_pyramiding': max_pyramiding,
+            'strength_threshold': strength_threshold,
             'printlog': False
         }
     elif strategy == BollingerRsiMacdStrategy:
@@ -414,7 +416,8 @@ def main():
                     'mult': round(best_trial.params['mult'], 2),
                     'investment_fraction':
                         round(best_trial.params['investment_fraction'], 2),
-                    'max_pyramiding': int(best_trial.params['max_pyramiding'])
+                    'max_pyramiding': int(best_trial.params['max_pyramiding']),
+                    'strength_threshold': int(best_trial.params['strength_threshold'])
                 }
             elif strat == BollingerRsiMacdStrategy:
                 best_params = {
@@ -514,11 +517,11 @@ def main():
             'max_drawdown': 'first',
             'win_rate': 'first',
             'total_return': 'first',
-            'signal_strength': 'first'
+            'strength_threshold': 'first'
         }).round(4)
         
         performance_summary.columns = [
-            '夏普比率', '最大回撤(%)', '胜率(%)', '总收益率(%)', '信号强度'
+            '夏普比率', '最大回撤(%)', '胜率(%)', '总收益率(%)', '信号强度阈值'
         ]
         performance_summary['胜率(%)'] = performance_summary['胜率(%)'] * 100
         performance_summary['总收益率(%)'] = performance_summary['总收益率(%)'] * 100
@@ -552,7 +555,8 @@ def main():
                     'investment_fraction': '投资比例',
                     'period': '周期',
                     'mult': '倍数',
-                    'max_pyramiding': '金字塔等级'
+                    'max_pyramiding': '金字塔等级',
+                    'strength_threshold': '信号强度阈值'
                 }
                 
                 params_summary.columns = [

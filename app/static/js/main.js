@@ -596,6 +596,46 @@ function createStrategySection(data) {
     `;
     section.appendChild(detailsCard);
     
+    // 在 detailsCard 后添加策略参数卡片
+    const strategyParamsCard = document.createElement('div');
+    strategyParamsCard.className = 'bg-white rounded-xl shadow-sm p-6 mt-6';
+    strategyParamsCard.innerHTML = `
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="flex-shrink-0">
+                <div class="h-10 w-1 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">最优策略参数</h3>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            ${Object.entries(data.bestParams || {})
+                .filter(([key]) => formatParamName(key))
+                .map(([key, value]) => `
+                    <div class="relative bg-gradient-to-br from-white to-gray-50 rounded-xl p-6 
+                                shadow-sm hover:shadow-md transition-all duration-300 
+                                transform hover:-translate-y-1">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r 
+                                   from-blue-500 to-purple-500 rounded-t-xl opacity-75"></div>
+                        <div class="mt-2">
+                            <div class="text-sm font-medium text-gray-500 mb-2">
+                                ${formatParamName(key)}
+                            </div>
+                            <div class="flex items-baseline">
+                                <span class="text-2xl font-bold text-gray-900">
+                                    ${formatParamValue(value, key)}  <!-- 传入 key 参数 -->
+                                </span>
+                                ${getParamUnit(key)}
+                            </div>
+                        </div>
+                        <div class="absolute bottom-4 right-4 opacity-10">
+                            ${getParamIcon(key)}
+                        </div>
+                    </div>
+                `).join('')}
+        </div>
+    `;
+    section.appendChild(strategyParamsCard);
+
     return section;
 }
 
@@ -611,13 +651,15 @@ function getBackgroundColor(color) {
 }
 
 function formatParamName(key) {
+    // 只显示这些参数
     const nameMap = {
         'period': '周期',
         'mult': '倍数',
-        'investment_fraction': '投资比例',
-        'max_pyramiding': '最大加仓次数'
+        'strength_threshold': '信号阈值'
     };
-    return nameMap[key] || key;
+    
+    // 如果参数不在映射表中，返回空字符串，这样这个参数就不会显示
+    return nameMap[key] || '';
 }
 
 // 日期选择器类
@@ -4079,4 +4121,63 @@ function getSignalDescription(score) {
     if (score >= 40) return '中等';
     if (score >= 20) return '较弱';
     return '微弱';
+}
+
+// 添加辅助函数来格式化参数名称
+function formatParamName(key) {
+    // 只显示这些参数
+    const nameMap = {
+        'period': '周期',
+        'mult': '倍数',
+        'strength_threshold': '信号阈值'
+    };
+    
+    // 如果参数不在映射表中，返回空字符串，这样这个参数就不会显示
+    return nameMap[key] || '';
+}
+
+// 修改 formatParamValue 函数，添加 key 参数
+function formatParamValue(value, key) {  // 添加 key 参数
+    if (typeof value === 'number') {
+        if (key === 'strength_threshold') {
+            return Math.round(value); // 信号阈值显示整数
+        }
+        return Number.isInteger(value) ? value : value.toFixed(2);
+    }
+    return value;
+}
+
+// 添加获取参数单位的辅助函数
+function getParamUnit(key) {
+    const units = {
+        'period': '<span class="ml-2 text-sm text-gray-500">天</span>',
+        'mult': '<span class="ml-2 text-sm text-gray-500">倍</span>',
+        'strength_threshold': '<span class="ml-2 text-sm text-gray-500">%</span>'
+    };
+    return units[key] || '';
+}
+
+// 添加获取参数图标的辅助函数
+function getParamIcon(key) {
+    const icons = {
+        'period': `
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        `,
+        'mult': `
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            </svg>
+        `,
+        'strength_threshold': `
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+        `
+    };
+    return icons[key] || '';
 }

@@ -69,7 +69,8 @@ def optimize_single_stock(symbol):
             'period': int(best_trial.params['period']),
             'mult': round(best_trial.params['mult'], 2),
             'investment_fraction': round(best_trial.params['investment_fraction'], 2),
-            'max_pyramiding': int(best_trial.params['max_pyramiding'])
+            'max_pyramiding': int(best_trial.params['max_pyramiding']),
+            'strength_threshold': int(best_trial.params['strength_threshold'])
         }
 
         return {

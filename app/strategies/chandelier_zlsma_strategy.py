@@ -120,8 +120,8 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         ('volatility_period', 20),       # 波动率计算周期
         ('volatility_threshold', 0.02),  # 波动率阈值
         ('confirm_period', 2),           # 信号确认周期
-        ('strength_threshold', 50),      # 信号强度最小阈值
-        ('strength_scale', True),        # 是否根据信号强度调整仓位
+        ('strength_threshold', 40),      # 信号强度最小阈值
+        ('strength_scale', False),        # 是否根据信号强度调整仓位
         ('max_position_scale', 1.5),     # 最大仓位缩放倍数
     )
 
@@ -275,7 +275,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                      f'和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
 
         # 记录日志
-        print(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {self.reason}')
+        # print(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {self.reason}')
 
         # 检查方向是否发生变化
         direction_change = False
@@ -333,10 +333,10 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 self.signal[0] = -2
                 print('减仓预警: 多头趋势，但ZLSMA未上升')
         elif self.direction == -1 and current_direction == -1:  # 保持空头
-            print('清仓信号: 持续空头')
+            #print('清仓信号: 持续空头')
             if self.position:
                 self.buy_signal = False
-                print('清仓信号: 持续空头状态')
+                #print('清仓信号: 持续空头状态')
         elif self.direction == 2 and current_direction == 2:  # 保持建仓预警
             print(
                 f'建仓预警: 价格{current_close:.2f} > '
@@ -362,32 +362,52 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         duration_bonus = min(self.signal_duration / 5, 1.0) * 0.2  # 最多额外20%强度加成
         self.current_strength = max(0, min(100, int((base_strength + duration_bonus) * 100)))
         
+        print(f'交易日期: {self.data.datetime.date(0)}, 买入信号: {self.buy_signal}, 是否持仓: {bool(self.position)}, 当前信号强度: {self.current_strength}/100, 当前保证金: {self.broker.get_cash():.2f}')
         # 交易执行逻辑
-        if not self.position:
+        if not self.position:  # 无持仓
             if self.buy_signal:
                 if self.current_strength >= self.p.strength_threshold:
-                    # 计算仓位规模
+                    # 计算基础仓位
                     base_size = self.calculate_trade_size(self.data.close[0])
+                    
+                    # 根据信号强度调整仓位规模
                     if self.p.strength_scale:
-                        strength_multiplier = 1 + (self.current_strength - self.p.strength_threshold) / \
-                            (100 - self.p.strength_threshold) * (self.p.max_position_scale - 1)
+                        # 计算强度乘数
+                        strength_range = 100 - self.p.strength_threshold
+                        strength_ratio = (
+                            self.current_strength - self.p.strength_threshold
+                        ) / strength_range
+                        scale_range = self.p.max_position_scale - 1
+                        strength_multiplier = 1 + strength_ratio * scale_range
+                        
+                        # 调整仓位大小
                         adjusted_size = int(base_size * strength_multiplier)
                     else:
                         adjusted_size = base_size
                     
-                    print(f'买入信号确认 - 强度: {self.current_strength}/100, 规模: {adjusted_size}')
+                    print(
+                        f'买入信号确认 - 强度: {self.current_strength}/100, '
+                        f'规模: {adjusted_size}'
+                    )
                     self.buy(size=adjusted_size)
                 else:
-                    print(f'信号强度不足 ({self.current_strength}/100) - 放弃交易')
-        else:
-            if self.direction == 1:
-                if direction_change:
-                    if self.current_strength >= self.p.strength_threshold:
-                        print(f'卖出信号确认 - 强度: {self.current_strength}/100')
-                        self.sell(size=self.position.size)
-                    else:
-                        print(f'卖出信号强度不足 ({self.current_strength}/100) - 保持观望')
-
+                    print(
+                        f'信号强度不足 ({self.current_strength}/100) - '
+                        f'阈值: {self.p.strength_threshold} - 放弃交易'
+                    )
+        else:  # 有持仓
+            if current_direction == -1:  # 空头持仓
+                if self.current_strength >= min(30, self.p.strength_threshold):
+                    print(
+                        f'卖出信号确认 - 强度: {self.current_strength}/100, '
+                        f'阈值: {self.p.strength_threshold}'
+                    )
+                    self.sell(size=self.position.size)
+                else:
+                    print(
+                        f'卖出信号强度不足 ({self.current_strength}/100) - '
+                        f'阈值: {self.p.strength_threshold} - 保持观望'
+                    )
         # 更新方向
         self.direction = current_direction
 
@@ -402,10 +422,10 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                print(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                print(f'买单执行，日期: {self.data.datetime.date(0)}, 价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
                 print(f'当前持仓: {self.position.size}')
             elif order.issell():
-                print(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                print(f'卖单执行，日期: {self.data.datetime.date(0)}, 价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
                 print(f'当前持仓: {self.position.size}')
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
@@ -439,13 +459,34 @@ class ChandelierZlSmaStrategy(bt.Strategy):
 
     def calculate_trade_size(self, current_price):
         """计算基础交易规模"""
-        remaining_pyramiding = self.params.max_pyramiding - self.current_pyramiding
+        # 1. 考虑保证金要求
+        margin_requirement = 1.2  # 设置120%的保证金要求
+        
+        # 2. 计算实际可用资金
         available_cash = self.broker.getcash() * self.params.investment_fraction
-        available_cash_per_trade = available_cash / max(1, remaining_pyramiding)
-        base_size = int(available_cash_per_trade / current_price)
-        # 确保交易数量是最小交易单位的倍数
-        base_size = (base_size // self.params.min_trade_unit) * self.params.min_trade_unit
-        return base_size
+        
+        # 3. 考虑保证金后的可用资金
+        margin_adjusted_cash = available_cash / margin_requirement
+        
+        # 4. 计算最大可买数量
+        max_shares = int(margin_adjusted_cash / current_price)
+        
+        # 5. 确保是最小交易单位的整数倍
+        base_size = (max_shares // self.params.min_trade_unit) * self.params.min_trade_unit
+        
+        # 6. 添加安全边际
+        safe_size = int(base_size * 0.95)  # 留出5%安全边际
+        
+        # 调试信息
+        print(f'计算交易规模:')
+        print(f'  - 当前价格: {current_price:.2f}')
+        print(f'  - 账户总资金: {self.broker.getvalue():.2f}')
+        print(f'  - 可用资金: {available_cash:.2f}')
+        print(f'  - 考虑保证金后可用: {margin_adjusted_cash:.2f}')
+        print(f'  - 最大可买数量: {max_shares}')
+        print(f'  - 安全交易数量: {safe_size}')
+        
+        return safe_size
 
 def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params):
     """
@@ -618,14 +659,48 @@ if __name__ == '__main__':
     print(f"开始回测股票: {args.symbol}")
 
     # 运行回测
-    run_backtest(
-        symbol=args.symbol,
-        start_date=args.start_date,
-        end_date=args.end_date,
-        period=14,  # 使用统一的周期参数
-        mult=1.5,
-        investment_fraction=0.55,
-        max_pyramiding=1,
-        min_trade_unit=100,
-        printlog=False
-    )
+    # 从优化结果文件中读取参数
+    import pandas as pd
+    import os
+
+    # 构建结果文件路径
+    result_file = f'../results/{args.symbol}_ChandelierZlSmaStrategy_optimization_results.csv'
+
+    if os.path.exists(result_file):
+        # 读取优化结果
+        results = pd.read_csv(result_file)
+        
+        # 获取最优参数
+        period = int(results['period'].iloc[0])
+        mult = float(results['mult'].iloc[0])
+        investment_fraction = float(results['investment_fraction'].iloc[0])
+        max_pyramiding = int(results['max_pyramiding'].iloc[0])
+        strength_threshold = int(results['strength_threshold'].iloc[0])
+        
+        print(f'使用优化参数 - period:{period}, mult:{mult}, investment_fraction:{investment_fraction}, max_pyramiding:{max_pyramiding}, strength_threshold:{strength_threshold}')
+        
+        run_backtest(
+            symbol=args.symbol,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            period=period,
+            mult=mult, 
+            investment_fraction=investment_fraction,
+            max_pyramiding=max_pyramiding,
+            min_trade_unit=100,
+            strength_threshold=strength_threshold,
+            printlog=False
+        )
+    else:
+        print(f'未找到优化结果文件 {result_file}, 使用默认参数')
+        run_backtest(
+            symbol=args.symbol,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            period=14,
+            mult=1.5,
+            investment_fraction=0.55,
+            max_pyramiding=1,
+            min_trade_unit=100,
+            printlog=False
+        )

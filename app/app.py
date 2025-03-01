@@ -117,7 +117,8 @@ def optimize():
                             'investment_fraction': round(
                                 float(best_row['investment_fraction']), 2
                             ),
-                            'max_pyramiding': int(best_row['max_pyramiding'])
+                            'max_pyramiding': int(best_row['max_pyramiding']),
+                            'strength_threshold': int(best_row['strength_threshold'])
                         },
                         'metrics': {
                             'sharpeRatio': round(float(best_row['sharpe_ratio']), 2),
@@ -174,7 +175,8 @@ def optimize():
                 best_trial.params['investment_fraction'], 
                 2
             ),
-            'max_pyramiding': int(best_trial.params['max_pyramiding'])
+            'max_pyramiding': int(best_trial.params['max_pyramiding']),
+            'strength_threshold': int(best_trial.params['strength_threshold'])
         }
 
         logger.info(f"最优参数: {best_params}")
@@ -276,7 +278,8 @@ def backtest():
                 period=int(opt_params['period']),
                 mult=float(opt_params['mult']),
                 investment_fraction=float(opt_params['investment_fraction']),
-                max_pyramiding=int(opt_params['max_pyramiding'])
+                max_pyramiding=int(opt_params['max_pyramiding']),
+                strength_threshold=int(opt_params['strength_threshold'])
             )
         else:
             # 使用默认参
