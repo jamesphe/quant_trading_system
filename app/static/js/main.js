@@ -2740,6 +2740,14 @@ function displayTargetStocks(stocks) {
         const changeValue = parseFloat(stock['最新涨跌幅'] || 0);
         const changeColor = changeValue >= 0 ? 'text-red-600' : 'text-green-600';
         
+        // 处理信号强度的颜色逻辑
+        const signalStrength = parseFloat(stock['signal_strength'] || 0);
+        const signalColor = signalStrength >= 0.8 ? 'text-red-600' :  // 强烈信号 - 红色
+                          signalStrength >= 0.6 ? 'text-orange-600' :  // 中强信号 - 橙色
+                          signalStrength >= 0.4 ? 'text-yellow-600' :  // 一般信号 - 黄色
+                          signalStrength >= 0.2 ? 'text-blue-600' :    // 弱信号 - 蓝色
+                          'text-gray-600';                             // 无信号 - 灰色
+        
         // 处理最佳胜率和最佳回报的颜色
         const winRateValue = parseFloat(stock['最佳胜率'] || 0);
         const returnValue = parseFloat(stock['最佳回报'] || 0);
@@ -2753,7 +2761,7 @@ function displayTargetStocks(stocks) {
         const returnColor = returnValue >= 0.2 ? 'text-green-600' : 
                           returnValue >= 0 ? 'text-blue-600' : 'text-red-600';
                           
-        // 根据夏普比率设置新的颜色规则
+        // 根据夏普比率设置颜色
         const sharpeColor = sharpeValue >= 2.0 ? 'text-green-600' :  // 优秀 - 绿色
                           sharpeValue >= 1.0 ? 'text-blue-600' :     // 良好 - 蓝色
                           sharpeValue >= 0.0 ? 'text-yellow-600' :   // 一般 - 黄色
@@ -2798,6 +2806,9 @@ function displayTargetStocks(stocks) {
             </td>
             <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${sharpeColor} font-medium">
                 ${Number(sharpeValue).toFixed(2)}
+            </td>
+            <td class="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${signalColor} font-medium">
+                ${(signalStrength * 100).toFixed(0)}%
             </td>
         `;
         
@@ -3196,7 +3207,7 @@ async function updateTargetStocks(date) {
                         ${formatNumber(stock.最新价格)}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${stock.最新涨跌幅 >= 0 ? 'text-red-600' : 'text-green-600'}">
-                        ${formatChangePercent(stock.最新涨跅幅)}
+                        ${formatChangePercent(stock.最新涨跌幅)}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${formatNumber(stock.换手率)}%
@@ -3209,6 +3220,9 @@ async function updateTargetStocks(date) {
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm ${getSharpeColor(stock.夏普比率)} font-medium">
                         ${formatNumber(stock.夏普比率)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${getValueColor(stock.信号强度)} font-medium">
+                        ${formatNumber(stock.信号强度 * 100)}%
                     </td>
                 </tr>
             `;
@@ -3314,7 +3328,7 @@ function sortStocks(column) {
             let bValue = getCellValue(b, column);
             
             // 数比较
-            if (['最新价格', '最新涨跌幅', '换手率', '最佳率', '最佳回报', '夏普比率'].includes(column)) {
+            if (['最新价格', '最新涨跌幅', '换手率', '最佳率', '最佳回报', '夏普比率', '信号强度'].includes(column)) {
                 aValue = parseFloat(aValue.replace(/[+%]/g, '')) || 0;
                 bValue = parseFloat(bValue.replace(/[+%]/g, '')) || 0;
             }
@@ -3355,7 +3369,8 @@ function getColumnIndex(column) {
         '换手率': 5,
         '最佳胜率': 6,
         '最佳回报': 7,
-        '夏普比率': 8
+        '夏普比率': 8,
+        '信号强度': 9
     };
     return columnMap[column] || 0;
 }

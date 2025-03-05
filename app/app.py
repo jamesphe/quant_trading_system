@@ -805,7 +805,7 @@ def get_target_stocks():
             # 确保所有必需的列都存在
             required_columns = [
                 '股票代码', '股票名称', 'industry', '最新价格', 
-                '最新涨跌幅', '换手率', '夏普比率', '最佳回报', '最佳胜率'
+                '最新涨跌幅', '换手率', '夏普比率', '最佳回报', '最佳胜率','signal_strength'
             ]
             
             missing_columns = [col for col in required_columns if col not in df.columns]
@@ -817,21 +817,24 @@ def get_target_stocks():
             
             # 选择需要的列并处理空值
             df = df[['股票代码', '股票名称', '所属行业', '最新价格', '最新涨跌幅', 
-                    '换手率', '夏普比率', '最佳回报', '最佳胜率']].fillna({
+                    '换手率', '夏普比率', '最佳回报', '最佳胜率','signal_strength']].fillna({
                 '最新价格': 0,
                 '最新涨跌幅': 0,
                 '换手率': 0,
                 '夏普比率': 0,
                 '最佳回报': 0,
                 '最佳胜率': 0,
+                'signal_strength': 0,
                 '所属行业': ''
             })
             
             # 确保数值列为数值类型
             numeric_columns = ['最新价格', '最新涨跌幅', '换手率', 
-                             '夏普比率', '最佳回报', '最佳胜率']
+                             '夏普比率', '最佳回报', '最佳胜率','signal_strength']
             for col in numeric_columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            df = df.rename(columns={'signal_strength': '信号强度'})
             
             # 转换为字典列表
             stocks = df.to_dict('records')
