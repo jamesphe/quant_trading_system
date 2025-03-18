@@ -296,7 +296,7 @@ def get_stock_analysis_prompt(
 ) -> str:
     """
     优化后的函数，用于生成针对股票的分析提示词（Prompt）。
-    结合Chandelier Exit策略、其他技术指标和资讯，帮助LLM生成更深入的交易决策分析。
+    结合历史数据、技术指标和资讯，帮助LLM生成更深入的交易决策分析。
     
     Args:
         symbol (str): 股票代码
@@ -356,6 +356,28 @@ def get_stock_analysis_prompt(
     zlsma_20 = round(latest_row['ZLSMA_20'], 2)
     zlsma_60 = round(latest_row['ZLSMA_60'], 2)
 
+    # 增加成交量分析
+    current_volume = round(latest_row['Volume'] / 10000, 2)  # 转换为万手
+    current_amount = round(latest_row['Amount'] / 100000000, 2)  # 转换为亿元
+    
+    # 计算5日平均成交量
+    vol_ma5 = round(stock_data['Volume'].rolling(5).mean().iloc[-1] / 10000, 2)
+    # 计算量比 (当日成交量/5日平均成交量)
+    vol_ratio = round(current_volume / vol_ma5, 2) if vol_ma5 > 0 else 0
+    
+    # 判断量价关系
+    price_up = latest_row['Close'] > prev_row['Close']
+    volume_up = latest_row['Volume'] > prev_row['Volume']
+    vol_price_divergence = ""
+    if price_up and not volume_up:
+        vol_price_divergence = "价升量缩，可能缺乏上涨动能"
+    elif not price_up and volume_up:
+        vol_price_divergence = "价跌量增，可能存在下跌风险"
+    elif price_up and volume_up:
+        vol_price_divergence = "价升量增，上涨趋势确认"
+    else:
+        vol_price_divergence = "价跌量缩，下跌动能减弱"
+
     # 基本信息
     basic_info_text = "\n".join([f"{k}: {v}" for k, v in basic_info.items()])
 
@@ -397,30 +419,46 @@ def get_stock_analysis_prompt(
         macd_divergence = "检测到MACD顶背离，建议关注潜在风险，考虑减仓或止盈。"
 
     # ========== 4. 角色设定与深度分析需求 ========== #
-    # 通过在提示中增加更明确的角色和分析指引，让模型输出更深入的内容
     role_intro = f"""
 你是一名在金融行业拥有超过十年经验的资深量化交易员，熟悉多种交易策略和风控体系。
-请基于所提供的 {stock_name}（{symbol}）的最新行情、基本面数据以及资讯，结合 Chandelier Exit（吊灯止损）策略，
-深入分析并输出专业报告。你可以充分运用技术分析、数据建模以及宏观行业洞察，帮助我们制定更全面的交易计划。
+请严格基于以下提供的 {stock_name}（{symbol}）的数据进行分析：
+1. 近30日完整的历史价格、成交量数据
+2. 基本面数据
+3. 技术指标数据
+4. 新闻资讯
+
+重要提示：
+- 你必须仅使用上述提供的数据进行分析，不要编造或假设任何未提供的数据
+- 如果某些数据缺失或不完整，请在分析中明确指出，而不是自行补充或推测
+- 如果数据不足以支持某项分析，应该明确说明"由于缺乏xxx数据，无法对xxx进行分析"
+
+请结合 Chandelier Exit（吊灯止损）策略，基于实际数据给出专业的分析报告。
 """
 
-    # ========== 5. 详细分析要求，引导输出结构 ========== #
-    # 在analysis_requirements中明确列出希望模型逐条回应的分析重点
+    # ========== 5. 详细分析要求 ========== #
     analysis_requirements = f"""
 【分析要求】  
 
 1. **行情回顾与多空格局**  
-   - 总结 {symbol} 近30个交易日的价格走势与成交量变化，说明近期涨跌幅是否反映了多空情绪的转变。
-   - 结合 ATR（{atr}）等波动性指标，判断当前市场情绪是偏乐观还是谨慎。
+   - 基于近30日的完整数据，分析价格走势与成交量变化
+   - 计算并分析关键价格位置（如30日高点{stock_data['High'].max():.2f}、低点{stock_data['Low'].min():.2f}）
+   - 结合 ATR（{atr}）等波动性指标，判断当前市场情绪
+   - 分析成交量特征：
+     * 当日成交量: {current_volume}万手，成交额: {current_amount}亿元
+     * 5日均量: {vol_ma5}万手，量比: {vol_ratio}
+     * 量价关系: {vol_price_divergence}
 
 2. **Chandelier Exit策略深入分析**  
    - 回顾该策略的核心逻辑和历史表现（夏普比率: {sharpe_ratio}, 最大回撤: {max_drawdown}%, 胜率: {win_rate}%, 总收益: {total_return}%）。
    - 分析多头止损价格 {long_stop}、空头止损价格 {short_stop} 与当前股价({current_price})之间的关系，探讨其有效性。
    - 若有背离信号或风险提示（如MACD顶背离、RSI临界值等），请深入阐述。
 
-3. **技术指标交叉验证**  
+3. **技术指标与量价分析**  
    - 从MACD、RSI、BOLL、ZLSMA等角度，逐一解释其意义并判断当前是强势还是谨慎信号。
-   - 判断这些指标是否需要进一步确认，如等待量能配合、或参考其他周期的K线形态。
+   - 结合成交量变化分析指标的可靠性：
+     * 关注量价配合度
+     * 分析主力资金参与度
+     * 判断市场情绪变化
 
 4. **资讯与基本面解读**  
    - 将最新资讯中的重大信息提炼出来，分析其对公司或行业的正负面影响。
@@ -428,15 +466,26 @@ def get_stock_analysis_prompt(
 
 5. **深入的建仓与清仓策略**  
    - 针对"多头止损价 {long_stop} 上方的区域是否适合建仓"，给出更细化的价格区间及分批建仓思路。
-   - 若出现指标矛盾或信号减弱，如何执行止盈止损，包括参考价格区间、分批卖出的计划等。
+   - 结合成交量和价格走势，建议以下操作时机：
+     * 适合建仓的成交量特征
+     * 需要警惕的量价组合
+     * 分批建仓/减仓的具体计划
 
 6. **风险控制与情景推演**  
    - 结合胜率偏低（{win_rate if win_rate else '未知'}%）和夏普比率不佳（{sharpe_ratio if sharpe_ratio else '未知'}），如何调整仓位与资金管理。
    - 模拟极端行情或公司突发公告时的应对方案（快速止损、减仓或观望）。
 
 7. **最终交易计划与执行细则**  
-   - 请综合以上分析，提出在下一个交易日/短期内可行的交易方案，包括：初始买入价、加仓时机、止损和止盈目标。
+   - 请综合以上分析，提出在下一个交易日/短期内可行的交易方案，包括：
+     * 建仓价位与成交量条件
+     * 加仓时机与量价确认
+     * 止损止盈目标
    - 特别说明潜在不确定因素与风险提示，帮助投资者做好资金管理。
+
+请注意：
+1. 所有分析必须严格基于提供的数据
+2. 给出的建议要有具体数据支持
+3. 如遇数据缺失，请明确指出，不要凭空猜测或编造数据
 """
 
     # ========== 6. 组织最终 Prompt 文本 ========== #
