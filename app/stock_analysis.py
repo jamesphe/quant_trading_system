@@ -554,12 +554,37 @@ def get_stock_analysis_prompt(
 3. 如遇数据缺失，请明确指出，不要凭空猜测或编造数据
 """
 
+    # ========== 2. 格式化30日K线数据 ========== #
+    last_30_days = stock_data.tail(30).copy()
+    kline_data = []
+    
+    for idx, row in last_30_days.iterrows():
+        kline_info = {
+            'date': idx.strftime('%Y-%m-%d'),
+            'open': round(row['Open'], 2),
+            'high': round(row['High'], 2),
+            'low': round(row['Low'], 2),
+            'close': round(row['Close'], 2),
+            'volume': round(row['Volume']/10000, 2),  # 转换为万手
+            'amount': round(row['Amount']/100000000, 2),  # 转换为亿元
+            'change': round(row['Pct_change'], 2)
+        }
+        kline_data.append(kline_info)
+    
+    # 生成K线数据文本
+    kline_text = "【近30日K线数据】\n"
+    kline_text += "日期,开盘,最高,最低,收盘,成交量(万手),成交额(亿),涨跌幅(%)\n"
+    for k in kline_data:
+        kline_text += f"{k['date']},{k['open']},{k['high']},{k['low']},{k['close']},{k['volume']},{k['amount']},{k['change']}\n"
+
     # ========== 6. 组织最终 Prompt 文本 ========== #
     prompt = f"""
 {role_intro}
 
 【股票基本信息】  
 {basic_info_text}
+
+{kline_text}
 
 【当前价格信息】  
 - 当前价格: {current_price:.2f}  
@@ -593,7 +618,7 @@ def get_stock_analysis_prompt(
 
 {analysis_requirements}
 
-请根据以上信息，结合你的量化交易经验、资金管理策略和行业分析能力，
+请根据以上信息，特别是近30日完整K线数据，结合你的量化交易经验、资金管理策略和行业分析能力，
 给出具有深度、逻辑清晰、且能实际执行的交易分析报告。
 """
     print(f"openai 提示词: {prompt}")
