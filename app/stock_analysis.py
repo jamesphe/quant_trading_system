@@ -356,27 +356,65 @@ def get_stock_analysis_prompt(
     zlsma_20 = round(latest_row['ZLSMA_20'], 2)
     zlsma_60 = round(latest_row['ZLSMA_60'], 2)
 
-    # 增加成交量分析
+    # 增加成交量分析，考虑盘中数据
     current_volume = round(latest_row['Volume'] / 10000, 2)  # 转换为万手
     current_amount = round(latest_row['Amount'] / 100000000, 2)  # 转换为亿元
     
+    # 判断是否是盘中数据
+    now = datetime.now()
+    is_trading_time = (
+        now.hour < 15 or (now.hour == 15 and now.minute < 1)
+    ) and now.weekday() < 5
+    
+    if is_trading_time:
+        # 计算当前时间在交易日中的比例
+        current_minute = now.hour * 60 + now.minute
+        morning_start = 9 * 60 + 30  # 9:30
+        morning_end = 11 * 60 + 30   # 11:30
+        afternoon_start = 13 * 60     # 13:00
+        afternoon_end = 15 * 60       # 15:00
+        
+        total_trading_minutes = (morning_end - morning_start) + (afternoon_end - afternoon_start)
+        
+        if current_minute < morning_start:
+            trading_progress = 0
+        elif current_minute <= morning_end:
+            trading_progress = (current_minute - morning_start) / total_trading_minutes
+        elif current_minute < afternoon_start:
+            trading_progress = (morning_end - morning_start) / total_trading_minutes
+        elif current_minute <= afternoon_end:
+            trading_progress = ((morning_end - morning_start) + 
+                              (current_minute - afternoon_start)) / total_trading_minutes
+        else:
+            trading_progress = 1
+            
+        # 估算全天成交量
+        estimated_volume = current_volume / trading_progress if trading_progress > 0 else 0
+        volume_note = f"(当前时间{now.strftime('%H:%M')}, 预估全天成交量约{round(estimated_volume, 2)}万手)"
+    else:
+        volume_note = "(收盘数据)"
+        estimated_volume = current_volume
+
     # 计算5日平均成交量
     vol_ma5 = round(stock_data['Volume'].rolling(5).mean().iloc[-1] / 10000, 2)
     # 计算量比 (当日成交量/5日平均成交量)
-    vol_ratio = round(current_volume / vol_ma5, 2) if vol_ma5 > 0 else 0
+    vol_ratio = round(estimated_volume / vol_ma5, 2) if vol_ma5 > 0 else 0
     
-    # 判断量价关系
+    # 判断量价关系时考虑是否是盘中数据
     price_up = latest_row['Close'] > prev_row['Close']
-    volume_up = latest_row['Volume'] > prev_row['Volume']
+    volume_up = estimated_volume > prev_row['Volume'] / 10000
     vol_price_divergence = ""
+    if is_trading_time:
+        vol_price_divergence = f"盘中数据，成交量分析仅供参考 - "
+    
     if price_up and not volume_up:
-        vol_price_divergence = "价升量缩，可能缺乏上涨动能"
+        vol_price_divergence += "价升量缩，可能缺乏上涨动能"
     elif not price_up and volume_up:
-        vol_price_divergence = "价跌量增，可能存在下跌风险"
+        vol_price_divergence += "价跌量增，可能存在下跌风险"
     elif price_up and volume_up:
-        vol_price_divergence = "价升量增，上涨趋势确认"
+        vol_price_divergence += "价升量增，上涨趋势确认"
     else:
-        vol_price_divergence = "价跌量缩，下跌动能减弱"
+        vol_price_divergence += "价跌量缩，下跌动能减弱"
 
     # 基本信息
     basic_info_text = "\n".join([f"{k}: {v}" for k, v in basic_info.items()])
@@ -444,7 +482,8 @@ def get_stock_analysis_prompt(
    - 计算并分析关键价格位置（如30日高点{stock_data['High'].max():.2f}、低点{stock_data['Low'].min():.2f}）
    - 结合 ATR（{atr}）等波动性指标，判断当前市场情绪
    - 分析成交量特征：
-     * 当日成交量: {current_volume}万手，成交额: {current_amount}亿元
+     * 当日成交量: {current_volume}万手 {volume_note}
+     * 成交额: {current_amount}亿元
      * 5日均量: {vol_ma5}万手，量比: {vol_ratio}
      * 量价关系: {vol_price_divergence}
 
