@@ -12,6 +12,7 @@ from config import Config
 import json
 from openai import AsyncOpenAI, OpenAI
 import os
+import numpy as np
 
 
 class AIModelBase(ABC):
@@ -360,6 +361,20 @@ def get_stock_analysis_prompt(
     current_volume = round(latest_row['Volume'] / 10000, 2)  # 转换为万手
     current_amount = round(latest_row['Amount'] / 100000000, 2)  # 转换为亿元
     
+    # 计算波动率分布
+    stock_data['Daily_Return'] = stock_data['Close'].pct_change()
+    volatility_30d = stock_data['Daily_Return'].rolling(window=30).std() * np.sqrt(252)
+    current_volatility = volatility_30d.iloc[-1]
+    avg_volatility = volatility_30d.mean()
+
+    # 计算成交量统计
+    volume_ma5 = stock_data['Volume'].rolling(window=5).mean()
+    volume_ma10 = stock_data['Volume'].rolling(window=10).mean()
+    volume_ma30 = stock_data['Volume'].rolling(window=30).mean()
+    
+    # 计算量比
+    vol_ratio = current_volume / volume_ma5.iloc[-1] if not volume_ma5.empty else 0
+
     # 判断是否是盘中数据
     now = datetime.now()
     is_trading_time = (
@@ -395,11 +410,17 @@ def get_stock_analysis_prompt(
         volume_note = "(收盘数据)"
         estimated_volume = current_volume
 
-    # 计算5日平均成交量
-    vol_ma5 = round(stock_data['Volume'].rolling(5).mean().iloc[-1] / 10000, 2)
-    # 计算量比 (当日成交量/5日平均成交量)
-    vol_ratio = round(estimated_volume / vol_ma5, 2) if vol_ma5 > 0 else 0
-    
+    # 分析成交量趋势
+    volume_trend = ""
+    if len(stock_data) >= 30:
+        recent_vol_ma5 = volume_ma5.iloc[-5:]
+        if recent_vol_ma5.is_monotonic_increasing:
+            volume_trend = "5日均量持续放大"
+        elif recent_vol_ma5.is_monotonic_decreasing:
+            volume_trend = "5日均量持续萎缩"
+        else:
+            volume_trend = "5日均量波动"
+
     # 判断量价关系时考虑是否是盘中数据
     price_up = latest_row['Close'] > prev_row['Close']
     volume_up = estimated_volume > prev_row['Volume'] / 10000
@@ -480,11 +501,17 @@ def get_stock_analysis_prompt(
 1. **行情回顾与多空格局**  
    - 基于近30日的完整数据，分析价格走势与成交量变化
    - 计算并分析关键价格位置（如30日高点{stock_data['High'].max():.2f}、低点{stock_data['Low'].min():.2f}）
-   - 结合 ATR（{atr}）等波动性指标，判断当前市场情绪
-   - 分析成交量特征：
+   - 波动率分析：
+     * 当前波动率: {current_volatility:.2%}
+     * 30日平均波动率: {avg_volatility:.2%}
+   - 成交量特征：
      * 当日成交量: {current_volume}万手 {volume_note}
      * 成交额: {current_amount}亿元
-     * 5日均量: {vol_ma5}万手，量比: {vol_ratio}
+     * 5日均量: {volume_ma5.iloc[-1]/10000:.2f}万手
+     * 10日均量: {volume_ma10.iloc[-1]/10000:.2f}万手
+     * 30日均量: {volume_ma30.iloc[-1]/10000:.2f}万手
+     * 量比: {vol_ratio:.2f}
+     * 成交量趋势: {volume_trend}
      * 量价关系: {vol_price_divergence}
 
 2. **Chandelier Exit策略深入分析**  
@@ -669,12 +696,15 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                     yield content
                 return
             
+        # 获取额外90天的历史数据以确保指标计算的准确性
+        extended_start_date = (pd.to_datetime(start_date) - pd.Timedelta(days=90)).strftime('%Y-%m-%d')
+            
         if symbol.startswith(('51', '159')):
-            stock_data = get_etf_data(symbol, start_date, end_date)
+            stock_data = get_etf_data(symbol, extended_start_date, end_date)
         elif symbol.isdigit():
             stock_data = get_stock_data(
                 symbol,
-                start_date,
+                extended_start_date,  # 使用扩展的开始日期
                 end_date,
                 include_macd=True,
                 include_rsi=True,
@@ -683,17 +713,20 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                 include_chandelier=True
             )
         else:
-            stock_data = get_us_stock_data(symbol, start_date, end_date)
+            stock_data = get_us_stock_data(symbol, extended_start_date, end_date)
             
         if stock_data.empty:
             yield "未找到股票数据"
             return
 
+        # 只使用请求的日期范围生成分析提示
+        analysis_data = stock_data[start_date:end_date].copy()
+
         stock_name = get_stock_name(symbol)
         basic_info = get_stock_basic_info(symbol)
         news_list = get_stock_news(symbol, limit=5)
         
-        prompt = get_stock_analysis_prompt(symbol, stock_data, stock_name, basic_info, news_list)
+        prompt = get_stock_analysis_prompt(symbol, analysis_data, stock_name, basic_info, news_list)
         
         try:
             for chunk in model.analyze(prompt, stream=True):
