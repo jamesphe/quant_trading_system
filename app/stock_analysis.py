@@ -3,8 +3,10 @@ from datetime import datetime, timedelta
 import pandas as pd
 from zhipuai import ZhipuAI
 import sys
-from data_fetch import get_stock_data, get_stock_name, get_stock_basic_info, get_stock_news, get_etf_data, get_us_stock_data
-import logging
+from data_fetch import (
+    get_stock_data, get_stock_name, get_stock_basic_info, 
+    get_stock_news, get_etf_data, get_us_stock_data
+)
 from typing import Union, Generator
 import requests
 from abc import ABC, abstractmethod
@@ -111,11 +113,17 @@ class OpenAIModel(AIModelBase):
         self.config = config.config.get('openai', {})
         self.client = OpenAI(
             api_key=api_key, 
-            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
+            base_url=self.config.get(
+                'base_url', 
+                "https://api.chatanywhere.tech/v1"
+            )
         )
         self.async_client = AsyncOpenAI(
             api_key=api_key, 
-            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
+            base_url=self.config.get(
+                'base_url', 
+                "https://api.chatanywhere.tech/v1"
+            )
         )
     
     def analyze(
@@ -127,7 +135,12 @@ class OpenAIModel(AIModelBase):
         messages = [
             {
                 "role": "system",
-                "content": self.config.get('system_prompt', "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。")
+                "content": self.config.get(
+                    'system_prompt', 
+                    "你是一位在金融行业拥有超过十年经验的资深量化交易员，"
+                    "熟悉多种交易策略和风控体系。请基于提供的数据进行专业分析，"
+                    "不要编造或假设任何未提供的数据。"
+                )
             },
             {
                 "role": "user",
@@ -165,15 +178,23 @@ class DeepSeekModel(AIModelBase):
                 api_key=api_key,
                 base_url="https://api.deepseek.com"
             )
-        except Exception as e:
+        except Exception:
             raise
     
-    def analyze(self, prompt: str, stream: bool = False) -> Union[str, Generator]:
+    def analyze(
+        self, 
+        prompt: str, 
+        stream: bool = False
+    ) -> Union[str, Generator]:
         try:
             messages = [
                 {
                     "role": "system", 
-                    "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+                    "content": (
+                        "你是一位在金融行业拥有超过十年经验的资深量化交易员，"
+                        "熟悉多种交易策略和风控体系。请基于提供的数据进行专业分析，"
+                        "不要编造或假设任何未提供的数据。"
+                    )
                 },
                 {
                     "role": "user",
@@ -188,7 +209,7 @@ class DeepSeekModel(AIModelBase):
                     stream=stream,
                     max_tokens=4096
                 )
-            except Exception as api_error:
+            except Exception:
                 raise
             
             if stream:
@@ -197,7 +218,7 @@ class DeepSeekModel(AIModelBase):
             result = response.choices[0].message.content
             return result
             
-        except Exception as e:
+        except Exception:
             raise
     
     def _handle_stream_response(self, response):
@@ -208,7 +229,7 @@ class DeepSeekModel(AIModelBase):
                     content = chunk.choices[0].delta.content
                     yield content
                     
-        except Exception as e:
+        except Exception:
             raise
 
 
@@ -232,7 +253,11 @@ class SiliconFlowModel(AIModelBase):
             messages = [
                 {
                     "role": "system",
-                    "content": "你是一位专业的股票分析师，请基于提供的数据进行专业的分析。"
+                    "content": (
+                        "你是一位在金融行业拥有超过十年经验的资深量化交易员，"
+                        "熟悉多种交易策略和风控体系。请基于提供的数据进行专业分析，"
+                        "不要编造或假设任何未提供的数据。"
+                    )
                 },
                 {
                     "role": "user", 
@@ -252,7 +277,7 @@ class SiliconFlowModel(AIModelBase):
                 return self._handle_stream_response(response)
             return response.choices[0].message.content
             
-        except Exception as e:
+        except Exception:
             raise
     
     def _handle_stream_response(self, response):
@@ -263,7 +288,7 @@ class SiliconFlowModel(AIModelBase):
                     content = chunk.choices[0].delta.content
                     yield content
                     
-        except Exception as e:
+        except Exception:
             raise
 
 
@@ -276,7 +301,10 @@ def get_cost_price(symbol: str) -> float:
     Returns:
         float: 持仓成本价格,如果未找到返回0
     """
-    portfolio_file = os.path.join(os.path.dirname(__file__), 'config/portfolio_stocks.csv')
+    portfolio_file = os.path.join(
+        os.path.dirname(__file__), 
+        'config/portfolio_stocks.csv'
+    )
     try:
         df = pd.read_csv(portfolio_file)
         cost_price = df[df['股票代码'].astype(str) == str(symbol)]['持仓成本'].iloc[0]
@@ -284,7 +312,6 @@ def get_cost_price(symbol: str) -> float:
     except Exception as e:
         print(f"获取股票{symbol}持仓成本时出错: {str(e)}")
         return 0.0
-
 
 
 def get_stock_analysis_prompt(
@@ -624,7 +651,12 @@ def get_stock_analysis_prompt(
     print(f"openai 提示词: {prompt}")
     return prompt
 
-def get_backtest_results(symbol, start_date=None, end_date=None, strategy_params=None):
+def get_backtest_results(
+    symbol, 
+    start_date=None, 
+    end_date=None, 
+    strategy_params=None
+):
     """
     调用回测函数获取指定股票的回测结果
     
@@ -757,7 +789,7 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
             for chunk in model.analyze(prompt, stream=True):
                 if chunk:
                     yield chunk
-        except Exception as e:
+        except Exception:
             raise
 
     except Exception as e:
