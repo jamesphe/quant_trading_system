@@ -519,9 +519,14 @@ def get_stock_analysis_prompt(
     if macd < round(prev_row['MACD'], 2) and current_price > round(prev_row['Close'], 2):
         macd_divergence = "检测到MACD顶背离，建议关注潜在风险，考虑减仓或止盈。"
 
+    # 获取当前时间
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
     # ========== 4. 角色设定与深度分析需求 ========== #
     role_intro = f"""
 你是一名在金融行业拥有超过十年经验的资深量化交易员，熟悉多种交易策略和风控体系。
+当前时间是: {current_time}
+
 请严格基于以下提供的 {stock_name}（{symbol}）的数据进行分析：
 1. 近30日完整的历史价格、成交量数据
 2. 基本面数据
@@ -534,7 +539,8 @@ def get_stock_analysis_prompt(
 - 如果数据不足以支持某项分析，应该明确说明"由于缺乏xxx数据，无法对xxx进行分析"
 - 不要使用你训练数据中的任何股票信息，即使你认为它们可能相关
 - 如果用户追问的问题超出提供的数据范围，明确告知你只能基于提供的数据进行分析
-
+- 不要使用当前时间之后的任何市场数据或事件
+  
 请结合 Chandelier Exit（吊灯止损）策略，基于实际数据给出专业的分析报告。
 """
 
@@ -829,9 +835,14 @@ def handle_stock_followup_question(symbol, question, model, conversation_history
     if conversation_history is None:
         conversation_history = []
         
+    # 获取当前时间
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
     # 构建强化的系统提示
     system_prompt = f"""
     你是一位在金融行业拥有超过十年经验的资深量化交易员，现在正在分析股票代码 {symbol}。
+    
+    当前时间是: {current_time}
     
     重要限制：
     1. 你必须仅使用之前提供给你的数据进行分析
@@ -839,6 +850,7 @@ def handle_stock_followup_question(symbol, question, model, conversation_history
     3. 如果用户询问的内容超出提供的数据范围，请明确告知："我只能基于之前提供的数据进行分析，无法回答超出这些数据范围的问题"
     4. 不要编造或假设任何未提供的数据
     5. 如果需要额外数据才能回答问题，请明确指出需要哪些具体数据
+    6. 不要使用当前时间之后的任何市场数据或事件
     
     请基于这些限制回答用户的问题。
     """
