@@ -27,7 +27,8 @@ from stock_analysis import (
     OpenAIModel, 
     analyze_stock, 
     DeepSeekModel, 
-    SiliconFlowModel
+    SiliconFlowModel,
+    handle_stock_followup_question
 )
 from ai_stock_analysis import (
     stream_zhipu_followup,
@@ -1045,14 +1046,28 @@ def handle_followup():
         symbol = data.get('symbol')
         question = data.get('question')
         conversation_history = data.get('conversation_history', [])
+        model_type = data.get('model', 'openai')  # 默认使用 openai 模型
         
         if not symbol or not question:
             return jsonify({'error': '缺少必要参数'}), 400
             
+        # 初始化选择的AI模型
+        if model_type == 'zhipu':
+            model = ZhipuAIModel()
+        elif model_type == 'kimi':
+            model = KimiModel()
+        elif model_type == 'deepseek':
+            model = DeepSeekModel()
+        elif model_type == 'siliconflow':
+            model = SiliconFlowModel()
+        else:
+            model = OpenAIModel()
+            
         # 使用生成器函数来流式返回响应
         def generate():
             try:
-                for chunk in stream_openai_followup(symbol, question, conversation_history):
+                # 使用新的 handle_stock_followup_question 方法处理追问
+                for chunk in handle_stock_followup_question(symbol, question, model, conversation_history):
                     if chunk:  # 确保 chunk 不为空
                         yield chunk  # 直接返回文本内容
             except Exception as e:

@@ -138,8 +138,13 @@ class OpenAIModel(AIModelBase):
                 "content": self.config.get(
                     'system_prompt', 
                     "你是一位在金融行业拥有超过十年经验的资深量化交易员，"
-                    "熟悉多种交易策略和风控体系。请基于提供的数据进行专业分析，"
-                    "不要编造或假设任何未提供的数据。"
+                    "熟悉多种交易策略和风控体系。"
+                    "重要提示：你必须严格遵守以下规则："
+                    "1. 仅使用用户提供的数据进行分析，不要使用任何训练数据中的股票信息"
+                    "2. 如果用户询问的内容超出提供的数据范围，明确告知'我只能基于您提供的数据进行分析，无法回答超出这些数据范围的问题'"
+                    "3. 不要编造或假设任何未提供的数据"
+                    "4. 不要引用任何未在用户提供的数据中明确提及的股票历史表现、价格或趋势"
+                    "5. 如果用户追问的问题需要额外数据，请明确指出需要哪些具体数据才能回答该问题"
                 )
             },
             {
@@ -192,8 +197,13 @@ class DeepSeekModel(AIModelBase):
                     "role": "system", 
                     "content": (
                         "你是一位在金融行业拥有超过十年经验的资深量化交易员，"
-                        "熟悉多种交易策略和风控体系。请基于提供的数据进行专业分析，"
-                        "不要编造或假设任何未提供的数据。"
+                        "熟悉多种交易策略和风控体系。"
+                        "重要提示：你必须严格遵守以下规则："
+                        "1. 仅使用用户提供的数据进行分析，不要使用任何训练数据中的股票信息"
+                        "2. 如果用户询问的内容超出提供的数据范围，明确告知'我只能基于您提供的数据进行分析，无法回答超出这些数据范围的问题'"
+                        "3. 不要编造或假设任何未提供的数据"
+                        "4. 不要引用任何未在用户提供的数据中明确提及的股票历史表现、价格或趋势"
+                        "5. 如果用户追问的问题需要额外数据，请明确指出需要哪些具体数据才能回答该问题"
                     )
                 },
                 {
@@ -255,8 +265,13 @@ class SiliconFlowModel(AIModelBase):
                     "role": "system",
                     "content": (
                         "你是一位在金融行业拥有超过十年经验的资深量化交易员，"
-                        "熟悉多种交易策略和风控体系。请基于提供的数据进行专业分析，"
-                        "不要编造或假设任何未提供的数据。"
+                        "熟悉多种交易策略和风控体系。"
+                        "重要提示：你必须严格遵守以下规则："
+                        "1. 仅使用用户提供的数据进行分析，不要使用任何训练数据中的股票信息"
+                        "2. 如果用户询问的内容超出提供的数据范围，明确告知'我只能基于您提供的数据进行分析，无法回答超出这些数据范围的问题'"
+                        "3. 不要编造或假设任何未提供的数据"
+                        "4. 不要引用任何未在用户提供的数据中明确提及的股票历史表现、价格或趋势"
+                        "5. 如果用户追问的问题需要额外数据，请明确指出需要哪些具体数据才能回答该问题"
                     )
                 },
                 {
@@ -517,6 +532,8 @@ def get_stock_analysis_prompt(
 - 你必须仅使用上述提供的数据进行分析，不要编造或假设任何未提供的数据
 - 如果某些数据缺失或不完整，请在分析中明确指出，而不是自行补充或推测
 - 如果数据不足以支持某项分析，应该明确说明"由于缺乏xxx数据，无法对xxx进行分析"
+- 不要使用你训练数据中的任何股票信息，即使你认为它们可能相关
+- 如果用户追问的问题超出提供的数据范围，明确告知你只能基于提供的数据进行分析
 
 请结合 Chandelier Exit（吊灯止损）策略，基于实际数据给出专业的分析报告。
 """
@@ -794,6 +811,65 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
 
     except Exception as e:
         yield f"分析过程中发生错误: {str(e)}"
+
+
+def handle_stock_followup_question(symbol, question, model, conversation_history=None):
+    """
+    处理股票分析的追问
+    
+    Args:
+        symbol (str): 股票代码
+        question (str): 用户追问
+        model (AIModelBase): AI模型实例
+        conversation_history (list): 对话历史
+        
+    Returns:
+        Generator: 回答生成器
+    """
+    if conversation_history is None:
+        conversation_history = []
+        
+    # 构建强化的系统提示
+    system_prompt = f"""
+    你是一位在金融行业拥有超过十年经验的资深量化交易员，现在正在分析股票代码 {symbol}。
+    
+    重要限制：
+    1. 你必须仅使用之前提供给你的数据进行分析
+    2. 不要使用你训练数据中的任何股票信息，即使你认为它们可能相关
+    3. 如果用户询问的内容超出提供的数据范围，请明确告知："我只能基于之前提供的数据进行分析，无法回答超出这些数据范围的问题"
+    4. 不要编造或假设任何未提供的数据
+    5. 如果需要额外数据才能回答问题，请明确指出需要哪些具体数据
+    
+    请基于这些限制回答用户的问题。
+    """
+    
+    # 构建消息
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    
+    # 添加对话历史
+    if conversation_history:
+        messages.extend(conversation_history)
+        
+    # 添加当前问题
+    messages.append({"role": "user", "content": question})
+    
+    # 调用模型
+    try:
+        response = model.client.chat.completions.create(
+            model=model.config.get('model', "gpt-4o") if hasattr(model, 'config') else "gpt-4o",
+            messages=messages,
+            stream=True,
+            temperature=0.7
+        )
+        
+        for chunk in response:
+            if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        yield f"处理追问时发生错误: {str(e)}"
 
 
 def main():
