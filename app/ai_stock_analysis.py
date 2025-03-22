@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import sys
 import argparse
 import os
-import zhipuai
 from zhipuai import ZhipuAI
 from abc import ABC, abstractmethod
 from config import Config
@@ -168,7 +167,11 @@ def analyze_stock(symbol, start_date, end_date):
     - str，分析结果
     """
     # 获取股票数据
-    stock_data = get_stock_data(symbol, start_date, end_date, include_macd=True, include_rsi=True, include_boll=True, include_zlsma=True, include_chandelier=True)
+    stock_data = get_stock_data(
+        symbol, start_date, end_date, 
+        include_macd=True, include_rsi=True, include_boll=True, 
+        include_zlsma=True, include_chandelier=True
+    )
     
     if stock_data.empty:
         return f"无法获取股票 {symbol} 的数据"
@@ -192,7 +195,7 @@ def read_industry_fund_flow(date):
     file_name = os.path.join('stock_data', f"行业资金流_{date.strftime('%Y%m%d')}.csv")
     print(f"尝试读取文件: {file_name}")
     if os.path.exists(file_name):
-        print(f"文件存在,正在读取...")
+        print("文件存在,正在读取...")
         return pd.read_csv(file_name)
     else:
         print(f"文件不存在: {file_name}")
@@ -207,7 +210,8 @@ def save_analysis_to_markdown(analysis_result, symbol=None, date=None):
     - symbol: str，可选，股票代码
     - date: datetime，可选，分析日期
     """
-    date_str = date.strftime('%Y%m%d') if date else datetime.now().strftime('%Y%m%d')
+    date_str = (date.strftime('%Y%m%d') if date 
+                else datetime.now().strftime('%Y%m%d'))
     file_name = (f"stock_analysis_{symbol}_{date_str}.md" if symbol 
                  else f"stocks_analysis_{args.ai}_{date_str}.md")
     
@@ -300,7 +304,8 @@ def get_csv_analysis_prompt(df, industry_fund_flow):
     - str，分析提示词
     """
     return f"""
-    请对提供的全部股票进行全面的对比分析，从中筛选出最适合建仓的5只股票。分析过程需要对每只股票的各项指标进行横向比较，综合评估后给出最终推荐名单。
+    请对提供的全部股票进行全面的对比分析，从中筛选出最适合短线交易的5只股票。
+    分析过程需要对每只股票的各项指标进行横向比较，综合评估后给出最终推荐名单。
 
     行业资金流数据:
     {industry_fund_flow.to_string() if industry_fund_flow is not None 
@@ -310,53 +315,66 @@ def get_csv_analysis_prompt(df, industry_fund_flow):
     {df.to_string()}
 
     分析步骤:
-    1. 个股筛选标准(主要考虑因素)
-    - 主力资金流向分析
-      * 主力净流入金额及占比
-      * 近3日和5日资金净流入趋势
-      * 主力资金持续性评估
+    1. 短线交易股票筛选标准(主要考虑因素)
     - 技术指标表现
-      * 夏普比率(优选>0.15)
-      * 历史胜率(>60%)
-      * 最大回撤(<15%)
-      * 历史最佳回报率
+      * 夏普比率(优选>1.5的高夏普比率股票)
+      * 胜率(优选胜率>0.7的股票)
+      * 最大回撤(优先选择<15%的股票)
+      * 信号强度(signal_strength值较高的股票，优先考虑>0.5的股票)
+      * 最新信号(为1.0的股票表示有买入信号)
+      * 周期(period)与倍数组合分析(短周期适合短线交易)
+    - 价格波动性分析
+      * 最新涨跌幅(优先选择涨幅在3-10%之间的股票，避免涨幅过大或过小的股票)
+      * 近期价格走势(寻找突破或回调点)
+      * 最佳回报率(参考历史表现)
+    - 主力资金流向分析
+      * 主力净流入金额及占比(主力净流入率>5%为佳)
+      * 近3日资金净流入趋势(连续流入为佳)
+      * 近5日资金净流入变化(关注资金流向反转)
     - 交易活跃度
-      * 最新交易量
-      * 换手率变化
-      * 最新涨跌幅(优先选择涨幅在5%以内的股票,避免涨停和涨幅过大的股票)
-
-    2. 行业资金流分析(辅助参考)
-    - 所属行业资金流入规模
-    - 行业资金流入持续性
-    - 行业基本面和发展前景
+      * 最新交易量(相对于行业平均水平)
+      * 换手率(优选换手率>5%的活跃股票)
+      * 行业对比(同行业内相对活跃度)
     
-    3. 风险控制指标
-    - 涨跌幅风险评估
-    - 流动性风险评估
-    - 行业系统性风险评估
+    2. 行业资金流分析(辅助参考)
+    - 所属行业短期资金流入规模
+    - 行业热点轮动情况
+    - 行业近期表现
+    - 行业内个股表现对比
+    
+    3. 短线风险控制指标
+    - 止损位设置建议(基于吊灯指标或ATR倍数，参考period和倍数列)
+    - 流动性风险评估(基于换手率和交易量)
+    - 短期技术面风险评估
+    - 最大加仓次数限制(参考最大加仓列)
     
     4. 综合评估
-    - 个股投资价值评分
-    - 行业景气度加分
-    - 风险因素扣分
+    - 短线交易机会评分(综合考虑夏普比率、胜率、信号强度)
+    - 行业短期热度加分
+    - 风险因素扣分(考虑最大回撤和资金流向)
+    - 投资比例参考(参考CSV中的投资比例列)
+    - strength_threshold值分析(作为信号强度阈值参考)
 
     对每只推荐股票请提供:
-    1. 核心推荐理由(重点说明个股自身优势)
+    1. 核心短线交易理由(重点说明短期催化因素)
     2. 关键指标数据:
-       - 主力资金净流入情况
-       - 近期资金流向趋势
-       - 夏普比率
-       - 历史胜率
-       - 最大回撤
-       - 最新价格
-       - 最新涨跌幅（百分比）
-    3. 所属行业资金流情况及影响
+       - 夏普比率、胜率和最大回撤
+       - 主力资金净流入情况及占比
+       - 近期资金流向趋势(3日和5日)
+       - 换手率和交易量分析
+       - 最新价格和涨跌幅
+       - 信号强度和周期(period)分析
+       - 投资比例和最大加仓建议
+    3. 所属行业短期资金流情况及影响
     4. 风险提示
-    5. 建议买入价位区间
+    5. 建议买入价位区间和止损位(参考吊灯指标，使用period和倍数列计算)
 
     最后请给出:
-    1. 投资组合配置建议
-    2. 止盈止损建议
+    1. 短线交易策略建议(包括持仓时间、预期收益，参考period值)
+    2. 精确的止盈止损建议(基于吊灯指标，使用倍数列作为参考)
+    3. 交易时机选择建议
+    4. 仓位配置建议(参考投资比例列)
+    5. 加仓策略(参考最大加仓列)
     """
 
 
@@ -400,7 +418,9 @@ def get_zhipu_analysis(stock_data):
     返回：
     - str，智谱AI的分析结果
     """
-    client = ZhipuAI(api_key="8d71dbdc04f0f2fb125badc9f6ab51be.vBBjM6pPSaoVIHoM")
+    client = ZhipuAI(
+        api_key="8d71dbdc04f0f2fb125badc9f6ab51be.vBBjM6pPSaoVIHoM"
+    )
     
     prompt = get_stock_analysis_prompt(stock_data)
     
@@ -434,7 +454,9 @@ def stream_zhipu_analysis(prompt):
     参数：
     - prompt: str，发送给智谱AI的提示词
     """
-    client = ZhipuAI(api_key="8d71dbdc04f0f2fb125badc9f6ab51be.vBBjM6pPSaoVIHoM")
+    client = ZhipuAI(
+        api_key="8d71dbdc04f0f2fb125badc9f6ab51be.vBBjM6pPSaoVIHoM"
+    )
     
     try:
         response = client.chat.completions.create(
@@ -544,8 +566,6 @@ def stream_zhipu_followup(symbol, question, conversation_history):
                     stream=True
                 )
                 
-                buffer = ""
-                skip_line = False
                 for chunk in response:
                     if hasattr(chunk.choices[0].delta, 'content'):
                         content = chunk.choices[0].delta.content
@@ -646,7 +666,6 @@ def stream_openai_followup(symbol, question, conversation_history):
                     stream=True
                 )
                 
-                buffer = ""
                 for chunk in response:
                     if hasattr(chunk.choices[0].delta, 'content'):
                         content = chunk.choices[0].delta.content
