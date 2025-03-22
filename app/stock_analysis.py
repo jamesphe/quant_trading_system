@@ -550,7 +550,7 @@ def get_stock_analysis_prompt(
 
 1. **行情回顾与多空格局**  
    - 基于近30日的完整数据，分析价格走势与成交量变化
-   - 计算并分析关键价格位置（如30日高点{stock_data['High'].max():.2f}、低点{stock_data['Low'].min():.2f}）
+   - 计算并分析关键价格位置（如30日高点{stock_data.tail(30)['High'].max():.2f}、低点{stock_data.tail(30)['Low'].min():.2f}）
    - 波动率分析：
      * 当前波动率: {current_volatility:.2%}
      * 30日平均波动率: {avg_volatility:.2%}
