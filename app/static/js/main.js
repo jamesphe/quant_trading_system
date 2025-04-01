@@ -1185,9 +1185,13 @@ async function handleBacktest() {
     }
 }
 
-// 修改 handleAnalysis 函数，添加对话历史记录
+// 修改 handleAnalysis 函数，确保正确阻止表单默认提交行为
 async function handleAnalysis(event) {
-    event.preventDefault();
+    // 确保阻止默认行为
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();  // 添加这行来阻止事件冒泡
+    }
     
     const symbol = document.getElementById('analysisSymbol').value;
     const model = document.getElementById('modelSelect').value;
@@ -1308,6 +1312,9 @@ async function handleAnalysis(event) {
 
                             // 渲染markdown内容
                             contentDiv.innerHTML = md.render(fullText);
+                            
+                            // 保存原始内容用于复制
+                            contentDiv.setAttribute('data-raw-content', fullText);
                         }
                     } catch (e) {
                         console.warn('解析数据行失败:', e);
@@ -1330,6 +1337,9 @@ async function handleAnalysis(event) {
         `;
         showToast(error.message, 'error');
     }
+    
+    // 返回 false 以确保不会触发表单默认提交
+    return false;
 }
 
 // 确保表单绑定了事件处理函数
@@ -1338,33 +1348,60 @@ document.addEventListener('DOMContentLoaded', function() {
     const analysisForm = document.getElementById('analysisForm');
     if (analysisForm) {
         // 确保移除任何现有的事件监听器
-        analysisForm.removeEventListener('submit', handleAnalysis);
-        // 只添加一次事件监听器
-        analysisForm.addEventListener('submit', handleAnalysis, { once: true });
+        const newForm = analysisForm.cloneNode(true);
+        analysisForm.parentNode.replaceChild(newForm, analysisForm);
+        
+        // 添加新的事件监听器
+        newForm.addEventListener('submit', function(event) {
+            console.log('分析表单提交被触发');
+            event.preventDefault();
+            event.stopPropagation();
+            handleAnalysis(event);
+            return false;
+        });
     }
 
     // 追问相关的事件监听器
     const followupForm = document.getElementById('followupForm');
     if (followupForm) {
-        followupForm.removeEventListener('submit', sendFollowupQuestion);
-        followupForm.addEventListener('submit', function(event) {
+        const newFollowupForm = followupForm.cloneNode(true);
+        followupForm.parentNode.replaceChild(newFollowupForm, followupForm);
+        
+        newFollowupForm.addEventListener('submit', function(event) {
             event.preventDefault();
+            event.stopPropagation();
             sendFollowupQuestion();
+            return false;
         });
     }
     
     const followupInput = document.getElementById('followupQuestion');
     if (followupInput) {
-        followupInput.removeEventListener('keypress', handleFollowupKeypress);
-        followupInput.addEventListener('keypress', handleFollowupKeypress);
+        followupInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendFollowupQuestion();
+                return false;
+            }
+        });
     }
 });
 
-// 将回车键处理提取为单独的函数
-function handleFollowupKeypress(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        sendFollowupQuestion();
+// 修改 switchToAIAnalysis 函数，确保正确处理分析
+function switchToAIAnalysis(stockCode) {
+    // 切换到个股分析标签页
+    switchTab('analysis-tab');
+    
+    // 设置股票代码
+    const analysisSymbol = document.getElementById('analysisSymbol');
+    if (analysisSymbol) {
+        analysisSymbol.value = stockCode;
+        
+        // 自动触发分析
+        setTimeout(() => {
+            // 直接调用 handleAnalysis 而不是触发表单提交事件
+            handleAnalysis();
+        }, 100);
     }
 }
 
@@ -1972,27 +2009,6 @@ function switchToTechnicalAnalysis(stockCode) {
     
     // 自动触发优化
     document.getElementById('optimizeForm').dispatchEvent(new Event('submit'));
-}
-
-// 修改 switchToAIAnalysis 函数，添加自动触发分析的功能
-function switchToAIAnalysis(stockCode) {
-    // 切换到个股分析标签页
-    switchTab('analysis-tab');
-    
-    // 设置股票代码
-    const analysisSymbol = document.getElementById('analysisSymbol');
-    if (analysisSymbol) {
-        analysisSymbol.value = stockCode;
-        
-        // 自动触发分析
-        const analysisForm = document.getElementById('analysisForm');
-        if (analysisForm) {
-            // 使用 setTimeout 确保标签页切换完成后再触发分析
-            setTimeout(() => {
-                analysisForm.dispatchEvent(new Event('submit'));
-            }, 100);
-        }
-    }
 }
 
 // 优化 toggleDetails 函数
@@ -3605,33 +3621,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 添加个股分析处理函数
 async function handleStockAnalysis(event) {
-    event.preventDefault();
+    event.preventDefault();  // 确保阻止表单默认提交行为
     
     const symbol = document.getElementById('analysisSymbol').value;
     const date = document.getElementById('analysisDate').value;
+    const resultsDiv = document.getElementById('stockAnalysisResults');
+    const analysisContent = document.getElementById('analysisContent');
     
     if (!symbol || !date) {
         showToast('请输入股票代码和选择日期', 'warning');
         return;
     }
     
+    if (!resultsDiv || !analysisContent) {
+        showToast('页面元素不存在', 'error');
+        return;
+    }
+
     try {
         // 显示加载状态
-        const resultsDiv = document.getElementById('stockAnalysisResults');
-        const analysisContent = document.getElementById('analysisContent');
-        
-        if (!resultsDiv || !analysisContent) {
-            showToast('页面元素不存在', 'error');
-            return;
-        }
-        
+        resultsDiv.classList.remove('hidden');
         analysisContent.innerHTML = `
             <div class="flex justify-center items-center py-8">
                 <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
                 <div class="ml-3 text-gray-600">正在分析数据...</div>
             </div>
         `;
-        resultsDiv.classList.remove('hidden');
         
         // 发送分析请求
         const response = await fetch('/api/stock/analysis', {
@@ -3670,7 +3685,7 @@ async function handleStockAnalysis(event) {
                         return hljs.highlight(str, { language: lang }).value;
                     } catch (__) {}
                 }
-                return ''; // 使用默认的转义
+                return ''; 
             }
         });
 
@@ -3684,14 +3699,11 @@ async function handleStockAnalysis(event) {
         
     } catch (error) {
         console.error('个股分析失败:', error);
-        const analysisContent = document.getElementById('analysisContent');
-        if (analysisContent) {
-            analysisContent.innerHTML = `
-                <div class="text-red-500 text-center p-4">
-                    ${error.message || '分析失败，请重试'}
-                </div>
-            `;
-        }
+        analysisContent.innerHTML = `
+            <div class="text-red-500 text-center p-4">
+                ${error.message || '分析失败，请重试'}
+            </div>
+        `;
         showToast(error.message, 'error');
     }
 }
