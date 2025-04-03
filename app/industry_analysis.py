@@ -176,7 +176,11 @@ class IndustryAnalyzer:
                 ]
                 
                 # 获取行业详细数据
-                detail = self.analyze_industry_detail(industry_name)
+                try:
+                    detail = self.analyze_industry_detail(industry_name)
+                except Exception as e:
+                    print(f"获取{industry_name}行业详细数据失败: {e}")
+                    detail = None
                 if detail:
                     industry_info.extend([
                         f"行业成分股总数: {detail['total_stocks']}",
@@ -188,7 +192,11 @@ class IndustryAnalyzer:
                     ])
                 
                 # 获取龙头股信息
-                leaders = self.get_industry_leaders(industry_name)
+                try:
+                    leaders = self.get_industry_leaders(industry_name)
+                except Exception as e:
+                    print(f"获取{industry_name}行业龙头股信息失败: {e}")
+                    leaders = pd.DataFrame()
                 if not leaders.empty:
                     industry_info.append("\n行业龙头股:")
                     for _, leader in leaders.iterrows():
@@ -200,7 +208,11 @@ class IndustryAnalyzer:
                         )
                 
                 # 添加潜力股信息
-                potential_stocks = self.get_industry_potential_stocks(industry_name, top_n=5)
+                try:
+                    potential_stocks = self.get_industry_potential_stocks(industry_name, top_n=5)
+                except Exception as e:
+                    print(f"获取{industry_name}行业潜力股信息失败: {e}")
+                    potential_stocks = pd.DataFrame()
                 if not potential_stocks.empty:
                     industry_info.append("\n行业潜力股:")
                     for _, stock in potential_stocks.iterrows():
