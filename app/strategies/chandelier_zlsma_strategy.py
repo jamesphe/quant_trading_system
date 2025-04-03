@@ -211,22 +211,22 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         # 成交量过滤
         if self.p.use_volume_filter:
             if self.data.volume[0] <= self.volume_ma[0] * self.p.volume_threshold:
-                print(f"成交量过滤: 当前成交量 {self.data.volume[0]} 不足")
+                self.log(f"成交量过滤: 当前成交量 {self.data.volume[0]} 不足")
                 return False
 
         # RSI过滤
         if self.p.use_rsi_filter:
             if is_buy_signal and self.rsi[0] > self.p.rsi_overbought:
-                print(f"RSI过滤: 当前RSI {self.rsi[0]:.2f} 超买")
+                self.log(f"RSI过滤: 当前RSI {self.rsi[0]:.2f} 超买")
                 return False
             if not is_buy_signal and self.rsi[0] < self.p.rsi_oversold:
-                print(f"RSI过滤: 当前RSI {self.rsi[0]:.2f} 超卖")
+                self.log(f"RSI过滤: 当前RSI {self.rsi[0]:.2f} 超卖")
                 return False
 
         # 波动率过滤
         if self.p.use_volatility_filter:
             if self.volatility[0] < self.p.volatility_threshold:
-                print(f"波动率过滤: 当前波动率 {self.volatility[0]:.4f} 过低")
+                self.log(f"波动率过滤: 当前波动率 {self.volatility[0]:.4f} 过低")
                 return False
 
         return True
@@ -274,9 +274,6 @@ class ChandelierZlSmaStrategy(bt.Strategy):
             self.reason = (f'收盘价 {current_close:.2f} 介于 多头止损价 {prev_long_stop:.2f} '
                      f'和 空头止损价 {prev_short_stop:.2f} 之间, 维持原有方向')
 
-        # 记录日志
-        # print(f'日期: {self.datas[0].datetime.date(0)}, 当前方向: {direction_name}, 原因: {self.reason}')
-
         # 检查方向是否发生变化
         direction_change = False
         self.buy_signal = False
@@ -287,30 +284,30 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 if current_close > self.zlsma[0]:
                     self.buy_signal = True
                     self.signal[0] = 1
-                    print(
+                    self.log(
                         f'建仓信号: 方向转多头，收盘价{current_close:.2f} > '
                         f'ZLSMA {self.zlsma[0]:.2f}'
                     )
                 else:
                     self.signal[0] = 0
-                    print('建仓信号: 方向转多头，但价格未高于ZLSMA，无交易')
+                    self.log('建仓信号: 方向转多头，但价格未高于ZLSMA，无交易')
             elif current_direction == -1:  # 转为空头
                 self.buy_signal = False
                 self.signal[0] = -1
-                print(
+                self.log(
                     f'清仓信号: 转空头，价格{current_close:.2f} < '
                     f'止损价{prev_long_stop:.2f}'
                 )
             elif current_direction == 2:  # 建仓预警
                 self.buy_signal = False
                 self.signal[0] = 3
-                print(
+                self.log(
                     f'建仓预警: 价格{current_close:.2f} > 空头止损价 {prev_short_stop:.2f}'
                 )
             elif current_direction == -2:  # 减仓预警
                 self.buy_signal = False
                 self.signal[0] = -3
-                print(
+                self.log(
                     f'减仓预警: 价格{current_close:.2f} < 多头止损价 {prev_long_stop:.2f}'
                 )
         elif self.direction == 1 and current_direction == 1:  # 保持多头
@@ -318,37 +315,37 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 self.buy_signal = True
                 if not self.position:
                     self.signal[0] = 1
-                    print(
+                    self.log(
                         f'建仓信号: 多头趋势，ZLSMA上升 '
                         f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
                     )
                 else:
                     self.signal[0] = 2
-                    print(
+                    self.log(
                         f'加仓信号: 多头趋势，ZLSMA上升 '
                         f'({self.zlsma[-1]:.2f}->{self.zlsma[0]:.2f})'
                     )
             else:
                 self.buy_signal = False
                 self.signal[0] = -2
-                print('减仓预警: 多头趋势，但ZLSMA未上升')
+                self.log('减仓预警: 多头趋势，但ZLSMA未上升')
         elif self.direction == -1 and current_direction == -1:  # 保持空头
-            #print('清仓信号: 持续空头')
+            #self.log('清仓信号: 持续空头')
             if self.position:
                 self.buy_signal = False
-                #print('清仓信号: 持续空头状态')
+                #self.log('清仓信号: 持续空头状态')
         elif self.direction == 2 and current_direction == 2:  # 保持建仓预警
-            print(
+            self.log(
                 f'建仓预警: 价格{current_close:.2f} > '
                 f'空头止损价{prev_short_stop:.2f}'
             )
         elif self.direction == -2 and current_direction == -2:  # 保持减仓预警
-            print(
+            self.log(
                 f'减仓预警: 价格{current_close:.2f} < '
                 f'多头止损价{prev_long_stop:.2f}'
             )
         else:
-            print('无交易信号')
+            self.log('无交易信号')
 
         # 计算信号持续性
         if self.signal[0] == self.last_signal:
@@ -362,7 +359,7 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         duration_bonus = min(self.signal_duration / 5, 1.0) * 0.2  # 最多额外20%强度加成
         self.current_strength = max(0, min(100, int((base_strength + duration_bonus) * 100)))
         
-        print(f'交易日期: {self.data.datetime.date(0)}, 买入信号: {self.buy_signal}, 是否持仓: {bool(self.position)}, 当前信号强度: {self.current_strength}/100, 当前保证金: {self.broker.get_cash():.2f}')
+        self.log(f'交易日期: {self.data.datetime.date(0)}, 买入信号: {self.buy_signal}, 是否持仓: {bool(self.position)}, 当前信号强度: {self.current_strength}/100, 当前保证金: {self.broker.get_cash():.2f}')
         # 交易执行逻辑
         if not self.position:  # 无持仓
             if self.buy_signal:
@@ -385,26 +382,26 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                     else:
                         adjusted_size = base_size
                     
-                    print(
+                    self.log(
                         f'买入信号确认 - 强度: {self.current_strength}/100, '
                         f'规模: {adjusted_size}'
                     )
                     self.buy(size=adjusted_size)
                 else:
-                    print(
+                    self.log(
                         f'信号强度不足 ({self.current_strength}/100) - '
                         f'阈值: {self.p.strength_threshold} - 放弃交易'
                     )
         else:  # 有持仓
             if current_direction == -1:  # 空头持仓
                 if self.current_strength >= min(30, self.p.strength_threshold):
-                    print(
+                    self.log(
                         f'卖出信号确认 - 强度: {self.current_strength}/100, '
                         f'阈值: {self.p.strength_threshold}'
                     )
                     self.sell(size=self.position.size)
                 else:
-                    print(
+                    self.log(
                         f'卖出信号强度不足 ({self.current_strength}/100) - '
                         f'阈值: {self.p.strength_threshold} - 保持观望'
                     )
@@ -416,28 +413,27 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         订单通知，用于跟踪订单状态。
         """
         if order.status in [order.Submitted, order.Accepted]:
-            # 订单已提交/被接受，尚未执行
-            print(f'订单状态: {"已提交" if order.status == order.Submitted else "已接受"}')
+            self.log(f'订单状态: {"已提交" if order.status == order.Submitted else "已接受"}')
             return
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                print(f'买单执行，日期: {self.data.datetime.date(0)}, 价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
-                print(f'当前持仓: {self.position.size}')
+                self.log(f'买单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'当前持仓: {self.position.size}')
             elif order.issell():
-                print(f'卖单执行，日期: {self.data.datetime.date(0)}, 价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
-                print(f'当前持仓: {self.position.size}')
+                self.log(f'卖单执行，价格: {order.executed.price:.2f}, 成本: {order.executed.value:.2f}, 手续费: {order.executed.comm:.2f}')
+                self.log(f'当前持仓: {self.position.size}')
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            print(f'订单状态: {"已取消" if order.status == order.Canceled else "保证金不足" if order.status == order.Margin else "被拒绝"}')
-            print(f'订单详情: {order}')
+            self.log(f'订单状态: {"已取消" if order.status == order.Canceled else "保证金不足" if order.status == order.Margin else "被拒绝"}')
+            self.log(f'订单详情: {order}')
 
         # 添加调试信息
-        print(f'当前账户价值: {self.broker.getvalue():.2f}')
-        print(f'当前现金: {self.broker.getcash():.2f}')
-        print(f'当前ZLSMA值: {self.zlsma[0]:.2f}')
-        print(f'当前Chandelier Exit Long: {self.chandelier_exit_long[0]:.2f}')
-        print(f'当前Chandelier Exit Short: {self.chandelier_exit_short[0]:.2f}')
+        self.log(f'当前账户价值: {self.broker.getvalue():.2f}')
+        self.log(f'当前现金: {self.broker.getcash():.2f}')
+        self.log(f'当前ZLSMA值: {self.zlsma[0]:.2f}')
+        self.log(f'当前Chandelier Exit Long: {self.chandelier_exit_long[0]:.2f}')
+        self.log(f'当前Chandelier Exit Short: {self.chandelier_exit_short[0]:.2f}')
 
     def notify_trade(self, trade):
         """
@@ -449,13 +445,13 @@ class ChandelierZlSmaStrategy(bt.Strategy):
                 # 如果找到相同的交易引用,则更新它
                 self.trades[i] = trade
                 if trade.isclosed:
-                    print(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
+                    self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
                 return
                 
         # 如果是新交易则添加到列表
         self.trades.append(trade)
         if trade.isclosed:
-            print(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
+            self.log(f'交易结束，毛利: {trade.pnl:.2f}, 净利: {trade.pnlcomm:.2f}')
 
     def calculate_trade_size(self, current_price):
         """计算基础交易规模"""
@@ -478,13 +474,13 @@ class ChandelierZlSmaStrategy(bt.Strategy):
         safe_size = int(base_size * 0.95)  # 留出5%安全边际
         
         # 调试信息
-        print(f'计算交易规模:')
-        print(f'  - 当前价格: {current_price:.2f}')
-        print(f'  - 账户总资金: {self.broker.getvalue():.2f}')
-        print(f'  - 可用资金: {available_cash:.2f}')
-        print(f'  - 考虑保证金后可用: {margin_adjusted_cash:.2f}')
-        print(f'  - 最大可买数量: {max_shares}')
-        print(f'  - 安全交易数量: {safe_size}')
+        self.log('计算交易规模:')
+        self.log(f'  - 当前价格: {current_price:.2f}')
+        self.log(f'  - 账户总资金: {self.broker.getvalue():.2f}')
+        self.log(f'  - 可用资金: {available_cash:.2f}')
+        self.log(f'  - 考虑保证金后可用: {margin_adjusted_cash:.2f}')
+        self.log(f'  - 最大可买数量: {max_shares}')
+        self.log(f'  - 安全交易数量: {safe_size}')
         
         return safe_size
 
@@ -503,7 +499,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     data_df = get_stock_data(symbol, start_date, end_date)
 
     if data_df.empty:
-        print(f"股票 {symbol} 没有可用的数据进行回测。")
+        self.log(f"股票 {symbol} 没有可用的数据进行回测。")
         return
 
     # 初始化 Cerebro 引擎
@@ -541,7 +537,7 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
 
     # 打印初始资金
-    print(f'初始资金: {initial_cash:.2f}')
+    self.log(f'初始资金: {initial_cash:.2f}')
 
     # 运行策略，并获取策略实例列表
     results = cerebro.run()
@@ -561,51 +557,51 @@ def run_backtest(symbol, start_date, end_date, printlog=False, **strategy_params
     total_profit = sum(trade.pnlcomm for trade in strat.trades if trade.isclosed)
     roi = (total_profit / initial_cash) * 100
 
-    print(f'最终资金: {final_cash:.2f}')
-    print(f'总收益: {total_profit:.2f}')
-    print(f'收益率: {roi:.2f}%')
-    print(f'年化收益率: {annual_return:.2f}%')
+    self.log(f'最终资金: {final_cash:.2f}')
+    self.log(f'总收益: {total_profit:.2f}')
+    self.log(f'收益率: {roi:.2f}%')
+    self.log(f'年化收益率: {annual_return:.2f}%')
     
-    print(f"交易总数: {len(strat.trades)}")
-    print(f"盈利交易数: {len([trade for trade in strat.trades if trade.pnl > 0])}")
+    self.log(f"交易总数: {len(strat.trades)}")
+    self.log(f"盈利交易数: {len([trade for trade in strat.trades if trade.pnl > 0])}")
     
     # 计算胜率
     if len(strat.trades) > 0:  # 添加防御性检查
         win_rate = (len([trade for trade in strat.trades if trade.pnl > 0]) / len(strat.trades)) * 100
-        print(f'胜率: {win_rate:.2f}%')
+        self.log(f'胜率: {win_rate:.2f}%')
     else:
-        print('无交易记录，无法计算胜率')
+        self.log('无交易记录，无法计算胜率')
 
     # 打印夏普比率
     if sharpe_ratio is not None:
-        print(f'夏普比率: {sharpe_ratio:.2f}')
+        self.log(f'夏普比率: {sharpe_ratio:.2f}')
     else:
-        print('夏普比率无法计算')
+        self.log('夏普比率无法计算')
 
     # 计算最大回撤
     drawdown_analysis = strat.analyzers.drawdown.get_analysis()
     max_drawdown = drawdown_analysis.get('max', {}).get('drawdown', None)
     if max_drawdown is not None:
-        print(f'最大回撤: {max_drawdown:.2f}%')
+        self.log(f'最大回撤: {max_drawdown:.2f}%')
     else:
-        print('最大回撤无法计算。')
+        self.log('最大回撤无法计算。')
         
     # 打印交易记录
-    print("\n交易记录:")
+    self.log("\n交易记录:")
     for i, trade in enumerate(strat.trades):
-        print(f"交易 {i+1}:")
+        self.log(f"交易 {i+1}:")
         if trade.dtopen:  # 检查是否有开仓日期
-            print(f"  开仓日期: {bt.num2date(trade.dtopen)}")
-        print(f"  开仓价格: {trade.price:.2f}")
-        print(f"  开仓数量: {trade.size}")
+            self.log(f"  开仓日期: {bt.num2date(trade.dtopen)}")
+        self.log(f"  开仓价格: {trade.price:.2f}")
+        self.log(f"  开仓数量: {trade.size}")
         if trade.isclosed:  # 只有在交易已关闭时才打印关闭日期
-            print(f"  平仓日期: {bt.num2date(trade.dtclose)}")
-            print(f"  交易盈亏: {trade.pnl:.2f}")
-            print(f"  交易佣金: {trade.commission:.2f}")
-            print(f"  净盈亏: {trade.pnlcomm:.2f}")
+            self.log(f"  平仓日期: {bt.num2date(trade.dtclose)}")
+            self.log(f"  交易盈亏: {trade.pnl:.2f}")
+            self.log(f"  交易佣金: {trade.commission:.2f}")
+            self.log(f"  净盈亏: {trade.pnlcomm:.2f}")
         else:
-            print("  交易尚未平仓")
-        print()
+            self.log("  交易尚未平仓")
+        self.log()
 
     # 可选：绘制结果
     # cerebro.plot(style='candlestick', volume=False, barup='green', bardown='red')[0][0]
@@ -656,7 +652,7 @@ if __name__ == '__main__':
                        help='回测结束日期 (YYYY-MM-DD)')
     args = parser.parse_args()
 
-    print(f"开始回测股票: {args.symbol}")
+    self.log(f"开始回测股票: {args.symbol}")
 
     # 运行回测
     # 从优化结果文件中读取参数
@@ -677,7 +673,7 @@ if __name__ == '__main__':
         max_pyramiding = int(results['max_pyramiding'].iloc[0])
         strength_threshold = int(results['strength_threshold'].iloc[0])
         
-        print(f'使用优化参数 - period:{period}, mult:{mult}, investment_fraction:{investment_fraction}, max_pyramiding:{max_pyramiding}, strength_threshold:{strength_threshold}')
+        self.log(f'使用优化参数 - period:{period}, mult:{mult}, investment_fraction:{investment_fraction}, max_pyramiding:{max_pyramiding}, strength_threshold:{strength_threshold}')
         
         run_backtest(
             symbol=args.symbol,
@@ -692,7 +688,7 @@ if __name__ == '__main__':
             printlog=False
         )
     else:
-        print(f'未找到优化结果文件 {result_file}, 使用默认参数')
+        self.log(f'未找到优化结果文件 {result_file}, 使用默认参数')
         run_backtest(
             symbol=args.symbol,
             start_date=args.start_date,

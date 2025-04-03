@@ -1237,7 +1237,7 @@ async function handleAnalysis(event) {
                     onclick="copyMessage(this)">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-12a2 2 0 00-2-2h-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-12a2 2 0 00-2-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/>
                 </svg>
                 <span>复制</span>
             </button>
@@ -3422,23 +3422,25 @@ async function handleIndustryAnalysis(event) {
         return;
     }
     
+    // 初始化标签页状态
+    switchIndustryTab('report');
+    
+    // 获取必要的DOM元素
+    const reportContent = document.getElementById('reportContent');
+    const industryStocksTableBody = document.getElementById('industryStocksTableBody');
+    
+    // 显示加载状态
+    reportContent.innerHTML = `
+        <div class="flex justify-center items-center py-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+            <div class="ml-3 text-gray-600">正在加载分析报告...</div>
+        </div>
+    `;
+    
+    // 格式化日期，移除连字符
     const formattedDate = date.replace(/-/g, '');
     
     try {
-        // 初始化标签页状态
-        switchIndustryTab('report');
-        
-        // 显示加载状态
-        const reportContent = document.getElementById('reportContent');
-        const industryStocksTableBody = document.getElementById('industryStocksTableBody');
-        
-        reportContent.innerHTML = `
-            <div class="flex justify-center items-center py-8">
-                <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
-                <div class="ml-3 text-gray-600">正在加载分析报告...</div>
-            </div>
-        `;
-        
         // 获取行业分析报告
         const reportResponse = await fetch('/api/industry/report', {
             method: 'POST',
@@ -3447,7 +3449,7 @@ async function handleIndustryAnalysis(event) {
             },
             body: JSON.stringify({ date: formattedDate })
         });
-        
+
         // 如果报告不存在，显示立即分析按钮
         if (reportResponse.status === 404) {
             reportContent.innerHTML = `
@@ -3468,15 +3470,42 @@ async function handleIndustryAnalysis(event) {
             return;
         }
 
+        if (!reportResponse.ok) {
+            throw new Error(`获取报告失败: ${reportResponse.status}`);
+        }
+
         const reportData = await reportResponse.json();
         
-        if (reportData.success) {
-            reportContent.innerHTML = marked.parse(reportData.content);
-            applyMarkdownStyles(reportContent);
-        } else {
-            reportContent.innerHTML = `<div class="text-red-500">${reportData.error}</div>`;
+        if (!reportData.success) {
+            throw new Error(reportData.error || '获取报告失败');
         }
+
+        // 使用 markdown-it 渲染报告内容
+        const md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true,
+            highlight: function (str, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(str, { language: lang }).value;
+                    } catch (__) {}
+                }
+                return '';
+            }
+        });
+
+        // 添加插件支持
+        md.use(window.markdownitEmoji);
+        md.use(window.markdownitFootnote);
+        md.use(window.markdownitTaskLists);
+
+        // 渲染markdown内容
+        reportContent.innerHTML = md.render(reportData.content);
         
+        // 应用自定义样式
+        applyMarkdownStyles(reportContent);
+
         // 获取行业股票清单
         const stocksResponse = await fetch('/api/industry/stocks', {
             method: 'POST',
@@ -3485,42 +3514,46 @@ async function handleIndustryAnalysis(event) {
             },
             body: JSON.stringify({ date: formattedDate })
         });
-        
+
+        if (!stocksResponse.ok) {
+            throw new Error(`获取股票列表失败: ${stocksResponse.status}`);
+        }
+
         const stocksData = await stocksResponse.json();
         
-        if (stocksData.success) {
-            industryStocksTableBody.innerHTML = stocksData.stocks.map(stock => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
-                        <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.stock_code}')">
-                            ${stock.stock_code}
-                        </a>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
-                        <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.stock_code}')">
-                            ${stock.stock_name}
-                        </a>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.price}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.change_pct) >= 0 ? 'text-red-600' : 'text-green-600'}">
-                        ${parseFloat(stock.change_pct) >= 0 ? '+' : ''}${stock.change_pct}%
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.turnover_rate}%</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatAmount(stock.turnover)}</td>
-                </tr>
-            `).join('');
-        } else {
-            industryStocksTableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-red-500">
-                        ${stocksData.error}
-                    </td>
-                </tr>
-            `;
+        if (!stocksData.success) {
+            throw new Error(stocksData.error || '获取股票列表失败');
         }
-        
+
+        // 更新股票表格
+        industryStocksTableBody.innerHTML = stocksData.stocks.map(stock => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                    <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.stock_code}')">
+                        ${stock.stock_code}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
+                    <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.stock_code}')">
+                        ${stock.stock_name}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.price}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.change_pct) >= 0 ? 'text-red-600' : 'text-green-600'}">
+                    ${parseFloat(stock.change_pct) >= 0 ? '+' : ''}${stock.change_pct}%
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.turnover_rate}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatAmount(stock.turnover)}</td>
+            </tr>
+        `).join('');
+
     } catch (error) {
         console.error('获取行业分析数据失败:', error);
+        reportContent.innerHTML = `
+            <div class="text-red-500 text-center p-4">
+                ${error.message}
+            </div>
+        `;
         showToast(error.message, 'error');
     }
 }
@@ -4207,4 +4240,214 @@ function getParamIcon(key) {
         `
     };
     return icons[key] || '';
+}
+
+// ... 现有代码 ...
+
+// 添加运行行业分析的函数
+async function runIndustryAnalysis(date) {
+    try {
+        const formattedDate = date.replace(/-/g, '');
+        const reportContent = document.getElementById('reportContent');
+        
+        // 显示加载状态
+        reportContent.innerHTML = `
+            <div class="flex justify-center items-center py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+                <div class="ml-3 text-gray-600">正在生成行业分析报告...</div>
+            </div>
+        `;
+
+        const response = await fetch('/api/industry/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: formattedDate })
+        });
+
+        if (!response.ok) {
+            throw new Error(`请求失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || '分析失败');
+        }
+
+        // 重新获取报告内容
+        await handleIndustryAnalysis(date);
+        
+        showToast('行业分析完成', 'success');
+
+    } catch (error) {
+        console.error('行业分析失败:', error);
+        reportContent.innerHTML = `
+            <div class="text-center py-8">
+                <p class="text-red-500 mb-4">${error.message}</p>
+                <button onclick="runIndustryAnalysis('${date}')"
+                        class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200">
+                    重试
+                </button>
+            </div>
+        `;
+        showToast(error.message, 'error');
+    }
+}
+
+// 修改 handleIndustryAnalysis 函数的开头部分
+async function handleIndustryAnalysis(event) {
+    // 如果是事件对象，则阻止默认行为
+    if (event && event.preventDefault) {
+        event.preventDefault();
+    }
+    
+    // 获取日期值
+    let date;
+    if (typeof event === 'string') {
+        date = event;
+    } else {
+        date = document.getElementById('industryDate').value;
+    }
+    
+    if (!date) {
+        showToast('请选择日期', 'warning');
+        return;
+    }
+    
+    // 初始化标签页状态
+    switchIndustryTab('report');
+    
+    // 获取必要的DOM元素
+    const reportContent = document.getElementById('reportContent');
+    const industryStocksTableBody = document.getElementById('industryStocksTableBody');
+    
+    // 显示加载状态
+    reportContent.innerHTML = `
+        <div class="flex justify-center items-center py-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+            <div class="ml-3 text-gray-600">正在加载分析报告...</div>
+        </div>
+    `;
+    
+    // 格式化日期，移除连字符
+    const formattedDate = date.replace(/-/g, '');
+    
+    try {
+        // 获取行业分析报告
+        const reportResponse = await fetch('/api/industry/report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: formattedDate })
+        });
+
+        // 如果报告不存在，显示立即分析按钮
+        if (reportResponse.status === 404) {
+            reportContent.innerHTML = `
+                <div class="text-center py-8">
+                    <p class="text-gray-600 mb-4">未找到${date}的行业分析报告</p>
+                    <button onclick="runIndustryAnalysis('${date}')"
+                            class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg 
+                                   shadow-lg hover:shadow-xl transition-all duration-200 
+                                   flex items-center justify-center space-x-2 mx-auto">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <span>立即分析</span>
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        if (!reportResponse.ok) {
+            throw new Error(`获取报告失败: ${reportResponse.status}`);
+        }
+
+        const reportData = await reportResponse.json();
+        
+        if (!reportData.success) {
+            throw new Error(reportData.error || '获取报告失败');
+        }
+
+        // 使用 markdown-it 渲染报告内容
+        const md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true,
+            highlight: function (str, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(str, { language: lang }).value;
+                    } catch (__) {}
+                }
+                return '';
+            }
+        });
+
+        // 添加插件支持
+        md.use(window.markdownitEmoji);
+        md.use(window.markdownitFootnote);
+        md.use(window.markdownitTaskLists);
+
+        // 渲染markdown内容
+        reportContent.innerHTML = md.render(reportData.content);
+        
+        // 应用自定义样式
+        applyMarkdownStyles(reportContent);
+
+        // 获取行业股票清单
+        const stocksResponse = await fetch('/api/industry/stocks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ date: formattedDate })
+        });
+
+        if (!stocksResponse.ok) {
+            throw new Error(`获取股票列表失败: ${stocksResponse.status}`);
+        }
+
+        const stocksData = await stocksResponse.json();
+        
+        if (!stocksData.success) {
+            throw new Error(stocksData.error || '获取股票列表失败');
+        }
+
+        // 更新股票表格
+        industryStocksTableBody.innerHTML = stocksData.stocks.map(stock => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                    <a href="javascript:void(0)" onclick="switchToTechnicalAnalysis('${stock.stock_code}')">
+                        ${stock.stock_code}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600 hover:text-purple-800">
+                    <a href="javascript:void(0)" onclick="switchToAIAnalysis('${stock.stock_code}')">
+                        ${stock.stock_name}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.price}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm ${parseFloat(stock.change_pct) >= 0 ? 'text-red-600' : 'text-green-600'}">
+                    ${parseFloat(stock.change_pct) >= 0 ? '+' : ''}${stock.change_pct}%
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${stock.turnover_rate}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatAmount(stock.turnover)}</td>
+            </tr>
+        `).join('');
+
+    } catch (error) {
+        console.error('获取行业分析数据失败:', error);
+        reportContent.innerHTML = `
+            <div class="text-red-500 text-center p-4">
+                ${error.message}
+            </div>
+        `;
+        showToast(error.message, 'error');
+    }
 }

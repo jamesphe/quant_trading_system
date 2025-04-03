@@ -6,6 +6,23 @@ from datetime import datetime
 import os
 from typing import Dict, List, Optional, Tuple, Union, Generator
 from data_fetch import get_hot_industries as fetch_hot_industries
+import ssl
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.ssl_ import create_urllib3_context
+
+# 配置 SSL
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# 创建自定义的 Session
+session = requests.Session()
+session.verify = False  # 禁用 SSL 验证
+adapter = HTTPAdapter(max_retries=3)
+session.mount('https://', adapter)
+session.mount('http://', adapter)
+
+# 设置 akshare 使用这个 session
+ak.requests = session
 
 class IndustryAnalyzer:
     def __init__(self, openai_api_key: Optional[str] = None):
@@ -17,10 +34,11 @@ class IndustryAnalyzer:
         """
         # 使用 Config 类获取 API key
         config = Config()
+        self.config = config.config.get('openai', {})
         self.api_key = openai_api_key or config.get_api_key('openai')
         self.client = OpenAI(
             api_key=self.api_key, 
-            base_url="https://api.chatanywhere.tech/v1"
+            base_url=self.config.get('base_url', "https://api.chatanywhere.tech/v1")
         )
             
     def get_hot_industries(self, rise_threshold: float = 2.0, 
@@ -256,7 +274,7 @@ class IndustryAnalyzer:
             
             # 调用 OpenAI API
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model=self.config.get('model', "gpt-4o"),
                 messages=messages,
                 stream=stream,
                 temperature=0.7
@@ -366,74 +384,78 @@ class IndustryAnalyzer:
             print(f"保存分析报告失败: {e}") 
 
     def get_industry_detail_data(self, industry_name: str) -> pd.DataFrame:
-        """
-        获取行业内个股详细数据
-        """
-        try:
-            # 使用正确的接口获取行业成分股
-            stocks_data = ak.stock_board_industry_cons_em(symbol=industry_name)
-            
-            if stocks_data.empty:
-                print(f"未获取到{industry_name}行业的个股数据")
-                return pd.DataFrame()
-            
-            # 获取这些股票的实时行情数据
-            # 确保股票代码为字符串格式
-            stocks_data['代码'] = stocks_data['代码'].astype(str)
-            stock_codes = stocks_data['代码'].tolist()
-            quotes = ak.stock_zh_a_spot_em()  # 获取所有A股实时行情
-            
-            # 确保行情数据中的股票代码也是字符串格式
-            quotes['代码'] = quotes['代码'].astype(str)
-            
-            # 筛选出行业内股票的行情数据
-            industry_quotes = quotes[quotes['代码'].isin(stock_codes)]
-            
-            # 重命名列
-            column_mapping = {
-                '代码': 'stock_code',
-                '名称': 'stock_name',
-                '最新价': 'price',
-                '涨跌幅': 'change_pct',
-                '成交额': 'turnover',
-                '换手率': 'turnover_rate',
-                '总市值': 'market_value',
-                '流通市值': 'float_market_value'
-            }
-            
-            # 选择并重命名列
-            available_columns = {k: v for k, v in column_mapping.items() 
-                               if k in industry_quotes.columns}
-            result_df = industry_quotes[list(available_columns.keys())].rename(
-                columns=available_columns
-            )
-            
-            # 确保结果中的股票代码仍然是字符串格式
-            result_df['stock_code'] = result_df['stock_code'].astype(str)
-            
-            # 数据类型转换
-            numeric_columns = [col for col in result_df.columns 
-                               if col not in ['stock_code', 'stock_name']]
-            for col in numeric_columns:
-                result_df[col] = pd.to_numeric(
-                    result_df[col].astype(str)
-                    .str.replace('%', '')
-                    .str.replace(',', '')
-                    .str.replace('亿', ''),
-                    errors='coerce'
-                )
-                # 将百分比转换为小数
-                if col in ['change_pct', 'turnover_rate']:
-                    result_df[col] = result_df[col] / 100
+        """获取行业内个股详细数据"""
+        import time
+        from requests.exceptions import SSLError, ConnectionError
+        max_retries = 3
+        retry_delay = 2  # 秒
+        
+        for attempt in range(max_retries):
+            try:
+                # 使用正确的接口获取行业成分股
+                stocks_data = ak.stock_board_industry_cons_em(symbol=industry_name)
                 
-            return result_df
-            
-        except Exception as e:
-            print(f"获取行业个股数据失败: {e}")
-            if 'stocks_data' in locals():
-                print("实际返回的列名:", stocks_data.columns.tolist())
-            return pd.DataFrame()
-            
+                if stocks_data.empty:
+                    print(f"未获取到{industry_name}行业的个股数据")
+                    return pd.DataFrame()
+                
+                # 获取这些股票的实时行情数据
+                # 确保股票代码为字符串格式
+                stocks_data['代码'] = stocks_data['代码'].astype(str)
+                stock_codes = stocks_data['代码'].tolist()
+                
+                # 添加延迟和重试机制
+                try:
+                    quotes = ak.stock_zh_a_spot_em()  # 获取所有A股实时行情
+                except (SSLError, ConnectionError) as e:
+                    if attempt < max_retries - 1:  # 如果不是最后一次尝试
+                        print(f"获取行情数据失败，{retry_delay}秒后重试: {str(e)}")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        raise  # 如果是最后一次尝试，则抛出异常
+                
+                # 确保行情数据中的股票代码也是字符串格式
+                quotes['代码'] = quotes['代码'].astype(str)
+                
+                # 筛选出行业内股票的行情数据
+                industry_quotes = quotes[quotes['代码'].isin(stock_codes)]
+                
+                # 重命名列
+                column_mapping = {
+                    '代码': 'stock_code',
+                    '名称': 'stock_name',
+                    '最新价': 'price',
+                    '涨跌幅': 'change_pct',
+                    '成交额': 'turnover',
+                    '换手率': 'turnover_rate',
+                    '总市值': 'market_value',
+                    '流通市值': 'float_market_value'
+                }
+                
+                # 选择并重命名列
+                available_columns = {k: v for k, v in column_mapping.items() 
+                                  if k in industry_quotes.columns}
+                result_df = industry_quotes[list(available_columns.keys())].rename(
+                    columns=available_columns
+                )
+                
+                # 数据类型转换和处理...
+                return result_df
+                
+            except Exception as e:
+                if attempt < max_retries - 1:  # 如果不是最后一次尝试
+                    print(f"第{attempt + 1}次尝试失败: {str(e)}")
+                    print(f"等待{retry_delay}秒后重试...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"获取行业个股数据失败: {e}")
+                    if 'stocks_data' in locals():
+                        print("实际返回的列名:", stocks_data.columns.tolist())
+                    return pd.DataFrame()
+        
+        return pd.DataFrame()  # 如果所有重试都失败，返回空DataFrame
+
     def get_industry_fund_flow_trend(self, days: int = 5) -> pd.DataFrame:
         """
         获取行业资金流向趋势数据
@@ -788,7 +810,7 @@ def main():
     # 设置命令行参数
     parser = argparse.ArgumentParser(description='行业分析工具')
     parser.add_argument('--stream', action='store_true', help='是否使用流式输出')
-    parser.add_argument('--save_dir', type=str, default='results', help='结果保���目录')
+    parser.add_argument('--save_dir', type=str, default='results', help='结果保存目录')
     parser.add_argument('--rise_threshold', type=float, default=2.0, help='涨幅阈值（百分比）')
     parser.add_argument('--fund_threshold', type=float, default=5000, help='资金流入阈值（万元）')
     args = parser.parse_args()
@@ -841,6 +863,7 @@ def main():
                 on='industry_name',
                 how='left'
             )
+               
         
         # 使用AI分析数据
         print("\n正在进行AI分析...")
@@ -856,7 +879,7 @@ def main():
             print("\nAI分析结果:")
             print(analysis_text)
         
-        # 保存分��报告
+        # 保存分析报告
         print(f"\n正在保存分析报告到 {report_file}...")
         analyzer.save_analysis_report(
             hot_industries=hot_industries,

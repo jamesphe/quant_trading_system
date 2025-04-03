@@ -65,6 +65,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 添加控制台处理器(如果还没有的话)
+if not any(isinstance(handler, logging.StreamHandler) for handler in logger.handlers):
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
 app = Flask(__name__)
 
 # Azure 配置
@@ -919,42 +927,123 @@ def update_prices():
 @app.route('/api/industry/report', methods=['POST'])
 def get_industry_report():
     try:
+        # 记录请求开始
+        logger.info("开始处理行业报告请求")
         data = request.get_json()
         date = data.get('date')
         
+        # 记录请求参数
+        logger.info(f"请求参数: date={date}")
+        
         if not date:
+            logger.warning("未提供日期参数")
             return jsonify({
                 'success': False,
                 'error': '请选择日期'
             }), 400
             
-        # 构建文件路径
-        file_path = os.path.join(
-            os.path.dirname(__file__), 
-            'results', 
-            f'industry_analysis_{date}.md'
-        )
+        # 获取当前目录
+        base_dir = os.path.dirname(__file__)
+        logger.info(f"基础目录: {base_dir}")
         
-        if not os.path.exists(file_path):
+        # 检查目录是否存在
+        results_dir = os.path.join(base_dir, 'results')
+        ai_result_dir = os.path.join(base_dir, 'AIResult')
+        
+        # 记录目录状态
+        dir_status = {
+            'results_dir': {
+                'path': results_dir,
+                'exists': os.path.exists(results_dir),
+                'writable': os.access(results_dir, os.W_OK) 
+                    if os.path.exists(results_dir) else False,
+                'contents': os.listdir(results_dir) 
+                    if os.path.exists(results_dir) else []
+            },
+            'ai_result_dir': {
+                'path': ai_result_dir,
+                'exists': os.path.exists(ai_result_dir),
+                'writable': os.access(ai_result_dir, os.W_OK) 
+                    if os.path.exists(ai_result_dir) else False,
+                'contents': os.listdir(ai_result_dir) 
+                    if os.path.exists(ai_result_dir) else []
+            }
+        }
+            
+        # 构建多个可能的文件路径，使用原始日期格式
+        possible_paths = [
+            os.path.join(results_dir, f'industry_analysis_{date}.md'),
+            os.path.join(ai_result_dir, f'industry_analysis_{date}.md'),
+            os.path.join(base_dir, f'industry_analysis_{date}.md')
+        ]
+        
+        # 记录所有可能的文件路径
+        logger.info("尝试查找以下文件路径:")
+        for path in possible_paths:
+            logger.info(f"- {path} (存在: {os.path.exists(path)})")
+        
+        # 检查文件是否存在
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                logger.info(f"找到文件: {file_path}")
+                break
+                
+        if not file_path:
+            # 记录更详细的错误信息
+            logger.error(f'未找到行业分析报告文件，尝试过以下路径: {possible_paths}')
             return jsonify({
                 'success': False,
-                'error': f'未找到{date}的行业分析报告'
+                'error': f'未找到{date}的行业分析报告',
+                'debug_info': {
+                    'date': date,
+                    'attempted_paths': possible_paths,
+                    'directory_status': dir_status,
+                    'base_dir': base_dir
+                }
             }), 404
             
         # 读取并返回报告内容
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            logger.info(f"正在读取文件: {file_path}")
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                logger.info(f"成功读取文件，内容长度: {len(content)} 字符")
+                
+            return jsonify({
+                'success': True,
+                'content': content,
+                'file_path': file_path,
+                'debug_info': {
+                    'file_size': os.path.getsize(file_path),
+                    'last_modified': datetime.fromtimestamp(
+                        os.path.getmtime(file_path)
+                    ).strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
             
-        return jsonify({
-            'success': True,
-            'content': content
-        })
-        
+        except Exception as e:
+            logger.error(f'读取文件失败: {str(e)}', exc_info=True)
+            return jsonify({
+                'success': False,
+                'error': f'读取报告文件失败: {str(e)}',
+                'debug_info': {
+                    'file_path': file_path,
+                    'error_details': str(e),
+                    'error_type': type(e).__name__
+                }
+            }), 500
+            
     except Exception as e:
         logger.error(f'获取行业分析报告失败: {str(e)}', exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'debug_info': {
+                'error_type': type(e).__name__,
+                'error_details': str(e)
+            }
         }), 500
 
 
