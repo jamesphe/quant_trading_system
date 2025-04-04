@@ -398,6 +398,10 @@ def get_stock_analysis_prompt(
     boll_lower = round(latest_row['BOLL_LOWER'], 2)
     zlsma_20 = round(latest_row['ZLSMA_20'], 2)
     zlsma_60 = round(latest_row['ZLSMA_60'], 2)
+    
+    # 添加SAR指标
+    sar = round(latest_row['SAR'], 2) if 'SAR' in latest_row else None
+    sar_trend = "看涨" if sar is not None and sar < current_price else "看跌" if sar is not None else "未知"
 
     # 增加成交量分析，考虑盘中数据
     current_volume = round(latest_row['Volume'] / 10000, 2)  # 转换为万手
@@ -468,7 +472,7 @@ def get_stock_analysis_prompt(
     volume_up = estimated_volume > prev_row['Volume'] / 10000
     vol_price_divergence = ""
     if is_trading_time:
-        vol_price_divergence = f"盘中数据，成交量分析仅供参考 - "
+        vol_price_divergence = "盘中数据，成交量分析仅供参考 - "
     
     if price_up and not volume_up:
         vol_price_divergence += "价升量缩，可能缺乏上涨动能"
@@ -588,7 +592,12 @@ def get_stock_analysis_prompt(
    - 若有背离信号或风险提示（如MACD顶背离、RSI临界值等），请深入阐述。
 
 3. **技术指标与量价分析**  
-   - 从MACD、RSI、BOLL、ZLSMA等角度，逐一解释其意义并判断当前是强势还是谨慎信号。
+   - 从MACD、RSI、BOLL、ZLSMA、SAR等角度，逐一解释其意义并判断当前是强势还是谨慎信号。
+   - SAR与RSI综合分析：
+     * SAR当前值({sar if sar is not None else '未知'})显示趋势为{sar_trend}，结合RSI(6)={rsi_6:.2f}、RSI(12)={rsi_12:.2f}、RSI(24)={rsi_24:.2f}的表现
+     * 当SAR与RSI同向确认时的信号强度分析
+     * 当SAR与RSI出现背离时的风险评估
+     * 基于SAR与RSI组合的短期交易机会识别
    - 结合成交量变化分析指标的可靠性：
      * 关注量价配合度
      * 分析主力资金参与度
@@ -677,6 +686,7 @@ def get_stock_analysis_prompt(
 - RSI(6): {rsi_6:.2f}, RSI(12): {rsi_12:.2f}, RSI(24): {rsi_24:.2f}  
 - BOLL(上轨): {boll_upper:.2f}, BOLL(中轨): {boll_middle:.2f}, BOLL(下轨): {boll_lower:.2f}  
 - ZLSMA(20): {zlsma_20:.2f}, ZLSMA(60): {zlsma_60:.2f}
+- SAR: {sar if sar is not None else '未知'} (趋势: {sar_trend})
 
 【持仓建议】  
 {position_plan}
@@ -694,6 +704,7 @@ def get_stock_analysis_prompt(
 """
     print(f"openai 提示词: {prompt}")
     return prompt
+
 
 def get_backtest_results(
     symbol, 
@@ -811,7 +822,8 @@ def analyze_stock(symbol, start_date, end_date, model, stream=False):
                 include_rsi=True,
                 include_boll=True,
                 include_zlsma=True,
-                include_chandelier=True
+                include_chandelier=True,
+                include_sar=True
             )
         else:
             stock_data = get_us_stock_data(symbol, extended_start_date, end_date)

@@ -25,6 +25,9 @@ from data_fetch import (
     get_industry_market_data,  # 新增
     get_industry_detail_data,   # 新增
     get_hot_stock_rank,  # 添加新的导入
+    get_stock_pe,
+    get_stock_debt_ratio,
+    get_stock_cash_flow,
 )
 
 def test_get_vgt_data():
@@ -448,38 +451,24 @@ def test_get_stock_data():
     """
     测试获取股票历史行情数据功能，包括基础数据和技术指标
     """
-    print("\n开始测试股票历史行情数据获取功能...")
-
-    # 测试参数
+    print("\n开始测试获取股票历史行情数据...")
+    
     symbol = "600519"  # 贵州茅台
     end_date = datetime.now().strftime('%Y-%m-%d')  # 使用当前日期作为结束日期
     start_date = (datetime.now() - timedelta(days=120)).strftime('%Y-%m-%d')  # 从120天前开始
 
     print(f"测试日期范围: {start_date} 到 {end_date}")
 
-    # 1. 测试基础数据获取
-    print("\n1. 测试基础数据获取")
+    # 测试基础数据获取
     test_basic_data(symbol, start_date, end_date)
-
-    # 2. 测试MACD指标
-    print("\n2. 测试MACD指标")
+    
+    # 测试各种技术指标
     test_macd_indicator(symbol, start_date, end_date)
-
-    # 3. 测试RSI指标
-    print("\n3. 测试RSI指标")
     test_rsi_indicator(symbol, start_date, end_date)
-
-    # 4. 测试布林带指标
-    print("\n4. 测试布林带指标")
     test_bollinger_bands(symbol, start_date, end_date)
-
-    # 5. 测试ZLSMA指标
-    print("\n5. 测试ZLSMA指标")
     test_zlsma_indicator(symbol, start_date, end_date)
-
-    # 6. 测试吊灯指标
-    print("\n6. 测试吊灯指标")
     test_chandelier_indicator(symbol, start_date, end_date)
+    test_sar_indicator(symbol, start_date, end_date)  # 添加SAR指标测试
 
 def test_basic_data(symbol, start_date, end_date):
     """测试基础数据获取"""
@@ -668,6 +657,41 @@ def test_chandelier_indicator(symbol, start_date, end_date):
             print("获取吊灯指标数据失败")
     except Exception as e:
         print(f"测试吊灯指标时发生错误: {str(e)}")
+
+def test_sar_indicator(symbol, start_date, end_date):
+    """测试SAR指标计算"""
+    try:
+        stock_data = get_stock_data(
+            symbol, start_date, end_date,
+            source='akshare',
+            include_sar=True
+        )
+        
+        print(stock_data)
+        
+        if not stock_data.empty:
+            # 检查SAR列是否存在
+            assert 'SAR' in stock_data.columns, "SAR指标数据列不存在"
+            
+            # 检查数据类型
+            assert stock_data['SAR'].dtype == 'float64', "SAR列不是浮点数类型"
+            
+            # 检查SAR值是否有效（不应该有NaN值，除了前几个可能的初始化值）
+            non_na_count = stock_data['SAR'].count()
+            total_count = len(stock_data)
+            assert non_na_count / total_count > 0.9, "SAR数据中存在过多的缺失值"
+            
+            # 验证SAR的基本特性（应该在价格附近）
+            price_max = stock_data['High'].max()
+            price_min = stock_data['Low'].min()
+            assert all(stock_data['SAR'] <= price_max * 1.5), "SAR值超出合理范围"
+            assert all(stock_data['SAR'] >= price_min * 0.5), "SAR值低于合理范围"
+            
+            print("SAR指标验证通过")
+        else:
+            print("获取SAR数据失败")
+    except Exception as e:
+        print(f"测试SAR指标时发生错误: {str(e)}")
 
 def test_get_industry_market_data():
     """
@@ -878,6 +902,123 @@ def test_get_hot_stock_rank():
         print(f"测试过程中发生错误: {str(e)}")
         raise
 
+def test_get_stock_pe():
+    """
+    测试获取股票市盈率功能
+    """
+    print("\n开始测试获取股票市盈率...")
+    
+    try:
+        # 测试正常股票代码
+        symbol = "600519"  # 贵州茅台
+        pe = get_stock_pe(symbol)
+        
+        print(f"股票 {symbol} 的市盈率: {pe}")
+        
+        # 检查返回值类型和范围
+        assert isinstance(pe, float), "市盈率不是浮点数类型"
+        assert pe > 0, "市盈率应该为正数"
+        print("数据类型和范围检查通过")
+        
+        # 测试无效股票代码
+        invalid_symbol = "000000"
+        invalid_pe = get_stock_pe(invalid_symbol)
+        assert invalid_pe is None, "对于无效股票代码应返回None"
+        print("无效股票代码测试通过")
+        
+        print("\n市盈率数据验证全部通过！")
+            
+    except Exception as e:
+        print(f"测试过程中发生错误: {str(e)}")
+        raise
+
+def test_get_stock_debt_ratio():
+    """
+    测试获取股票资产负债率功能
+    """
+    print("\n开始测试获取股票资产负债率...")
+    
+    try:
+        # 测试正常股票代码
+        symbol = "600519"  # 贵州茅台
+        debt_ratio = get_stock_debt_ratio(symbol)
+        
+        print(f"股票 {symbol} 的资产负债率: {debt_ratio}%")
+        
+        # 检查返回值类型和范围
+        assert isinstance(debt_ratio, float), "资产负债率不是浮点数类型"
+        assert 0 <= debt_ratio <= 100, "资产负债率应该在0-100之间"
+        print("数据类型和范围检查通过")
+        
+        # 测试无效股票代码
+        invalid_symbol = "000000"
+        invalid_ratio = get_stock_debt_ratio(invalid_symbol)
+        assert invalid_ratio is None, "对于无效股票代码应返回None"
+        print("无效股票代码测试通过")
+        
+        print("\n资产负债率数据验证全部通过！")
+            
+    except Exception as e:
+        print(f"测试过程中发生错误: {str(e)}")
+        raise
+
+def test_get_stock_cash_flow():
+    """
+    测试获取股票现金流数据功能
+    """
+    print("\n开始测试获取股票现金流数据...")
+    
+    try:
+        # 测试正常股票代码
+        symbol = "600519"  # 贵州茅台
+        cash_flow = get_stock_cash_flow(symbol)
+        
+        print(f"股票 {symbol} 的现金流数据:")
+        for key, value in cash_flow.items():
+            print(f"{key}: {value}")
+        
+        # 检查返回的字典结构
+        expected_keys = [
+            '经营活动现金流量净额',
+            '投资活动现金流量净额',
+            '筹资活动现金流量净额',
+            '现金及现金等价物净增加额',
+            '期末现金及现金等价物余额'
+        ]
+        
+        # 检查所有必要的键是否存在
+        for key in expected_keys:
+            assert key in cash_flow, f"缺少必要的现金流数据项 '{key}'"
+        print("数据结构检查通过")
+        
+        # 检查数据类型
+        for value in cash_flow.values():
+            assert isinstance(value, float), "现金流数据不是浮点数类型"
+        print("数据类型检查通过")
+        
+        # 验证现金流勾稽关系
+        total_cash_flow = (
+            cash_flow['经营活动现金流量净额'] +
+            cash_flow['投资活动现金流量净额'] +
+            cash_flow['筹资活动现金流量净额']
+        )
+        assert abs(total_cash_flow - cash_flow['现金及现金等价物净增加额']) < 0.01, \
+            "现金流勾稽关系不符"
+        print("现金流勾稽关系检查通过")
+        
+        # 测试无效股票代码
+        invalid_symbol = "000000"
+        invalid_cash_flow = get_stock_cash_flow(invalid_symbol)
+        assert isinstance(invalid_cash_flow, dict), "对于无效股票代码应返回空字典"
+        assert len(invalid_cash_flow) == 0, "对于无效股票代码应返回空字典"
+        print("无效股票代码测试通过")
+        
+        print("\n现金流数据验证全部通过！")
+            
+    except Exception as e:
+        print(f"测试过程中发生错误: {str(e)}")
+        raise
+
 if __name__ == "__main__":
     #test_get_a_share_list()
     #test_get_vgt_data()
@@ -901,7 +1042,20 @@ if __name__ == "__main__":
     #print("\n" + "="*50 + "\n")
     #test_get_industry_detail_data()  # 新增
     #print("\n" + "="*50 + "\n")
-    test_get_stock_data()
-    print("\n" + "="*50 + "\n")
+    #test_get_stock_data()
+    #print("\n" + "="*50 + "\n")
     #test_get_hot_stock_rank()  # 添加新的测试
     #print("\n" + "="*50 + "\n")
+    #test_get_stock_pe()
+    #print("\n" + "="*50 + "\n")
+    #test_get_stock_debt_ratio()
+    #print("\n" + "="*50 + "\n")
+    #test_get_stock_cash_flow()
+    #print("\n" + "="*50 + "\n")
+    # test_get_stock_data()  # 取消注释以运行所有指标测试，包括新添加的SAR指标测试
+    # 或者单独测试SAR指标
+    symbol = "600519"  # 贵州茅台
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=120)).strftime('%Y-%m-%d')
+    test_sar_indicator(symbol, start_date, end_date)
+    print("\n" + "="*50 + "\n")

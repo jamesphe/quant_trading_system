@@ -208,11 +208,7 @@ class IndustryAnalyzer:
                         )
                 
                 # 添加潜力股信息
-                try:
-                    potential_stocks = self.get_industry_potential_stocks(industry_name, top_n=5)
-                except Exception as e:
-                    print(f"获取{industry_name}行业潜力股信息失败: {e}")
-                    potential_stocks = pd.DataFrame()
+                potential_stocks = self.get_industry_potential_stocks(industry_name, top_n=5)
                 if not potential_stocks.empty:
                     industry_info.append("\n行业潜力股:")
                     for _, stock in potential_stocks.iterrows():
