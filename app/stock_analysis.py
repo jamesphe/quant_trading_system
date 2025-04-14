@@ -427,6 +427,212 @@ def get_stock_analysis_prompt(
         now.hour < 15 or (now.hour == 15 and now.minute < 1)
     ) and now.weekday() < 5
     
+    # 增加具体交易时段判断
+    def get_trading_session():
+        """判断当前所处的交易时段"""
+        current_minute = now.hour * 60 + now.minute
+        weekday = now.weekday()
+        
+        # 非交易日
+        if weekday >= 5:
+            return "非交易日"
+        
+        # 上午开盘前（含集合竞价）
+        if 9 * 60 + 15 <= current_minute < 9 * 60 + 30:
+            return "集合竞价"
+        # 上午交易时段
+        elif 9 * 60 + 30 <= current_minute < 11 * 60 + 30:
+            # 进一步细分上午交易时段
+            if 9 * 60 + 30 <= current_minute < 10 * 60:
+                return "上午早盘"
+            else:
+                return "上午尾盘"
+        # 午休时段
+        elif 11 * 60 + 30 <= current_minute < 13 * 60:
+            return "午休时段"
+        # 下午交易时段
+        elif 13 * 60 <= current_minute < 15 * 60:
+            # 进一步细分下午交易时段
+            if 13 * 60 <= current_minute < 14 * 60:
+                return "下午早盘"
+            elif 14 * 60 <= current_minute < 14 * 60 + 57:
+                return "下午尾盘"
+            else:
+                return "收盘集合竞价"
+        # 闭市时段
+        elif current_minute >= 15 * 60:
+            return "收盘后"
+        else:
+            return "开盘前"
+    
+    # 获取当前交易时段
+    trading_session = get_trading_session() if is_trading_time or now.weekday() < 5 else "非交易时段"
+    
+    # 根据交易时段生成挂单策略建议
+    def generate_order_strategy(session, cost_price, current_price, long_stop, short_stop, 
+                               macd_hist, rsi_6, sar_trend, zlsma_20, price_deviation=None):
+        """根据交易时段和技术指标生成挂单策略建议"""
+        if price_deviation is None and cost_price > 0:
+            price_deviation = (current_price - cost_price) / cost_price * 100
+        
+        # 根据不同交易时段给出相应的挂单策略
+        if session == "集合竞价":
+            if cost_price > 0:  # 有持仓
+                if price_deviation > 5 and rsi_6 > 70:
+                    return (
+                        f"【集合竞价减仓】当前处于集合竞价阶段，持仓盈利较多({price_deviation:.2f}%)且RSI偏高，"
+                        f"可考虑按{current_price*0.99:.2f}挂单卖出部分仓位，避免高开低走风险。"
+                    )
+                elif price_deviation < -5:
+                    return (
+                        f"【集合竞价观望】当前处于集合竞价阶段，持仓亏损({price_deviation:.2f}%)，"
+                        f"建议等待开盘后观察走势，如低开高走可能是加仓机会，如持续走弱注意{long_stop:.2f}止损位。"
+                    )
+                else:
+                    return (
+                        f"【集合竞价持有】当前处于集合竞价阶段，持仓表现一般，"
+                        f"建议观察盘口变化，关注开盘后30分钟内的走势确认方向。"
+                    )
+            else:  # 无持仓
+                if sar_trend == "看涨" and macd_hist > 0 and rsi_6 < 60:
+                    return (
+                        f"【集合竞价观察】当前处于集合竞价阶段，技术指标偏强，"
+                        f"可关注开盘价相对昨收的变化，如低开可考虑在{zlsma_20*0.99:.2f}附近挂买单，"
+                        f"但不建议在集合竞价阶段盲目建仓，宜等开盘后确认。"
+                    )
+                else:
+                    return (
+                        f"【集合竞价等待】当前处于集合竞价阶段，不建议急于建仓，"
+                        f"等待开盘后市场方向确认，可设置{current_price*0.98:.2f}和{current_price*1.02:.2f}两个价位的条件单。"
+                    )
+        
+        elif session in ["上午早盘", "下午早盘"]:
+            # 早盘策略通常关注高开低走或低开高走等情况
+            if cost_price > 0:  # 有持仓
+                if price_deviation > 3 and current_price > zlsma_20 * 1.02:
+                    return (
+                        f"【早盘获利】当前处于{session}，股价强势突破均线，"
+                        f"如继续走强可持有，但建议设置{current_price*0.98:.2f}的保护性止盈，防止高开低走。"
+                    )
+                elif -3 <= price_deviation <= 3:
+                    return (
+                        f"【早盘观望】当前处于{session}，持仓浮动较小，"
+                        f"建议等待盘中趋势确立，可设置{long_stop:.2f}的止损单和{cost_price*1.05:.2f}的止盈单。"
+                    )
+                else:
+                    return (
+                        f"【早盘谨慎】当前处于{session}，持仓亏损({price_deviation:.2f}%)，"
+                        f"如市场继续走弱，建议在{(long_stop+current_price)/2:.2f}附近设置保护性止损。"
+                    )
+            else:  # 无持仓
+                if macd_hist > 0 and rsi_6 < 40:
+                    return (
+                        f"【早盘布局】当前处于{session}，MACD柱状图为正但RSI处于低位，"
+                        f"可考虑在{current_price*0.98:.2f}附近分批挂买单，首次仓位控制在30%以内。"
+                    )
+                elif sar_trend == "看涨" and rsi_6 < 50:
+                    return (
+                        f"【早盘观察】当前处于{session}，SAR看涨但其他指标不明确，"
+                        f"建议在{zlsma_20*0.98:.2f}附近设置限价买单，等待价格回调时介入。"
+                    )
+                else:
+                    return (
+                        f"【早盘等待】当前处于{session}，暂无明确信号，"
+                        f"建议等待上午收盘前再做决策，可利用时间研究盘口和主力资金动向。"
+                    )
+        
+        elif session in ["上午尾盘", "下午尾盘"]:
+            # 尾盘策略通常要考虑是否持仓过夜/午休的风险
+            if cost_price > 0:  # 有持仓
+                if session == "上午尾盘":
+                    if price_deviation > 2:
+                        return (
+                            f"【午盘前减仓】当前处于上午尾盘，有一定盈利({price_deviation:.2f}%)，"
+                            f"考虑到午休期间的不确定性，可适当减仓1/3，保护已有利润。"
+                        )
+                    else:
+                        return (
+                            f"【午盘前观望】当前处于上午尾盘，盈亏接近平衡，"
+                            f"建议保持现有持仓，但设置{long_stop:.2f}的硬性止损位，防范午休期间风险。"
+                        )
+                else:  # 下午尾盘
+                    if price_deviation > 3 and rsi_6 > 65:
+                        return (
+                            f"【尾盘减仓】当前处于下午尾盘，持仓盈利({price_deviation:.2f}%)且RSI较高，"
+                            f"建议适当减仓，降低隔夜风险，可在{current_price*0.99:.2f}附近挂单卖出部分仓位。"
+                        )
+                    elif price_deviation < -2:
+                        return (
+                            f"【尾盘止损】当前处于下午尾盘，持仓亏损({price_deviation:.2f}%)，"
+                            f"为避免隔夜风险扩大，建议执行止损计划，可在{current_price*0.99:.2f}附近挂单减仓。"
+                        )
+                    else:
+                        return (
+                            f"【尾盘持有】当前处于下午尾盘，持仓接近盈亏平衡，"
+                            f"如对后市有信心可继续持有，但建议设置{long_stop:.2f}的隔夜止损单。"
+                        )
+            else:  # 无持仓
+                if session == "上午尾盘":
+                    if macd_hist > 0 and rsi_6 < 40:
+                        return (
+                            f"【午盘前布局】当前处于上午尾盘，指标显示超跌，"
+                            f"可少量建仓，在{current_price*0.99:.2f}附近挂单，利用午休期间可能的情绪修复。"
+                        )
+                    else:
+                        return (
+                            f"【午盘前观望】当前处于上午尾盘，建议等待下午开盘后再决策，"
+                            f"午休期间可能发生利好/利空消息，增加不确定性。"
+                        )
+                else:  # 下午尾盘
+                    if sar_trend == "看涨" and macd_hist > 0 and current_price > zlsma_20:
+                        return (
+                            f"【尾盘谨慎建仓】尽管技术指标看涨，但下午尾盘不宜大量建仓，"
+                            f"可小仓位试探（不超过20%资金），在{current_price*0.99:.2f}挂单，持仓过夜观察明日走势。"
+                        )
+                    else:
+                        return (
+                            f"【尾盘观望】当前处于下午尾盘，不建议新建仓位，"
+                            f"等待次日开盘，避免隔夜风险，可提前设置次日限价单。"
+                        )
+        
+        elif session == "收盘集合竞价":
+            # 收盘集合竞价通常是机构博弈的时段，散户不宜参与
+            return (
+                f"【收盘集合竞价】当前处于收盘集合竞价阶段，不建议普通投资者参与，"
+                f"该时段通常是机构投资者博弈的时段，波动可能较大。持仓者注意观察收盘价，"
+                f"为明日交易做准备。"
+            )
+        
+        elif session in ["收盘后", "非交易日", "非交易时段", "开盘前", "午休时段"]:
+            # 非交易时段的准备工作
+            strategy = f"【{session}】当前处于{session}，"
+            
+            if session == "收盘后":
+                strategy += (
+                    f"可总结今日交易并为明日做准备，"
+                    f"如有持仓，建议设置好次日的止盈止损条件单。"
+                )
+            elif session in ["非交易日", "非交易时段"]:
+                strategy += (
+                    f"可利用时间进行技术分析和基本面研究，"
+                    f"为下一个交易日做好准备，预设交易计划。"
+                )
+            elif session == "开盘前":
+                strategy += (
+                    f"可关注今日的市场情绪和行业动态，"
+                    f"为开盘后的交易做准备，预设可能的操作方案。"
+                )
+            else:  # 午休时段
+                strategy += (
+                    f"可分析上午的交易情况，调整下午的交易策略，"
+                    f"特别关注重要价位的突破或支撑情况。"
+                )
+            
+            return strategy
+        
+        else:
+            return f"【未知时段】当前时段{session}暂无特定挂单建议，请根据大盘走势和个股表现自行判断。"
+    
     if is_trading_time:
         # 计算当前时间在交易日中的比例
         current_minute = now.hour * 60 + now.minute
@@ -502,21 +708,102 @@ def get_stock_analysis_prompt(
         cost_info = f"当前持仓成本: {round(cost_price, 2)}"
     else:
         cost_info = "无持仓成本信息"
+        
+    # 生成挂单策略
+    order_strategy = ""
+    if is_trading_time or now.weekday() < 5:
+        order_strategy = generate_order_strategy(
+            trading_session, cost_price, current_price, 
+            long_stop, short_stop, macd_hist, rsi_6, 
+            sar_trend, zlsma_20,
+            price_deviation=(current_price - cost_price) / cost_price * 100 if cost_price > 0 else None
+        )
 
     # ========== 2. 持仓建议逻辑 ========== #
     if cost_price > 0:
+        # 计算价格与成本的偏离百分比
+        price_deviation = (current_price - cost_price) / cost_price * 100
+        
+        # 根据价格与成本的关系，结合技术指标，给出精细化的交易建议
         if current_price > cost_price * 1.05:
-            position_plan = "建议继续持有或部分止盈，保护已有利润。"
+            if macd_hist > 0 and rsi_6 < 80:
+                position_plan = (
+                    f"【持仓盈利】当前价格高于成本价{price_deviation:.2f}%，处于盈利状态。"
+                    f"MACD柱状图为正且RSI未到超买区域，建议继续持有，同时设置{current_price*0.97:.2f}附近的保护性止盈。"
+                )
+            elif macd_hist > 0 and rsi_6 >= 80:
+                position_plan = (
+                    f"【持仓盈利】当前价格高于成本价{price_deviation:.2f}%，处于盈利状态。"
+                    f"RSI(6)={rsi_6:.2f}已达超买水平，建议分批减仓，先兑现部分利润。"
+                )
+            else:
+                position_plan = (
+                    f"【持仓盈利】当前价格高于成本价{price_deviation:.2f}%，处于盈利状态。"
+                    f"MACD柱状图为负，可能有回调风险，建议保护利润，可设置{long_stop:.2f}为止盈点。"
+                )
+        
         elif long_stop < current_price <= cost_price:
-            position_plan = (
-                "当前价格接近或低于持仓成本，建议严格关注多头止损并制定减仓计划。"
-            )
+            if price_deviation > -3:  # 轻微亏损
+                if macd_hist > 0 and rsi_6 < 30:
+                    position_plan = (
+                        f"【轻微亏损】当前价格低于成本价{abs(price_deviation):.2f}%，处于轻微亏损状态。"
+                        f"MACD柱状图为正且RSI处于超卖区域，后市可能企稳回升，建议继续持有，密切观察{long_stop:.2f}止损位。"
+                    )
+                else:
+                    position_plan = (
+                        f"【轻微亏损】当前价格低于成本价{abs(price_deviation):.2f}%，处于轻微亏损状态。"
+                        f"建议严格关注多头止损位{long_stop:.2f}，如若跌破考虑部分减仓。"
+                    )
+            else:  # 较大亏损
+                position_plan = (
+                    f"【较大亏损】当前价格低于成本价{abs(price_deviation):.2f}%，亏损幅度较大。"
+                    f"建议严格执行止损策略，价格若靠近多头止损位{long_stop:.2f}，应考虑分批减仓以控制风险。"
+                )
+        
         elif current_price <= long_stop:
-            position_plan = "价格已低于多头止损，建议止损离场，减少损失。"
-        else:
-            position_plan = "当前价格表现平稳，建议继续观察，等待明确信号。"
+            position_plan = (
+                f"【止损信号】当前价格{current_price:.2f}已跌破多头止损位{long_stop:.2f}。"
+                f"根据吊灯止损策略，建议执行止损，减少进一步损失。后续可在价格站稳止损位上方时考虑重新介入。"
+            )
+        
+        else:  # 成本价与当前价之间的关系不明确
+            position_plan = (
+                f"【观望持有】当前价格{current_price:.2f}与持仓成本{cost_price:.2f}的关系不明确。"
+                f"建议继续观察，等待更明确的信号。重点关注价格与多头止损位{long_stop:.2f}的关系。"
+            )
     else:
-        position_plan = "无持仓，无需制定持仓计划。"
+        # 无持仓时的建仓建议
+        if sar_trend == "看涨" and macd_hist > 0:
+            if rsi_6 < 30:
+                position_plan = (
+                    "【建仓信号强】SAR指标看涨，MACD柱状图为正，RSI处于超卖区域，多重指标共振看涨。"
+                    f"建议考虑分批建仓，首次仓位控制在总资金的20%，止损位设置在{long_stop:.2f}。"
+                )
+            elif rsi_6 < 70:
+                position_plan = (
+                    "【建仓信号中】SAR指标看涨，MACD柱状图为正，RSI处于中性区域。"
+                    f"建议小仓位试探性建仓，关注成交量配合情况，止损位设置在{long_stop:.2f}。"
+                )
+            else:
+                position_plan = (
+                    "【建仓谨慎】虽然SAR指标看涨，MACD柱状图为正，但RSI已处于超买区域。"
+                    "建议等待回调后再考虑建仓，避免追高。"
+                )
+        elif sar_trend == "看涨" and macd_hist <= 0:
+            position_plan = (
+                "【观望信号】SAR指标看涨，但MACD柱状图为负，指标出现分歧。"
+                "建议观望，等待MACD形成金叉后再考虑建仓。"
+            )
+        elif sar_trend == "看跌" and macd_hist < 0:
+            position_plan = (
+                "【不建议建仓】SAR指标看跌，MACD柱状图为负，多重指标共振看跌。"
+                "不建议现阶段建仓，可等待企稳信号出现。"
+            )
+        else:
+            position_plan = (
+                "【市场观望】指标信号模糊，建议观望，等待更明确的市场信号。"
+                f"可关注价格是否站上ZLSMA(20)={zlsma_20:.2f}，以及成交量是否有效放大。"
+            )
 
     # ========== 3. MACD顶背离检测 ========== #
     macd_divergence = "未检测到顶背离。"
@@ -595,25 +882,29 @@ def get_stock_analysis_prompt(
    - 从MACD、RSI、BOLL、ZLSMA、SAR等角度，逐一解释其意义并判断当前是强势还是谨慎信号。
    - SAR与RSI综合分析：
      * SAR当前值({sar if sar is not None else '未知'})显示趋势为{sar_trend}，结合RSI(6)={rsi_6:.2f}、RSI(12)={rsi_12:.2f}、RSI(24)={rsi_24:.2f}的表现
-     * 当SAR与RSI同向确认时的信号强度分析
-     * 当SAR与RSI出现背离时的风险评估
-     * 基于SAR与RSI组合的短期交易机会识别
+     * 当SAR与RSI同向确认时的信号强度分析（如SAR看涨且RSI回升，或SAR看跌且RSI下行）
+     * 当SAR与RSI出现背离时的风险评估（如SAR看涨但RSI下行，或SAR看跌但RSI回升）
+     * 基于SAR与RSI组合的交易机会识别，并结合持仓情况给出明确的仓位建议
+     * SAR反转点附近的特殊信号分析与应对策略
    - 结合成交量变化分析指标的可靠性：
-     * 关注量价配合度
-     * 分析主力资金参与度
-     * 判断市场情绪变化
+     * 关注量价配合度，特别是价格突破关键位置时的成交量表现
+     * 分析主力资金参与度，判断上涨/下跌的持续性
+     * 判断市场情绪变化与短期反转可能性
 
 4. **资讯与基本面解读**  
    - 将最新资讯中的重大信息提炼出来，分析其对公司或行业的正负面影响。
    - 若消息面存在矛盾（如同一时间出现多空分歧），请给出如何辨别和甄别的建议。
 
 5. **深入的建仓与清仓策略**  
+   - 结合持仓成本{cost_price if cost_price > 0 else '无持仓'}与当前价格{current_price:.2f}的关系：
+     * {f"针对已持仓（成本{cost_price:.2f}元）的最优管理策略" if cost_price > 0 else "针对无持仓状态的最佳建仓时机"}
+     * {f"基于T+1交易制度，如何优化已有持仓的盈亏比" if cost_price > 0 else "如何根据SAR与RSI信号确定首次建仓位置"}
    - 考虑T+1交易制度，针对"多头止损价 {long_stop} 上方的区域是否适合建仓"，给出更细化的价格区间及分批建仓思路
    - 结合成交量和价格走势，建议以下操作时机：
-     * 适合建仓的成交量特征
-     * 需要警惕的量价组合
-     * 分批建仓/减仓的具体计划（需考虑100股整手交易单位）
-     * T+1制度下的风险控制策略
+     * 适合{f"加仓" if cost_price > 0 else "建仓"}的成交量特征与价格形态
+     * 需要警惕的量价组合与市场陷阱
+     * 分批{f"减仓" if cost_price > 0 else "建仓"}的具体计划（需考虑100股整手交易单位）
+     * T+1制度下的风险控制策略与资金管理方法
 
 6. **风险控制与情景推演**  
    - 结合胜率偏低（{win_rate if win_rate else '未知'}%）和夏普比率不佳（{sharpe_ratio if sharpe_ratio else '未知'}），如何在T+1制度下调整仓位与资金管理
@@ -627,6 +918,11 @@ def get_stock_analysis_prompt(
      * 止损止盈目标（考虑涨跌停板限制）
      * 交易成本测算
    - 特别说明潜在不确定因素与风险提示，帮助投资者做好资金管理
+   - 根据当前交易时段（{trading_session}）给出实时挂单建议：
+     * {order_strategy if order_strategy else "非交易时段，无实时挂单建议"}
+     * 考虑盘中波动情况，明确说明不同价位的操作计划
+     * 针对T+1交易制度，设计符合当前时段的交易执行路径
+     * 提供具体的价格区间和对应的仓位配置方案
 
 请注意：
 1. 所有分析必须严格基于提供的数据
